@@ -4,8 +4,8 @@ import Queue
 import threading
 import time
 import workflows.transport
-import services
-import status
+import workflows.services
+import workflows.status
 
 class Frontend():
   def __init__(self, transport=None, service=None):
@@ -17,7 +17,7 @@ class Frontend():
     self._service_name = None
     self._queue_commands = None
     self._queue_frontend = None
-    self._service_status = services.Service.SERVICE_STATUS_NONE
+    self._service_status = workflows.services.Service.SERVICE_STATUS_NONE
 
     # Connect to the network transport layer
     if transport is None or isinstance(transport, basestring):
@@ -30,11 +30,11 @@ class Frontend():
 
     # Start initial service if one has been requested
     if service is not None:
-      self._service_status = services.Service.SERVICE_STATUS_NEW
+      self._service_status = workflows.services.Service.SERVICE_STATUS_NEW
       self.switch_service(service)
 
     # Start broadcasting node information
-    self._status_advertiser = status.StatusAdvertise(
+    self._status_advertiser = workflows.status.StatusAdvertise(
         interval=6,
         status_callback=self.get_status,
         transport=self._transport)
@@ -56,7 +56,7 @@ class Frontend():
           pass
       n = n - 1
 
-    self._service_status = services.Service.SERVICE_STATUS_TEARDOWN
+    self._service_status = workflows.services.Service.SERVICE_STATUS_TEARDOWN
     self._status_advertiser.trigger()
     self._status_advertiser.stop_and_wait()
     print "Fin."
@@ -89,7 +89,7 @@ class Frontend():
 
       # Find service class if necessary
       if isinstance(new_service, basestring):
-        service_class = services.lookup(new_service)
+        service_class = workflows.services.lookup(new_service)
       else:
         service_class = new_service
 
@@ -114,6 +114,6 @@ class Frontend():
       self._service.terminate()
       self._service = None
       self._service_name = None
-      self._service_status = services.Service.SERVICE_STATUS_END
+      self._service_status = workflows.services.Service.SERVICE_STATUS_END
       self._queue_commands = None
       self._queue_frontend = None
