@@ -7,5 +7,6 @@ setup(name='workflows',
       author='Markus Gerstel',
       license='BSD',
       packages=['workflows'],
+      install_requires=['stomp.py'],
       tests_require=['mock'],
       zip_safe=False)
