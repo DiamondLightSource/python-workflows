@@ -2,8 +2,8 @@ from __future__ import division
 import status_monitor
 import mock
 
-@mock.patch('workflows.status_monitor.time')
-@mock.patch('workflows.status_monitor.workflows.transport')
+@mock.patch('workflows.contrib.status_monitor.time')
+@mock.patch('workflows.contrib.status_monitor.workflows.transport')
 def test_status_monitor_connects_to_transport_layer(mock_transport, mock_time):
   mock_time.sleep.side_effect = KeyboardInterrupt()
 
