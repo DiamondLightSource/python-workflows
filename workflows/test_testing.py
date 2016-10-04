@@ -1,7 +1,5 @@
-def test_testing():
-  '''A test to see if testing works.'''
-  assert False
+import workflows
 
 def test_success():
   '''A test to see if testing works.'''
-  pass
+  assert workflows.tested_function() == 1

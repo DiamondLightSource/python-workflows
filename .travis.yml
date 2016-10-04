@@ -1,8 +1,13 @@
 language: python
 python:
   - "2.7"
+  - "3.3"
+  - "3.4"
   - "3.5"
 install:
   - pip install .
+  - pip install pytest pytest-cov coveralls
 script:
-  - py.test
+  - py.test --cov=workflows
+after_success:
+  - coveralls

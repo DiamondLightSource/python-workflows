@@ -7,4 +7,5 @@ setup(name='workflows',
       author='Markus Gerstel',
       license='BSD',
       packages=['workflows'],
+      tests_require=['mock'],
       zip_safe=False)
