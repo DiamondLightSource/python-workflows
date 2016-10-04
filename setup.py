@@ -1,6 +1,6 @@
 from setuptools import setup
 
-package_version = '0.0'
+package_version = '0.1'
 
 setup(name='workflows',
       description='Supervised data processing in distributed environments',
