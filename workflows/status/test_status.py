@@ -1,10 +1,10 @@
 from __future__ import division
-import status
+import workflows.status
 import mock
 
 @mock.patch('workflows.status.threading')
 def test_status_advertiser_starts_and_stops_threads(mock_threading):
-  s = status.StatusAdvertise()
+  s = workflows.status.StatusAdvertise()
   mock_threading.Thread.assert_called_once()
   s.start()
   mock_threading.Thread.return_value.start.assert_called_once()
@@ -18,7 +18,7 @@ def test_status_advertiser_regularly_passes_status(mock_time, mock_threading, mo
   sm = mock.Mock() # status mock
   tm = mock.Mock() # transport mock
   qm = mock_queue.Queue.return_value
-  s = status.StatusAdvertise(interval=120, status_callback=sm, transport=tm)
+  s = workflows.status.StatusAdvertise(interval=120, status_callback=sm, transport=tm)
   t = mock_threading.Thread.call_args[1]['target'] # target function
   mock_time.time.return_value = 100
   qm.get.side_effect = RuntimeError(mock.sentinel.pause)
@@ -60,7 +60,7 @@ def test_status_advertiser_external_triggering(mock_time, mock_threading, mock_q
   tm = mock.Mock() # transport mock
   qm = mock_queue.Queue.return_value
   mock_threading.Queue.return_value = qm
-  s = status.StatusAdvertise(interval=120, status_callback=sm, transport=tm)
+  s = workflows.status.StatusAdvertise(interval=120, status_callback=sm, transport=tm)
   t = mock_threading.Thread.call_args[1]['target'] # target function
 
   s.trigger()
@@ -72,7 +72,7 @@ def test_status_advertiser_sends_last_update_when_stopping(mock_threading, mock_
   tm = mock.Mock() # transport mock
   qm = mock_queue.Queue.return_value
   mock_threading.Queue.return_value = qm
-  s = status.StatusAdvertise(transport=tm)
+  s = workflows.status.StatusAdvertise(transport=tm)
   t = mock_threading.Thread.call_args[1]['target'] # target function
   qm.get.side_effect = RuntimeError(mock.sentinel.queue_read)
   qm.empty.return_value = False
