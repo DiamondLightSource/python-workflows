@@ -177,8 +177,8 @@ def test_log_unknown_channel_data():
     if 'log' in message:
       messages.append(message)
   assert len(messages) == 2
-  assert messages[0]['source'] == 'service' and \
-         messages[0]['channel'] == mock.sentinel.channel
-  assert messages[1]['source'] == 'service' and \
-         messages[1].get('channel') == None
+  assert messages[0]['source'] == 'service'
+  assert messages[0]['channel'] == mock.sentinel.channel
+  assert messages[1]['source'] == 'service'
+  assert messages[1].get('channel') == None
 
