@@ -95,6 +95,21 @@ def test_broadcast_status(mockstomp, mocktime):
   assert 'stomp.cmdchan' in statusdict
 
 @mock.patch('workflows.transport.stomp.stomp')
+def test_send_message(mockstomp):
+  '''Test the message sending function.'''
+  mockconn = mock.Mock()
+  mockstomp.Connection.return_value = mockconn
+  stomp = Transport()
+  stomp.connect()
+
+  stomp.send_message( mock.sentinel.message, channel=str(mock.sentinel.channel) )
+
+  mockconn.send.assert_called_once()
+  args, kwargs = mockconn.send.call_args
+  assert kwargs['destination'] == str(mock.sentinel.channel)
+  assert kwargs['body'] == mock.sentinel.message
+
+@mock.patch('workflows.transport.stomp.stomp')
 def test_subscribe_to_channel(mockstomp):
   '''Test subscribing to a channel.'''
   mock_cb1 = mock.Mock()

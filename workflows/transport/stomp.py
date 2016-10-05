@@ -139,7 +139,15 @@ class Transport():
                     'expires': '%d' % int((90 + time.time()) * 1000)
                   })
 
-  def subscribe(self, channel, callback, client_id=None, retroactive=False):
+  def send_message(self, message, channel):
+    '''Send a message to a topic or queue.'''
+#   TODO: Does not take prefix into account
+    with self._lock:
+      self._conn.send(
+          body=message,
+          destination=channel)
+
+  def subscribe(self, channel, callback, client_id=None, retroactive=False, debug=True):
     '''Listen to a queue or topic, notify via callback function.
        :param channel: Full name of the topic or queue to subscribe to
        :param callback: Function to be called when messages are received
@@ -147,6 +155,7 @@ class Transport():
                          removing all subscriptions for a client simultaneously
                          when the client goes away.
        :param retroactive: Ask broker to send old messages if possible
+       :param debug: Print debugging information to STDOUT
     '''
     with self._lock:
       self._idcounter = self._idcounter + 1
@@ -161,12 +170,13 @@ class Transport():
     if retroactive:
       headers['activemq.retroactive'] = 'true'
 
-    print '-'*30
-    print subscription_id
-    print self._idcounter
-    print self._subscription_callbacks
-    print self._client_subscriptions
-    print '-'*30
+    if debug:
+      print '-'*30
+      print subscription_id
+      print self._idcounter
+      print self._subscription_callbacks
+      print self._client_subscriptions
+      print '-'*30
 
     with self._lock:
       self._conn.subscribe(channel, subscription_id, headers=headers)
