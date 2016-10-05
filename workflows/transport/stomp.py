@@ -4,8 +4,10 @@ import json
 import stomp
 import threading
 import time
+from workflows import WorkflowsError
+import workflows.transport
 
-class Transport():
+class Transport(workflows.transport.CommonTransport):
   '''Abstraction layer for messaging infrastructure. Here we are using ActiveMQ
      with STOMP.'''
 
@@ -44,7 +46,7 @@ class Transport():
       import ConfigParser
       cfgparser = ConfigParser.ConfigParser(allow_no_value=True)
       if not cfgparser.read(value):
-        raise RuntimeError('Could not read from configuration file %s' % value)
+        raise WorkflowsError('Could not read from configuration file %s' % value)
       for cfgoption, target in [
           ('host', '--stomp-host'),
           ('port', '--stomp-port'),
@@ -194,4 +196,4 @@ class Transport():
     if target_function is not None:
       target_function(headers, json.loads(body))
     else:
-      raise RuntimeError('Unhandled message %s %s' % (repr(headers), repr(body)))
+      raise WorkflowsError('Unhandled message %s %s' % (repr(headers), repr(body)))
