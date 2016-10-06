@@ -25,6 +25,8 @@ class CommonTransport():
 
   __clients = {}
   __client_id = 0
+  __subscriptions = {}
+  __subscription_id = 0
 
   #
   # -- High level communication calls ----------------------------------------
@@ -41,19 +43,27 @@ class CommonTransport():
        :param exclusive: Attempt to become exclusive subscriber to the queue.
        :param acknowledgement: If true receipt of each message needs to be
                                acknowledged.
+       :return: A unique subscription ID
     '''
+    self.__subscription_id += 1
+    self.__subscriptions[self.__subscription_id] = {
+      'channel': channel, 'client': client_id
+    }
     if client_id:
-      self.__clients[client_id]['subscriptions'].add(channel)
-    self._subscribe(channel, callback, exclusive, acknowledgement)
+      self.__clients[client_id]['subscriptions'].add(self.__subscription_id)
+    self._subscribe(self.__subscription_id, channel, callback, exclusive,
+                    acknowledgement)
+    return self.__subscription_id
 
-  def unsubscribe(self, channel, client_id=None):
-    '''Stop listening to a queue
-       :param channel: Queue name to unsubscribe from
-       :param client_id: Client to unsubscribe for.
+  def unsubscribe(self, subscription):
+    '''Stop listening to a queue or a broadcast
+       :param subscription: Subscription ID to cancel
     '''
-    if client_id:
-      self.__clients[client_id]['subscriptions'].remove(channel)
-    self._unsubscribe(channel)
+    if self.__subscriptions[subscription]['client']:
+      self.__clients[self.__subscriptions[subscription]['client']] \
+        ['subscriptions'].remove(subscription)
+    self._unsubscribe(subscription)
+    del(self.__subscriptions[subscription])
 
   def subscribe_broadcast(self, channel, callback, client_id=None,
                           retroactive=False):
@@ -65,14 +75,15 @@ class CommonTransport():
                          when the client goes away.
        :param retroactive: Ask broker to send old messages if possible
     '''
-    self._subscribe_broadcast(channel, callback, retroactive)
-
-  def unsubscribe_broadcast(self, channel, client_id=None):
-    '''Stop listening to a broadcast topic.
-       :param channel: Topic name to unsubscribe from
-       :param client_id: Client to unsubscribe for.
-    '''
-    self._unsubscribe_broadcast(channel)
+    self.__subscription_id += 1
+    self.__subscriptions[self.__subscription_id] = {
+      'channel': channel, 'client': client_id
+    }
+    if client_id:
+      self.__clients[client_id]['subscriptions'].add(self.__subscription_id)
+    self._subscribe_broadcast(self.__subscription_id, channel, callback,
+                              retroactive)
+    return self.__subscription_id
 
   def send(self, destination, message, headers=None, expiration=None,
            transaction=None):
@@ -161,7 +172,7 @@ class CommonTransport():
       raise workflows.WorkflowsError("Attempting to drop unregistered client")
     channel_subscriptions = list(self.__clients[client_id]['subscriptions'])
     for subscription in channel_subscriptions:
-      self.unsubscribe(subscription, client_id=client_id)
+      self.unsubscribe(subscription)
     del(self.__clients[client_id])
 
   #
@@ -177,8 +188,9 @@ class CommonTransport():
   # -- Low level communication calls to be implemented by subclass -----------
   #
 
-  def _subscribe(self, channel, callback, exclusive, acknowledgement):
+  def _subscribe(self, sub_id, channel, callback, exclusive, acknowledgement):
     '''Listen to a queue, notify via callback function.
+       :param sub_id: ID for this subscription in the transport layer
        :param channel: Queue name to subscribe to
        :param callback: Function to be called when messages are received
        :param exclusive: Attempt to become exclusive subscriber to the queue.
@@ -187,23 +199,18 @@ class CommonTransport():
     '''
     raise workflows.WorkflowsError("Transport interface not implemented")
 
-  def _unsubscribe(self, channel):
-    '''Stop listening to a queue
-       :param channel: Queue name to unsubscribe from
-    '''
-    raise workflows.WorkflowsError("Transport interface not implemented")
-
-  def _subscribe_broadcast(self, channel, callback, retroactive):
+  def _subscribe_broadcast(self, sub_id, channel, callback, retroactive):
     '''Listen to a broadcast topic, notify via callback function.
+       :param sub_id: ID for this subscription in the transport layer
        :param channel: Topic name to subscribe to
        :param callback: Function to be called when messages are received
        :param retroactive: Ask broker to send old messages if possible
     '''
     raise workflows.WorkflowsError("Transport interface not implemented")
 
-  def _unsubscribe_broadcast(self, channel):
-    '''Stop listening to a broadcast topic.
-       :param channel: Topic name to unsubscribe from
+  def _unsubscribe(self, sub_id):
+    '''Stop listening to a queue or a broadcast
+       :param sub_id: ID for this subscription in the transport layer
     '''
     raise workflows.WorkflowsError("Transport interface not implemented")
 
