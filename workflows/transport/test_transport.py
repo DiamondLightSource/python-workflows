@@ -115,3 +115,78 @@ def test_dropping_subscriptions_when_dropping_client():
 
   ct._unsubscribe.assert_called_once_with(subid)
 
+  with pytest.raises(workflows.WorkflowsError):
+    ct.unsubscribe(subid)
+
+  client = ct.register_client()
+  subid = ct.subscribe(mock.sentinel.channel, mock.sentinel.callback, client_id=client)
+  ct.unsubscribe(subid)
+  ct.drop_client(client)
+
+  assert ct._unsubscribe.call_count == 2
+
+  with pytest.raises(workflows.WorkflowsError):
+    ct.unsubscribe(subid)
+
+def test_create_and_destroy_transactions():
+  "Create, commit and abort transactions."
+  ct = CommonTransport()
+  ct._transaction_begin = mock.Mock()
+  ct._transaction_commit = mock.Mock()
+  ct._transaction_abort = mock.Mock()
+
+  t = ct.transaction_begin()
+
+  assert t
+  ct._transaction_begin.assert_called_once_with(t)
+
+  ct.transaction_abort(t)
+  with pytest.raises(workflows.WorkflowsError):
+    ct.transaction_commit(t)
+  ct._transaction_abort.assert_called_once_with(t)
+
+  t2 = ct.transaction_begin()
+  assert t2
+  assert t != t2
+  ct.transaction_commit(t2)
+  with pytest.raises(workflows.WorkflowsError):
+    ct.transaction_abort(t2)
+  ct._transaction_commit.assert_called_once_with(t2)
+
+def test_dropping_transactions_when_dropping_client():
+  "Transactions associated with a client should be aborted when client is dropped."
+  ct = CommonTransport()
+  ct._transaction_begin = mock.Mock()
+  ct._transaction_commit = mock.Mock()
+  ct._transaction_abort = mock.Mock()
+
+  client = ct.register_client()
+  t = ct.transaction_begin(client_id=client)
+  ct.drop_client(client)
+  ct._transaction_abort.assert_called_once_with(t)
+  with pytest.raises(workflows.WorkflowsError):
+    ct.transaction_abort(t)
+  with pytest.raises(workflows.WorkflowsError):
+    ct.transaction_commit(t)
+
+  client = ct.register_client()
+  t = ct.transaction_begin(client_id=client)
+  ct.transaction_commit(t)
+  ct.drop_client(client)
+  ct._transaction_abort.assert_called_once
+  with pytest.raises(workflows.WorkflowsError):
+    ct.transaction_abort(t)
+  with pytest.raises(workflows.WorkflowsError):
+    ct.transaction_commit(t)
+
+  client = ct.register_client()
+  t = ct.transaction_begin(client_id=client)
+  ct.transaction_abort(t)
+  ct.drop_client(client)
+  assert ct._transaction_abort.call_count == 2
+  with pytest.raises(workflows.WorkflowsError):
+    ct.transaction_abort(t)
+  with pytest.raises(workflows.WorkflowsError):
+    ct.transaction_commit(t)
+
+

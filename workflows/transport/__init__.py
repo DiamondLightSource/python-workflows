@@ -27,6 +27,8 @@ class CommonTransport():
   __client_id = 0
   __subscriptions = {}
   __subscription_id = 0
+  __transactions = {}
+  __transaction_id = 0
 
   #
   # -- High level communication calls ----------------------------------------
@@ -59,6 +61,9 @@ class CommonTransport():
     '''Stop listening to a queue or a broadcast
        :param subscription: Subscription ID to cancel
     '''
+    if subscription not in self.__subscriptions:
+      raise workflows.WorkflowsError \
+            ("Attempting to unsubscribe unknown subscription")
     if self.__subscriptions[subscription]['client']:
       self.__clients[self.__subscriptions[subscription]['client']] \
         ['subscriptions'].remove(subscription)
@@ -138,19 +143,38 @@ class CommonTransport():
                          when the client goes away.
        :return: A transaction ID that can be passed to other functions.
     '''
-    raise workflows.WorkflowsError("Transport interface not implemented")
+    self.__transaction_id += 1
+    self.__transactions[self.__transaction_id] = {
+      'client': client_id
+    }
+    if client_id:
+      self.__clients[client_id]['transactions'].add(self.__transaction_id)
+    self._transaction_begin(self.__transaction_id)
+    return self.__transaction_id
 
   def transaction_abort(self, transaction_id):
     '''Abort a transaction and roll back all operations.
        :param transaction_id: ID of transaction to be aborted.
     '''
-    raise workflows.WorkflowsError("Transport interface not implemented")
+    if transaction_id not in self.__transactions:
+      raise workflows.WorkflowsError("Attempting to abort unknown transaction")
+    if self.__transactions[transaction_id]['client']:
+      self.__clients[self.__transactions[transaction_id]['client']] \
+        ['transactions'].remove(transaction_id)
+    del(self.__transactions[transaction_id])
+    self._transaction_abort(transaction_id)
 
   def transaction_commit(self, transaction_id):
     '''Commit a transaction.
        :param transaction_id: ID of transaction to be committed.
     '''
-    raise workflows.WorkflowsError("Transport interface not implemented")
+    if transaction_id not in self.__transactions:
+      raise workflows.WorkflowsError("Attempting to commit unknown transaction")
+    if self.__transactions[transaction_id]['client']:
+      self.__clients[self.__transactions[transaction_id]['client']] \
+        ['transactions'].remove(transaction_id)
+    del(self.__transactions[transaction_id])
+    self._transaction_commit(transaction_id)
 
   #
   # -- Client management calls -----------------------------------------------
@@ -161,7 +185,8 @@ class CommonTransport():
        tied to client IDs, so that they can be collectively dropped when
        clients go away.'''
     self.__client_id += 1
-    self.__clients[self.__client_id] = { 'subscriptions': set() }
+    self.__clients[self.__client_id] = { 'subscriptions': set(),
+                                         'transactions': set() }
     return self.__client_id
 
   def drop_client(self, client_id):
@@ -173,6 +198,9 @@ class CommonTransport():
     channel_subscriptions = list(self.__clients[client_id]['subscriptions'])
     for subscription in channel_subscriptions:
       self.unsubscribe(subscription)
+    transactions = list(self.__clients[client_id]['transactions'])
+    for transaction in transactions:
+      self.transaction_abort(transaction)
     del(self.__clients[client_id])
 
   #
@@ -255,9 +283,9 @@ class CommonTransport():
     '''
     raise workflows.WorkflowsError("Transport interface not implemented")
 
-  def _transaction_begin(self):
+  def _transaction_begin(self, transaction_id):
     '''Start a new transaction.
-       :return: A transaction ID that can be passed to other functions.
+       :param transaction_id: ID for this transaction in the transport layer.
     '''
     raise workflows.WorkflowsError("Transport interface not implemented")
 
