@@ -1,4 +1,4 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 
 package_version = '0.4'
 
@@ -18,7 +18,7 @@ setup(name='workflows',
       bugtrack_url="https://github.com/Anthchirp/workflows/issues",
       version=package_version,
       install_requires=['stomp.py'],
-      packages=['workflows'],
+      packages=find_packages(),
       license='BSD',
       tests_require=['mock'],
       zip_safe=False)
