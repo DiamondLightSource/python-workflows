@@ -18,6 +18,12 @@ class CommonTransport(object):
   # -- High level communication calls ----------------------------------------
   #
 
+  def connect(self):
+    '''Connect the transport class. This function has to be overridden.
+       :return: True-like value when connection successful,
+                False-like value otherwise.'''
+    return False
+
   def subscribe(self, channel, callback, client_id=None, exclusive=False,
                 acknowledgement=False):
     '''Listen to a queue, notify via callback function.

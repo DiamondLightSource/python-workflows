@@ -80,7 +80,7 @@ class CommonService(QueueTransport):
     self.__queue_frontend = kwargs.get('frontend')
     self.__queue_commands = kwargs.get('commands')
     self.__transport = workflows.transport.queue_transport.QueueTransport()
-
+    self.__transport.set_queue(self.__queue_frontend)
     self.__shutdown = False
     self.__callback_register = {}
     self.__update_service_status(self.SERVICE_STATUS_NEW)
