@@ -1,8 +1,8 @@
-from __future__ import division
-import workflows.services
+from __future__ import absolute_import, division
+from workflows.services.common_service import CommonService
 import time
 
-class Waiter(workflows.services.Service):
+class Waiter(CommonService):
   '''An example service building on top of the workflow.services architecture,
      demonstrating how this architecture can be used.
      This service receives work, waits a while and generates some 'results'.'''
@@ -25,9 +25,4 @@ class Waiter(workflows.services.Service):
     self.update_status('Processing stuff [3/3]')
     time.sleep(4)
     self.update_status('Completed processing stuff')
-
-class Producer(workflows.services.Service):
-  '''An example service building on top of the workflow.services architecture,
-     demonstrating how this architecture can be used.
-     This service generates messages into a queue.'''
 

@@ -1,19 +1,20 @@
 from __future__ import division
 
 import workflows.services
+from workflows.services.common_service import Commands, CommonService
 import mock
 import Queue
 
 def test_instantiate_basic_service():
   '''Create a basic service object'''
-  service = workflows.services.Service()
+  service = CommonService()
 
   assert service.get_name() is not None
 
 def test_logging_to_frontend():
   '''Log messages should be passed to frontend'''
   fe_queue = mock.Mock()
-  service = workflows.services.Service(frontend=fe_queue)
+  service = CommonService(frontend=fe_queue)
 
   service.log(mock.sentinel.logmessage)
 
@@ -23,13 +24,13 @@ def test_logging_to_frontend():
 
 def test_logging_to_dummy():
   '''Should run without errors, message should be dropped.'''
-  service = workflows.services.Service()
+  service = CommonService()
   service.log(mock.sentinel.logmessage)
 
 def test_send_status_updates_to_frontend():
   '''Status updates should be passed to frontend'''
   fe_queue = mock.Mock()
-  service = workflows.services.Service(frontend=fe_queue)
+  service = CommonService(frontend=fe_queue)
 
   service.update_status(mock.sentinel.status)
 
@@ -39,7 +40,7 @@ def test_send_status_updates_to_frontend():
 
 def test_send_status_dummy():
   '''Should run without errors, status should be dropped.'''
-  service = workflows.services.Service()
+  service = CommonService()
   service.update_status(mock.sentinel.status)
 
 def test_receive_and_follow_shutdown_command():
@@ -48,12 +49,12 @@ def test_receive_and_follow_shutdown_command():
   cmd_queue = mock.Mock()
   cmd_queue.get.side_effect = [
     { 'channel': 'command',
-      'payload': workflows.services.Commands.SHUTDOWN },
+      'payload': Commands.SHUTDOWN },
     AssertionError('Not observing commands') ]
   fe_queue = Queue.Queue()
 
   # Create service
-  service = workflows.services.Service(
+  service = CommonService(
       commands=cmd_queue, frontend=fe_queue)
   # override class API to ensure overidden functions are called
   service.initializing = mock.Mock()
@@ -94,14 +95,13 @@ def test_idle_timer_is_triggered():
   cmd_queue.get.side_effect = [
     Queue.Empty(),
     { 'channel': 'command',
-      'payload': workflows.services.Commands.SHUTDOWN },
+      'payload': Commands.SHUTDOWN },
     AssertionError('Not observing commands') ]
   fe_queue = Queue.Queue()
   idle_trigger = mock.Mock()
 
   # Create service
-  service = workflows.services.Service(
-      commands=cmd_queue, frontend=fe_queue)
+  service = CommonService(commands=cmd_queue, frontend=fe_queue)
   service._register_idle(10, idle_trigger)
 
   # Start service
@@ -136,14 +136,13 @@ def test_callbacks_are_routed_correctly():
     { 'channel': mock.sentinel.channel,
       'payload': mock.sentinel.payload },
     { 'channel': 'command',
-      'payload': workflows.services.Commands.SHUTDOWN },
+      'payload': Commands.SHUTDOWN },
     AssertionError('Not observing commands') ]
   fe_queue = Queue.Queue()
   callback = mock.Mock()
 
   # Create service
-  service = workflows.services.Service(
-      commands=cmd_queue, frontend=fe_queue)
+  service = CommonService(commands=cmd_queue, frontend=fe_queue)
   service._register(mock.sentinel.channel, callback)
 
   # Start service
@@ -159,13 +158,12 @@ def test_log_unknown_channel_data():
     { 'channel': mock.sentinel.channel, 'payload': mock.sentinel.failure1 },
     { 'payload': mock.sentinel.failure2 },
     { 'channel': 'command',
-      'payload': workflows.services.Commands.SHUTDOWN },
+      'payload': Commands.SHUTDOWN },
     AssertionError('Not observing commands') ]
   fe_queue = Queue.Queue()
 
   # Create service
-  service = workflows.services.Service(
-      commands=cmd_queue, frontend=fe_queue)
+  service = CommonService(commands=cmd_queue, frontend=fe_queue)
 
   # Start service
   service.start()

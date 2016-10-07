@@ -1,13 +1,14 @@
 from __future__ import division
 
 import workflows.services
+from workflows.services.common_service import Commands
 import workflows.services.sample_services
 import mock
 import Queue
 
 def test_service_can_be_looked_up():
   '''Attempt to look up the service by its name'''
-  service_class = workflows.services.lookup('sample_waiter')
+  service_class = workflows.services.lookup('Waiter')
   assert service_class == workflows.services.sample_services.Waiter
 
 @mock.patch('workflows.services.sample_services.time')
@@ -17,7 +18,7 @@ def test_start_and_shutdown_waiter_service(mock_time):
   cmd_queue.get.side_effect = [
     { 'channel': 'stuff', 'payload': mock.sentinel.stuff },
     { 'channel': 'command',
-      'payload': workflows.services.Commands.SHUTDOWN },
+      'payload': Commands.SHUTDOWN },
     AssertionError('Not observing commands') ]
   fe_queue = Queue.Queue()
 

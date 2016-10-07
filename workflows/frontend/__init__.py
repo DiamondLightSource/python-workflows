@@ -5,6 +5,7 @@ import threading
 import time
 import workflows.transport
 import workflows.services
+from workflows.services.common_service import CommonService
 import workflows.status
 
 class Frontend():
@@ -17,7 +18,7 @@ class Frontend():
     self._service_name = None
     self._queue_commands = None
     self._queue_frontend = None
-    self._service_status = workflows.services.Service.SERVICE_STATUS_NONE
+    self._service_status = CommonService.SERVICE_STATUS_NONE
 
     # Connect to the network transport layer
     if transport is None or isinstance(transport, basestring):
@@ -30,7 +31,7 @@ class Frontend():
 
     # Start initial service if one has been requested
     if service is not None:
-      self._service_status = workflows.services.Service.SERVICE_STATUS_NEW
+      self._service_status = CommonService.SERVICE_STATUS_NEW
       self.switch_service(service)
 
     # Start broadcasting node information
@@ -56,7 +57,7 @@ class Frontend():
           pass
       n = n - 1
 
-    self._service_status = workflows.services.Service.SERVICE_STATUS_TEARDOWN
+    self._service_status = CommonService.SERVICE_STATUS_TEARDOWN
     self._status_advertiser.trigger()
     self._status_advertiser.stop_and_wait()
     print "Fin."
@@ -114,6 +115,6 @@ class Frontend():
       self._service.terminate()
       self._service = None
       self._service_name = None
-      self._service_status = workflows.services.Service.SERVICE_STATUS_END
+      self._service_status = CommonService.SERVICE_STATUS_END
       self._queue_commands = None
       self._queue_frontend = None

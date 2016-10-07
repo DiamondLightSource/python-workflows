@@ -1,15 +1,15 @@
 from __future__ import division
 
 import workflows.services
-import workflows.services.sample_services
+import workflows.services.sample_producer
 import mock
 import pytest
 import Queue
 
 def test_service_can_be_looked_up():
   '''Attempt to look up the service by its name'''
-  service_class = workflows.services.lookup('sample_producer')
-  assert service_class == workflows.services.sample_services.Producer
+  service_class = workflows.services.lookup('Producer')
+  assert service_class == workflows.services.sample_producer.Producer
 
 @pytest.mark.skip(reason="broken test, skip for now")
 def test_service_registers_idle_timer():

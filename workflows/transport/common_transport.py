@@ -308,16 +308,9 @@ class CommonTransport(object):
     if isinstance(paths, basestring):
       paths = list(paths)
     cls.registered = []
-    errors = []
     for _, name, _ in pkgutil.iter_modules(paths):
       if not name.startswith('test_'):
         fid, pathname, desc = imp.find_module(name, paths)
-        try:
-          imp.load_module(name, fid, pathname, desc)
-        except Exception as e:
-          errors.append("could not load plugin module '%s': %s" % (
-                        pathname, e.message))
+        imp.load_module(name, fid, pathname, desc)
         if fid:
           fid.close()
-    if errors:
-      raise workflows.WorkflowsError(errors)
