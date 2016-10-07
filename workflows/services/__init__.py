@@ -5,14 +5,14 @@ class Service(object):
   '''
   Base class for workflow services. A service is a piece of software that runs
   in an isolated environment, communicating only via queues with the outside
-  world. Units of work are injected via a queue, results, status and log
+  world. Units of work are injected via a queue. Results, status and log
   messages, etc. are written out via a queue. Any task can be encapsulated
   as a service, for example a service that counts spots on an image passed
   as a filename, and returns the number of counts.
 
-  To instantiate a service three Queue-like objects should be passed to the
-  constructors, one to communicate to a frontend, one to the service
-  communication layer, and one for incoming commands and work packages.
+  To instantiate a service two Queue-like objects should be passed to the
+  constructors, one to communicate from the service to the frontend, one to
+  communicate from the frontend to the service.
   '''
 
   # Overrideable functions ----------------------------------------------------
@@ -192,6 +192,6 @@ def lookup(service):
     import workflows.services.sample_services
     return workflows.services.sample_services.Producer
   if service == 'sample_consumer': # less than ideal, but works for now
-    import workflows.services.sample_services
-    return workflows.services.sample_services.Consumer
+    import workflows.services.sample_consumer
+    return workflows.services.sample_consumer.Consumer
   # TODO: Do this properly

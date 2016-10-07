@@ -189,4 +189,6 @@ def test_dropping_transactions_when_dropping_client():
   with pytest.raises(workflows.WorkflowsError):
     ct.transaction_commit(t)
 
-
+@pytest.mark.skip(reason="TODO")
+def test_message_acknowledgments():
+  '''Test ack/nack functions. Automatically NACK messages if client goes away.'''

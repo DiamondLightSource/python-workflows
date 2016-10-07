@@ -26,11 +26,6 @@ class Waiter(workflows.services.Service):
     time.sleep(4)
     self.update_status('Completed processing stuff')
 
-class Consumer(workflows.services.Service):
-  '''An example service building on top of the workflow.services architecture,
-     demonstrating how this architecture can be used.
-     This service consumes messages off a queue.'''
-
 class Producer(workflows.services.Service):
   '''An example service building on top of the workflow.services architecture,
      demonstrating how this architecture can be used.

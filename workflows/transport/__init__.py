@@ -4,7 +4,8 @@ import workflows
 import workflows.transport
 
 all_transports = {
-  'stomp': lambda: workflows.transport.stomp.Transport
+  'stomp': lambda: workflows.transport.stomp.Transport,
+  'queue': lambda: workflows.transport.queue.Transport
 }
 default_transport = 'stomp'
 
@@ -53,6 +54,7 @@ class CommonTransport():
     }
     if client_id:
       self.__clients[client_id]['subscriptions'].add(self.__subscription_id)
+    self._debug('Subscribing to %s for %s with ID %d' % (channel, client_id, self.__subscription_id))
     self._subscribe(self.__subscription_id, channel, callback, exclusive,
                     acknowledgement)
     return self.__subscription_id
