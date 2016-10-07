@@ -1,6 +1,6 @@
 from __future__ import division
 import workflows.transport
-from workflows.transport.stomp import Transport
+from workflows.transport.stomp_transport import StompTransport
 import json
 import mock
 import optparse
@@ -9,22 +9,22 @@ import os
 def test_lookup_and_initialize_stomp_transport_layer():
   '''Find the stomp transport layer via the lookup mechanism and run
      its constructor with default settings.'''
-  stomp = workflows.transport.lookup("stomp")
-  assert stomp == Transport
+  stomp = workflows.transport.lookup("StompTransport")
+  assert stomp == StompTransport
   stomp()
 
 def test_add_command_line_help():
   '''Check that command line parameters are registered in the parser.'''
   parser = mock.MagicMock()
 
-  Transport().add_command_line_options(parser)
+  StompTransport().add_command_line_options(parser)
 
   assert parser.add_option.called
   assert parser.add_option.call_count > 4
   for call in parser.add_option.call_args_list:
     assert call[1]['action'] == 'callback'
 
-@mock.patch('workflows.transport.stomp.stomp')
+@mock.patch('workflows.transport.stomp_transport.stomp')
 def test_check_config_file_behaviour(mockstomp):
   '''Check that a specified configuration file is read, that command line
      parameters have precedence and are passed on to the stomp layer.'''
@@ -33,7 +33,7 @@ def test_check_config_file_behaviour(mockstomp):
   mockconn = mock.Mock()
   mockstomp.Connection.return_value = mockconn
   parser = optparse.OptionParser()
-  stomp = Transport()
+  stomp = StompTransport()
   stomp.add_command_line_options(parser)
 
   parser.parse_args([
@@ -46,13 +46,13 @@ def test_check_config_file_behaviour(mockstomp):
   mockconn.connect.assert_called_once_with(mock.sentinel.user, 'somesecret', wait=True)
   assert stomp.get_namespace() == 'namespace'
 
-@mock.patch('workflows.transport.stomp.stomp')
+@mock.patch('workflows.transport.stomp_transport.stomp')
 def test_instantiate_link_and_connect_to_broker(mockstomp):
   '''Test the Stomp connection routine.'''
   mockconn = mock.Mock()
   mockstomp.Connection.return_value = mockconn
 
-  stomp = Transport()
+  stomp = StompTransport()
   assert not stomp.is_connected()
 
   stomp.connect()
@@ -73,14 +73,14 @@ def test_instantiate_link_and_connect_to_broker(mockstomp):
 
   # TODO
 
-@mock.patch('workflows.transport.stomp.time')
-@mock.patch('workflows.transport.stomp.stomp')
+@mock.patch('workflows.transport.stomp_transport.time')
+@mock.patch('workflows.transport.stomp_transport.stomp')
 def test_broadcast_status(mockstomp, mocktime):
   '''Test the status broadcast function.'''
   mockconn = mock.Mock()
   mockstomp.Connection.return_value = mockconn
   mocktime.time.return_value = 20000
-  stomp = Transport()
+  stomp = StompTransport()
   stomp.connect()
 
   stomp.broadcast_status({ 'status': str(mock.sentinel.status) })
@@ -94,12 +94,12 @@ def test_broadcast_status(mockstomp, mocktime):
   assert statusdict['status'] == str(mock.sentinel.status)
   assert 'stomp.cmdchan' in statusdict
 
-@mock.patch('workflows.transport.stomp.stomp')
+@mock.patch('workflows.transport.stomp_transport.stomp')
 def test_send_message(mockstomp):
   '''Test the message sending function.'''
   mockconn = mock.Mock()
   mockstomp.Connection.return_value = mockconn
-  stomp = Transport()
+  stomp = StompTransport()
   stomp.connect()
 
   stomp.send_message( mock.sentinel.message, channel=str(mock.sentinel.channel) )
@@ -109,14 +109,14 @@ def test_send_message(mockstomp):
   assert kwargs['destination'] == str(mock.sentinel.channel)
   assert kwargs['body'] == mock.sentinel.message
 
-@mock.patch('workflows.transport.stomp.stomp')
+@mock.patch('workflows.transport.stomp_transport.stomp')
 def test_subscribe_to_channel(mockstomp):
   '''Test subscribing to a channel.'''
   mock_cb1 = mock.Mock()
   mock_cb2 = mock.Mock()
   mockconn = mock.Mock()
   mockstomp.Connection.return_value = mockconn
-  stomp = Transport()
+  stomp = StompTransport()
   stomp.connect()
 
   mockconn.set_listener.assert_called_once()

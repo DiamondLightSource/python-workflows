@@ -5,9 +5,9 @@ import stomp
 import threading
 import time
 from workflows import WorkflowsError
-import workflows.transport
+from workflows.transport.common_transport import CommonTransport
 
-class Transport(workflows.transport.CommonTransport):
+class StompTransport(CommonTransport):
   '''Abstraction layer for messaging infrastructure. Here we are using ActiveMQ
      with STOMP.'''
 

@@ -2,8 +2,9 @@ from __future__ import absolute_import
 from __future__ import division
 from workflows import WorkflowsError
 import workflows.transport
+from workflows.transport.common_transport import CommonTransport
 
-class Transport(workflows.transport.CommonTransport):
+class QueueTransport(CommonTransport):
   '''Abstraction layer for messaging infrastructure.
      Here we are using messaging via a Queue to the Frontend.'''
 
