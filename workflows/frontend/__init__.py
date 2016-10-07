@@ -49,10 +49,19 @@ class Frontend():
       if self._queue_frontend is not None:
         try:
           message = self._queue_frontend.get(True, 1)
-          if 'statuscode' in message:
-            self._service_status = message['statuscode']
-            self._status_advertiser.trigger()
-          print "MSG:", message
+          if isinstance(message, dict) and 'band' in message:
+            # only dictionaries with 'band' entry are valid messages
+            try:
+              handler = getattr(self, 'parse_band_' + message['band'])
+            except AttributeError:
+              print 'Unknown band %s' % message['band']
+            if handler:
+#              try:
+                handler(message)
+#              except Exception:
+#                print 'Uh oh. What to do.'
+          else:
+            print 'Invalid message received'
         except Queue.Empty:
           pass
       n = n - 1
@@ -61,6 +70,22 @@ class Frontend():
     self._status_advertiser.trigger()
     self._status_advertiser.stop_and_wait()
     print "Fin."
+
+  def parse_band_transport(self, message):
+    print "TRN:", message
+    if self._transport:
+#      getattr(self._transport, message['call'])(*message['payload'])
+      if message['call'] == 'send':
+        self._transport.send_message(message['payload'][1], \
+                                     '/topic/' + message['payload'][0])
+
+  def parse_band_status(self, message):
+    print "STT:", message
+
+  def parse_band_status_update(self, message):
+    print "STU:", message
+    self._service_status = message['statuscode']
+    self._status_advertiser.trigger()
 
   def get_host_id(self):
     '''Get a cached copy of the host id.'''
