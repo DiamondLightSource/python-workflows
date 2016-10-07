@@ -295,10 +295,10 @@ class CommonTransport(object):
        looking up transport mechanisms by name.'''
     def __init__(cls, name, base, attrs):
       '''Add new subclass of CommonTransport to list of all known subclasses.'''
-      if not hasattr(cls, 'register'):
-        cls.register = {}
+      if not hasattr(cls, 'transport_register'):
+        cls.transport_register = {}
       else:
-        cls.register[name] = cls
+        cls.transport_register[name] = cls
 
   @classmethod
   def load(cls, paths):

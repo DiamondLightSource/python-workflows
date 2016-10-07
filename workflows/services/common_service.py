@@ -1,8 +1,9 @@
 from __future__ import division, absolute_import
 import Queue
 import workflows
+from workflows.transport.queue_transport import QueueTransport
 
-class CommonService(object):
+class CommonService(QueueTransport):
   '''
   Base class for workflow services. A service is a piece of software that runs
   in an isolated environment, communicating only via queues with the outside
@@ -78,6 +79,8 @@ class CommonService(object):
     self._service_name = 'unnamed service'
     self.__queue_frontend = kwargs.get('frontend')
     self.__queue_commands = kwargs.get('commands')
+    self.__transport = workflows.transport.queue_transport.QueueTransport()
+
     self.__shutdown = False
     self.__callback_register = {}
     self.__update_service_status(self.SERVICE_STATUS_NEW)
@@ -181,38 +184,15 @@ class CommonService(object):
   # -- Plugin-related functions ----------------------------------------------
   #
 
-  class __metaclass__(type):
+  class __metaclass__(QueueTransport.__metaclass__):
     '''Define metaclass function to keep a list of all subclasses. This enables
-       looking up transport mechanisms by name.'''
+       looking up service mechanisms by name.'''
     def __init__(cls, name, base, attrs):
-      '''Add new subclass of CommonTransport to list of all known subclasses.'''
-      if not hasattr(cls, 'register'):
-        cls.register = {}
+      '''Add new subclass of CommonService to list of all known subclasses.'''
+      if not hasattr(cls, 'service_register'):
+        cls.service_register = {}
       else:
-        cls.register[name] = cls
-
-  @classmethod
-  def load(cls, paths):
-    '''Import all python files (except test_*) in directories. This is required
-       for registration of subclasses.'''
-    import imp, pkgutil
-    if isinstance(paths, basestring):
-      paths = list(paths)
-    cls.registered = []
-    errors = []
-    for _, name, _ in pkgutil.iter_modules(paths):
-      if not name.startswith('test_'):
-        fid, pathname, desc = imp.find_module(name, paths)
-        try:
-          imp.load_module(name, fid, pathname, desc)
-        except Exception as e:
-          raise
-          errors.append("could not load plugin module '%s': %s" % (
-                        pathname, e.message))
-        if fid:
-          fid.close()
-    if errors:
-      raise workflows.WorkflowsError(errors)
+        cls.service_register[name] = cls
 
 class Commands():
   SHUTDOWN = 'shutdown'

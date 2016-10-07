@@ -21,7 +21,9 @@ def run(cmdline_args):
       default=None, help="Name of the service to start. Known services: %s" % \
         ", ".join(workflows.services.get_known_services()))
   parser.add_option("-t", "--transport", dest="transport", metavar="TRN",
-      default="stomp", help="Transport mechanism, default '%default'")
+      default="StompTransport",
+      help="Transport mechanism. Known mechanisms: %s (default: %%default)" % \
+        ", ".join(workflows.transport.get_known_transports()))
   workflows.transport.add_command_line_options(parser)
   (options, args) = parser.parse_args(cmdline_args)
 
