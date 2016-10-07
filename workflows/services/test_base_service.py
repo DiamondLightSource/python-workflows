@@ -18,9 +18,10 @@ def test_logging_to_frontend():
 
   service.log(mock.sentinel.logmessage)
 
-  fe_queue.put.assert_called()
-  assert fe_queue.put.call_args \
-      == (({ 'log': mock.sentinel.logmessage, 'source': 'other' },), {})
+  fe_queue.put_nowait.assert_called()
+  assert fe_queue.put_nowait.called_once_with \
+    ({'band': 'logging',
+      'payload': { 'log': mock.sentinel.logmessage, 'source': 'other' }})
 
 def test_logging_to_dummy():
   '''Should run without errors, message should be dropped.'''
@@ -34,9 +35,10 @@ def test_send_status_updates_to_frontend():
 
   service.update_status(mock.sentinel.status)
 
-  fe_queue.put.assert_called()
-  assert fe_queue.put.call_args \
-      == (({ 'status': mock.sentinel.status },), {})
+  fe_queue.put_nowait.assert_called()
+  assert fe_queue.put_nowait.called_once_with \
+    ({'band': 'status_update',
+      'status': mock.sentinel.status })
 
 def test_send_status_dummy():
   '''Should run without errors, status should be dropped.'''
@@ -172,8 +174,8 @@ def test_log_unknown_channel_data():
   messages = []
   while not fe_queue.empty():
     message = fe_queue.get_nowait()
-    if 'log' in message:
-      messages.append(message)
+    if message.get('band') == 'log':
+      messages.append(message.get('payload'))
   assert len(messages) == 2
   assert messages[0]['source'] == 'service'
   assert messages[0]['channel'] == mock.sentinel.channel

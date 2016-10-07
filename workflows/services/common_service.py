@@ -79,8 +79,9 @@ class CommonService(QueueTransport):
     self._service_name = 'unnamed service'
     self.__queue_frontend = kwargs.get('frontend')
     self.__queue_commands = kwargs.get('commands')
-    self.__transport = workflows.transport.queue_transport.QueueTransport()
-    self.__transport.set_queue(self.__queue_frontend)
+    self._transport = workflows.transport.queue_transport.QueueTransport()
+    self._transport.set_queue(self.__queue_frontend)
+    self._transport.connect()
     self.__shutdown = False
     self.__callback_register = {}
     self.__update_service_status(self.SERVICE_STATUS_NEW)
@@ -94,7 +95,10 @@ class CommonService(QueueTransport):
   def __log_send_full(self, data_structure):
     '''Internal function to actually send log messages.'''
     if self.__queue_frontend:
-      self.__queue_frontend.put(data_structure)
+      self.__queue_frontend.put_nowait({
+        'band': 'log',
+        'payload': data_structure
+      })
 
   def _register(self, message_type, callback):
     '''Register a callback function for a specific command message type.'''
@@ -109,13 +113,19 @@ class CommonService(QueueTransport):
   def _update_status(self, status):
     '''Internal function to actually send status update.'''
     if self.__queue_frontend:
-      self.__queue_frontend.put({'status': status})
+      self.__queue_frontend.put_nowait({
+        'band': 'status_update',
+        'status': status
+      })
 
   def __update_service_status(self, statuscode):
     '''Set the internal status of the service object, and notify frontend.'''
     self.__service_status = statuscode
     if self.__queue_frontend:
-      self.__queue_frontend.put({'statuscode': self.__service_status})
+      self.__queue_frontend.put_nowait({
+        'band': 'status_update',
+        'statuscode': self.__service_status
+      })
 
   def get_name(self):
     '''Return a name for this service.
