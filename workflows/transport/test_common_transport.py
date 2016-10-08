@@ -201,3 +201,23 @@ def test_dropping_transactions_when_dropping_client():
 @pytest.mark.skip(reason="TODO")
 def test_message_acknowledgments():
   '''Test ack/nack functions. Automatically NACK messages if client goes away.'''
+
+def test_unimplemented_communication_methods_should_fail():
+  '''Check that low-level communication calls raise WorkflowsError when not
+     overridden.'''
+  ct = CommonTransport()
+  assert not ct.connect()
+  for function, argcount in [
+      ('_subscribe', 5),
+      ('_subscribe_broadcast', 4),
+      ('_unsubscribe', 1),
+      ('_send', 5),
+      ('_broadcast', 5),
+      ('_ack', 2),
+      ('_nack', 2),
+      ('_transaction_begin', 1),
+      ('_transaction_abort', 1),
+      ('_transaction_commit', 1),
+      ]:
+    with pytest.raises(workflows.WorkflowsError):
+      getattr(ct, function)(*([mock.Mock()] * argcount))
