@@ -1,9 +1,9 @@
+from __future__ import absolute_import, division
+import sys
+
 #
 # Starts a workflows service
 #
-
-from __future__ import absolute_import
-import sys
 
 def run(cmdline_args):
   import workflows

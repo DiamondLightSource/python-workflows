@@ -1,4 +1,4 @@
-from __future__ import division
+from __future__ import absolute_import, division
 import mock
 import pytest
 import workflows.transport
@@ -128,20 +128,49 @@ def test_forward_transaction_commit_call():
     )
   })
 
-@pytest.mark.skip(reason="TODO")
 def test_forward_subscribe_call():
-  # def _subscribe(self, sub_id, channel, callback, exclusive, acknowledgement):
-  pass
+  '''Test translation of a subscribe() call to Queue message.'''
+  mockqueue, queue = setup_queue()
 
-@pytest.mark.skip(reason="TODO")
+  subid = queue.subscribe(mock.sentinel.channel, mock.sentinel.callback)
+
+  mockqueue.put_nowait.assert_called_once_with({
+    'band': 'transport',
+    'call': 'subscribe',
+    'payload': (
+      subid, mock.sentinel.channel, False, False
+    )
+  })
+
 def test_forward_subscribe_broadcast_call():
-  # def _subscribe_broadcast(self, sub_id, channel, callback, retroactive):
-  pass
+  '''Test translation of a subscribe_broadcast() call to Queue message.'''
+  mockqueue, queue = setup_queue()
 
-@pytest.mark.skip(reason="TODO")
+  subid = queue.subscribe_broadcast(mock.sentinel.channel, mock.sentinel.callback)
+
+  mockqueue.put_nowait.assert_called_once_with({
+    'band': 'transport',
+    'call': 'subscribe_broadcast',
+    'payload': (
+      subid, mock.sentinel.channel, False
+    )
+  })
+
 def test_forward_unsubscribe_call():
-  # def _unsubscribe(self, sub_id):
-  pass
+  '''Test translation of an unsubscribe() call to Queue message.'''
+  mockqueue, queue = setup_queue()
+
+  subid = queue.subscribe(mock.sentinel.channel, mock.sentinel.callback)
+  queue.unsubscribe(subid)
+
+  assert mockqueue.put_nowait.call_count == 2
+  mockqueue.put_nowait.assert_called_with({
+    'band': 'transport',
+    'call': 'unsubscribe',
+    'payload': (
+      subid,
+    )
+  })
 
 @pytest.mark.skip(reason="TODO")
 def test_forward_ack_call():

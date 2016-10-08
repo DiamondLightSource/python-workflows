@@ -1,4 +1,4 @@
-from __future__ import division, absolute_import
+from __future__ import absolute_import, division
 import Queue
 import workflows
 from workflows.transport.queue_transport import QueueTransport

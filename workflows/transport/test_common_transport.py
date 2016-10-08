@@ -1,3 +1,4 @@
+from __future__ import absolute_import, division
 from workflows.transport.common_transport import CommonTransport
 import mock
 import pytest
@@ -14,12 +15,15 @@ def test_subscribe_unsubscribe_a_channel():
         exclusive=mock.sentinel.exclusive, acknowledgement=mock.sentinel.ack)
 
   assert subid
+  assert ct.subscription_callback(subid) == mock.sentinel.callback
   ct._subscribe.assert_called_once_with(subid, mock.sentinel.channel,
         mock.sentinel.callback, mock.sentinel.exclusive, mock.sentinel.ack)
 
   ct.unsubscribe(subid)
 
   ct._unsubscribe.assert_called_once_with(subid)
+  with pytest.raises(workflows.WorkflowsError):
+    ct.subscription_callback(subid)
 
 def test_simple_subscribe_unsubscribe_a_broadcast():
   """Public subscribe_bc()-call should be routed to specific _subscribe_bc().
@@ -32,12 +36,15 @@ def test_simple_subscribe_unsubscribe_a_broadcast():
         retroactive=mock.sentinel.retro)
 
   assert subid
+  assert ct.subscription_callback(subid) == mock.sentinel.callback
   ct._subscribe_broadcast.assert_called_once_with(subid, mock.sentinel.channel,
         mock.sentinel.callback, mock.sentinel.retro)
 
   ct.unsubscribe(subid)
 
   ct._unsubscribe.assert_called_once_with(subid)
+  with pytest.raises(workflows.WorkflowsError):
+    ct.subscription_callback(subid)
 
 def test_simple_send_message():
   """Pass string and object messages to send(), should be serialized and
@@ -114,12 +121,14 @@ def test_dropping_subscriptions_when_dropping_client():
   ct.drop_client(client)
 
   ct._unsubscribe.assert_called_once_with(subid)
-
+  with pytest.raises(workflows.WorkflowsError):
+    ct.subscription_callback(subid)
   with pytest.raises(workflows.WorkflowsError):
     ct.unsubscribe(subid)
 
   client = ct.register_client()
   subid = ct.subscribe(mock.sentinel.channel, mock.sentinel.callback, client_id=client)
+  assert ct.subscription_callback(subid) == mock.sentinel.callback
   ct.unsubscribe(subid)
   ct.drop_client(client)
 

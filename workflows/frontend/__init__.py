@@ -1,4 +1,4 @@
-from __future__ import division
+from __future__ import absolute_import, division
 import multiprocessing
 import Queue
 import threading

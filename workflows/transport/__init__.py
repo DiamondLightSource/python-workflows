@@ -1,4 +1,4 @@
-from __future__ import division, absolute_import
+from __future__ import absolute_import, division
 from workflows.transport.common_transport import CommonTransport
 
 default_transport = 'StompTransport'

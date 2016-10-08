@@ -1,4 +1,4 @@
-from __future__ import division, absolute_import
+from __future__ import absolute_import, division
 import json
 import workflows
 
@@ -39,7 +39,7 @@ class CommonTransport(object):
     '''
     self.__subscription_id += 1
     self.__subscriptions[self.__subscription_id] = {
-      'channel': channel, 'client': client_id
+      'channel': channel, 'client': client_id, 'callback': callback
     }
     if client_id:
       self.__clients[client_id]['subscriptions'].add(self.__subscription_id)
@@ -73,13 +73,24 @@ class CommonTransport(object):
     '''
     self.__subscription_id += 1
     self.__subscriptions[self.__subscription_id] = {
-      'channel': channel, 'client': client_id
+      'channel': channel, 'client': client_id, 'callback': callback
     }
     if client_id:
       self.__clients[client_id]['subscriptions'].add(self.__subscription_id)
     self._subscribe_broadcast(self.__subscription_id, channel, callback,
                               retroactive)
     return self.__subscription_id
+
+  def subscription_callback(self, subscription):
+    '''Retrieve the callback function for a subscription. Raise a
+       WorkflowsError if the subscription does not exist.
+       :param subscription: Subscription ID to look up
+       :return: Callback function
+    '''
+    if subscription not in self.__subscriptions:
+      raise workflows.WorkflowsError \
+            ("Attempting to callback on unknown subscription")
+    return self.__subscriptions[subscription]['callback']
 
   def send(self, destination, message, headers=None, expiration=None,
            transaction=None):

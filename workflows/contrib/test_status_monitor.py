@@ -1,5 +1,5 @@
-from __future__ import division
-import status_monitor
+from __future__ import absolute_import, division
+import workflows.contrib.status_monitor as status_monitor
 import mock
 
 @mock.patch('workflows.contrib.status_monitor.time')

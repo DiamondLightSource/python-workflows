@@ -1,5 +1,4 @@
-from __future__ import absolute_import
-from __future__ import division
+from __future__ import absolute_import, division
 from workflows import WorkflowsError
 import workflows.transport
 from workflows.transport.common_transport import CommonTransport
@@ -76,4 +75,37 @@ class QueueTransport(CommonTransport):
       'band': 'transport',
       'call': 'transaction_commit',
       'payload': args
+    })
+
+  def _subscribe(self, sub_id, channel, callback, *args):
+    '''Forward subscription command to queue.'''
+    self.assert_connected()
+    self._queue.put_nowait({
+      'band': 'transport',
+      'call': 'subscribe',
+      'payload': (
+        sub_id,
+        channel) + args
+    })
+
+  def _subscribe_broadcast(self, sub_id, channel, callback, *args):
+    '''Forward broadcast subscription command to queue.'''
+    self.assert_connected()
+    self._queue.put_nowait({
+      'band': 'transport',
+      'call': 'subscribe_broadcast',
+      'payload': (
+        sub_id,
+        channel) + args
+    })
+
+  def _unsubscribe(self, sub_id):
+    '''Forward unsubscribe command to queue.'''
+    self.assert_connected()
+    self._queue.put_nowait({
+      'band': 'transport',
+      'call': 'unsubscribe',
+      'payload': (
+        sub_id,
+      )
     })
