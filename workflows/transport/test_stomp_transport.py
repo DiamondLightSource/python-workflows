@@ -111,43 +111,43 @@ def test_send_message(mockstomp):
   assert kwargs['body'] == mock.sentinel.message
 
 @pytest.mark.skip(reason="Broken due to changed interface")
-@mock.patch('workflows.transport.stomp_transport.stomp')
-def test_subscribe_to_channel(mockstomp):
+#@mock.patch('workflows.transport.stomp_transport.stomp')
+def test_subscribe_to_channel():# mockstomp):
   '''Test subscribing to a channel.'''
-  mock_cb1 = mock.Mock()
-  mock_cb2 = mock.Mock()
-  mockconn = mock.Mock()
-  mockstomp.Connection.return_value = mockconn
-  stomp = StompTransport()
-  stomp.connect()
-
-  mockconn.set_listener.assert_called_once()
-  listener = mockconn.set_listener.call_args[0][1]
-  assert listener is not None
-
-  stomp.subscribe(mock.sentinel.channel1, mock_cb1, client_id='A')
-
-  mockconn.subscribe.assert_called_once()
-  args, kwargs = mockconn.subscribe.call_args
-  assert args, kwargs == ((mock.sentinel.channel1, mock.ANY), { 'headers': mock.ANY })
-  headers1 = kwargs['headers']
-  subscription_id1 = args[1]
-  assert headers1 == { }
-
-  stomp.subscribe(mock.sentinel.channel2, mock_cb2, client_id='B', retroactive=True)
-
-  assert mockconn.subscribe.call_count == 2
-  args, kwargs = mockconn.subscribe.call_args
-  assert args, kwargs == ((mock.sentinel.channel2, mock.ANY), { 'headers': mock.ANY })
-  headers2 = kwargs['headers']
-  subscription_id2 = args[1]
-  assert subscription_id1 != subscription_id2
-  assert headers2 == { 'activemq.retroactive':'true' }
-
-  assert mock_cb1.call_count == 0
-  listener.on_message({'subscription': subscription_id1}, '{"some": "message" }')
-  mock_cb1.assert_called_once_with({'subscription': subscription_id1}, { 'some': 'message' })
-
-  assert mock_cb2.call_count == 0
-  listener.on_message({'subscription': subscription_id2}, '{"other": ["mess", "age"] }')
-  mock_cb2.assert_called_once_with({'subscription': subscription_id2}, { 'other': ['mess', 'age'] })
+# mock_cb1 = mock.Mock()
+# mock_cb2 = mock.Mock()
+# mockconn = mock.Mock()
+# mockstomp.Connection.return_value = mockconn
+# stomp = StompTransport()
+# stomp.connect()
+#
+# mockconn.set_listener.assert_called_once()
+# listener = mockconn.set_listener.call_args[0][1]
+# assert listener is not None
+#
+# stomp.subscribe(mock.sentinel.channel1, mock_cb1, client_id='A')
+#
+# mockconn.subscribe.assert_called_once()
+# args, kwargs = mockconn.subscribe.call_args
+# assert args, kwargs == ((mock.sentinel.channel1, mock.ANY), { 'headers': mock.ANY })
+# headers1 = kwargs['headers']
+# subscription_id1 = args[1]
+# assert headers1 == { }
+#
+# stomp.subscribe(mock.sentinel.channel2, mock_cb2, client_id='B', retroactive=True)
+#
+# assert mockconn.subscribe.call_count == 2
+# args, kwargs = mockconn.subscribe.call_args
+# assert args, kwargs == ((mock.sentinel.channel2, mock.ANY), { 'headers': mock.ANY })
+# headers2 = kwargs['headers']
+# subscription_id2 = args[1]
+# assert subscription_id1 != subscription_id2
+# assert headers2 == { 'activemq.retroactive':'true' }
+#
+# assert mock_cb1.call_count == 0
+# listener.on_message({'subscription': subscription_id1}, '{"some": "message" }')
+# mock_cb1.assert_called_once_with({'subscription': subscription_id1}, { 'some': 'message' })
+#
+# assert mock_cb2.call_count == 0
+# listener.on_message({'subscription': subscription_id2}, '{"other": ["mess", "age"] }')
+# mock_cb2.assert_called_once_with({'subscription': subscription_id2}, { 'other': ['mess', 'age'] })
