@@ -4,54 +4,37 @@ import workflows.services
 import workflows.services.sample_producer
 import mock
 import pytest
-import Queue
 
 def test_service_can_be_looked_up():
   '''Attempt to look up the service by its name'''
   service_class = workflows.services.lookup('Producer')
   assert service_class == workflows.services.sample_producer.Producer
 
-@pytest.mark.skip(reason="broken test, skip for now")
 def test_service_registers_idle_timer():
-  pass
-# service._register_idle(10, idle_trigger)
-# cmd_queue = mock.Mock()
-# cmd_queue.get.side_effect = [
-#   Queue.Empty(),
-#   { 'channel': 'command',
-#     'payload': workflows.services.Commands.SHUTDOWN },
-#   AssertionError('Not observing commands') ]
-# fe_queue = Queue.Queue()
-# idle_trigger = mock.Mock()
-#
-# # Create service
-# service = workflows.services.Service(
-#     commands=cmd_queue, frontend=fe_queue)
-# service._register_idle(10, idle_trigger)
-#
-# # Start service
-# service.start()
-#
-# # Check trigger has been called
-# idle_trigger.assert_called_once_with()
-#
-# # Check startup/shutdown sequence
-# assert cmd_queue.get.call_count == 2
-# assert cmd_queue.get.call_args == ((True, 10),)
-# messages = []
-# while not fe_queue.empty():
-#   message = fe_queue.get_nowait()
-#   if 'statuscode' in message:
-#     messages.append(message['statuscode'])
-# assert messages == [
-#   service.SERVICE_STATUS_NEW,
-#   service.SERVICE_STATUS_STARTING,
-#   service.SERVICE_STATUS_IDLE,
-#   service.SERVICE_STATUS_TIMER,
-#   service.SERVICE_STATUS_IDLE,
-#   service.SERVICE_STATUS_PROCESSING,
-#   service.SERVICE_STATUS_SHUTDOWN,
-#   service.SERVICE_STATUS_END,
-#   ]
+  '''Check that the service registers an idle event handler.'''
+  p = workflows.services.sample_producer.Producer()
+  mock_idlereg = mock.Mock()
+  setattr(p, '_register_idle', mock_idlereg)
 
+  p.initializing()
 
+  mock_idlereg.assert_called_once_with(mock.ANY, p.create_message)
+
+def test_service_produces_messages():
+  '''Check that the producer produces messages in the idle event handler.'''
+  p = workflows.services.sample_producer.Producer()
+  mock_transport = mock.Mock()
+  setattr(p, '_transport', mock_transport)
+
+  p.initializing()
+  assert not mock_transport.send.called
+  p.create_message()
+
+  mock_transport.send.assert_called_once()
+
+  p.create_message()
+
+  assert mock_transport.send.call_count == 2
+  calls = mock_transport.send.call_args_list
+  assert calls[0][0][0] == calls[1][0][0] # same destination
+  assert calls[0][0][1] != calls[1][0][1] # different message
