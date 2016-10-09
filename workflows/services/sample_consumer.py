@@ -6,3 +6,14 @@ class Consumer(CommonService):
      demonstrating how this architecture can be used.
      This service consumes messages off a queue.'''
 
+  def initializing(self):
+    '''Subscribe to a channel.'''
+    self._transport.subscribe('transient.destination', self.consume_message)
+
+  def consume_message(self, header, message):
+    '''Consume a message'''
+    print "=== Consume ===="
+    print header
+    print "----------------"
+    print message
+    print "================"

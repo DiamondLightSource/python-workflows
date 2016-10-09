@@ -43,7 +43,7 @@ class Frontend():
 
   def run(self):
     print "Current service:", self._service
-    n = 20
+    n = 200
     while n > 0:
       print n
       if self._queue_frontend is not None:
@@ -54,6 +54,7 @@ class Frontend():
             try:
               handler = getattr(self, 'parse_band_' + message['band'])
             except AttributeError:
+              handler = None
               print 'Unknown band %s' % message['band']
             if handler:
 #              try:
@@ -74,10 +75,27 @@ class Frontend():
   def parse_band_transport(self, message):
     print "TRN:", message
     if self._transport:
-#      getattr(self._transport, message['call'])(*message['payload'])
       if message['call'] == 'send':
         self._transport.send_message(message['payload'][1], \
-                                     '/topic/' + message['payload'][0])
+                                     '/queue/' + message['payload'][0])
+      elif message['call'] == 'subscribe':
+        self._transport.subscribe(message['channel'],
+            lambda cb_header, cb_message:
+            self.send_command( {
+                'band': 'transport',
+                'payload': {
+                  'subscription_id': message['subscription_id'],
+                  'header': cb_header,
+                  'message': cb_message,
+                },
+              } )
+          )
+
+  def send_command(self, command):
+    '''Send command to service via the command queue.'''
+    print "To command queue: ", command
+    if self._queue_commands:
+      self._queue_commands.put(command)
 
   def parse_band_status(self, message):
     print "STT:", message

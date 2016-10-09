@@ -50,7 +50,7 @@ def test_receive_and_follow_shutdown_command():
      Check that status codes are updated properly.'''
   cmd_queue = mock.Mock()
   cmd_queue.get.side_effect = [
-    { 'channel': 'command',
+    { 'band': 'command',
       'payload': Commands.SHUTDOWN },
     AssertionError('Not observing commands') ]
   fe_queue = Queue.Queue()
@@ -96,7 +96,7 @@ def test_idle_timer_is_triggered():
   cmd_queue = mock.Mock()
   cmd_queue.get.side_effect = [
     Queue.Empty(),
-    { 'channel': 'command',
+    { 'band': 'command',
       'payload': Commands.SHUTDOWN },
     AssertionError('Not observing commands') ]
   fe_queue = Queue.Queue()
@@ -135,9 +135,9 @@ def test_callbacks_are_routed_correctly():
   '''Incoming messages are routed to the correct callback functions'''
   cmd_queue = mock.Mock()
   cmd_queue.get.side_effect = [
-    { 'channel': mock.sentinel.channel,
+    { 'band': mock.sentinel.band,
       'payload': mock.sentinel.payload },
-    { 'channel': 'command',
+    { 'band': 'command',
       'payload': Commands.SHUTDOWN },
     AssertionError('Not observing commands') ]
   fe_queue = Queue.Queue()
@@ -145,7 +145,7 @@ def test_callbacks_are_routed_correctly():
 
   # Create service
   service = CommonService(commands=cmd_queue, frontend=fe_queue)
-  service._register(mock.sentinel.channel, callback)
+  service._register(mock.sentinel.band, callback)
 
   # Start service
   service.start()
@@ -153,13 +153,13 @@ def test_callbacks_are_routed_correctly():
   # Check callback occured
   callback.assert_called_with(mock.sentinel.payload)
 
-def test_log_unknown_channel_data():
+def test_log_unknown_band_data():
   '''All unidentified messages should be logged to the frondend.'''
   cmd_queue = mock.Mock()
   cmd_queue.get.side_effect = [
-    { 'channel': mock.sentinel.channel, 'payload': mock.sentinel.failure1 },
+    { 'band': mock.sentinel.band, 'payload': mock.sentinel.failure1 },
     { 'payload': mock.sentinel.failure2 },
-    { 'channel': 'command',
+    { 'band': 'command',
       'payload': Commands.SHUTDOWN },
     AssertionError('Not observing commands') ]
   fe_queue = Queue.Queue()
@@ -178,7 +178,7 @@ def test_log_unknown_channel_data():
       messages.append(message.get('payload'))
   assert len(messages) == 2
   assert messages[0]['source'] == 'service'
-  assert messages[0]['channel'] == mock.sentinel.channel
+  assert messages[0]['log']['band'] == mock.sentinel.band
   assert messages[1]['source'] == 'service'
-  assert messages[1].get('channel') == None
+  assert messages[1]['log'].get('band') == None
 

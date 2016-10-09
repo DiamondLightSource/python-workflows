@@ -9,3 +9,17 @@ def test_service_can_be_looked_up():
   service_class = workflows.services.lookup('Consumer')
   assert service_class == workflows.services.sample_consumer.Consumer
 
+def test_service_subscribes_to_channel():
+  '''Check that the service registers an idle event handler.'''
+  p = workflows.services.sample_consumer.Consumer()
+  mock_transport = mock.Mock()
+  setattr(p, '_transport', mock_transport)
+
+  p.initializing()
+
+  mock_transport.subscribe.assert_called_once_with(mock.ANY, p.consume_message)
+
+def test_service_can_consume_messages():
+  '''Check that the service registers an idle event handler.'''
+  p = workflows.services.sample_consumer.Consumer()
+  p.consume_message(mock.sentinel.header, mock.sentinel.message)

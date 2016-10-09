@@ -1,5 +1,4 @@
 from __future__ import absolute_import, division
-import json
 import stomp
 import threading
 import time
@@ -26,7 +25,6 @@ class StompTransport(CommonTransport):
     self._namespace = None
     self._idcounter = 0
     self._subscription_callbacks = {}
-    self._client_subscriptions = {}
     self._lock = threading.RLock()
     self._stomp_listener = stomp.listener.ConnectionListener()
     self._stomp_listener = stomp.PrintingListener()
@@ -131,6 +129,7 @@ class StompTransport(CommonTransport):
       destination.append(channel)
     destination = '.'.join(destination)
     status['stomp.cmdchan'] = '12345'
+    import json
     message = json.dumps(status)
     with self._lock:
       self._conn.send(
@@ -148,39 +147,31 @@ class StompTransport(CommonTransport):
           body=message,
           destination=channel)
 
-  def subscribe(self, channel, callback, client_id=None, retroactive=False, debug=True):
-    '''Listen to a queue or topic, notify via callback function.
-       :param channel: Full name of the topic or queue to subscribe to
+  def _subscribe(self, sub_id, channel, callback, **kwargs):
+    '''Listen to a queue, notify via callback function.
+       :param sub_id: ID for this subscription in the transport layer
+       :param channel: Queue name to subscribe to
        :param callback: Function to be called when messages are received
-       :param client_id: Value tying a subscription to one client. This allows
-                         removing all subscriptions for a client simultaneously
-                         when the client goes away.
-       :param retroactive: Ask broker to send old messages if possible
-       :param debug: Print debugging information to STDOUT
+       :param **kwargs: Further parameters for the transport layer. For example
+              exclusive: Attempt to become exclusive subscriber to the queue.
+              acknowledgement: If true receipt of each message needs to be
+                               acknowledged.
     '''
-    with self._lock:
-      self._idcounter = self._idcounter + 1
-      subscription_id = str(self._idcounter)
-      self._subscription_callbacks[subscription_id] = callback
-      if client_id is not None:
-        if client_id not in self._client_subscriptions:
-          self._client_subscriptions[client_id] = []
-        self._client_subscriptions[client_id].append(subscription_id)
-
     headers = {}
-    if retroactive:
+    if kwargs.get('retroactive'):
       headers['activemq.retroactive'] = 'true'
 
-    if debug:
+    self._subscription_callbacks[sub_id] = callback
+
+    if kwargs.get('debug', True):
       print '-'*30
-      print subscription_id
-      print self._idcounter
-      print self._subscription_callbacks
-      print self._client_subscriptions
+      print sub_id
+      print channel
+      print callback
       print '-'*30
 
     with self._lock:
-      self._conn.subscribe(channel, subscription_id, headers=headers)
+      self._conn.subscribe('/queue/' + channel, sub_id, headers=headers)
 
 
 ## Stomp listener methods #####################################################
@@ -189,10 +180,11 @@ class StompTransport(CommonTransport):
     return headers, body
 
   def _on_message(self, headers, body):
-    subscription_id = headers.get('subscription')
+    print "on_message", headers, body
+    subscription_id = int(headers.get('subscription'))
     with self._lock:
       target_function = self._subscription_callbacks.get(subscription_id)
     if target_function is not None:
-      target_function(headers, json.loads(body))
+      target_function(headers, body)
     else:
       raise WorkflowsError('Unhandled message %s %s' % (repr(headers), repr(body)))

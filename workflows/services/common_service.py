@@ -100,9 +100,9 @@ class CommonService(QueueTransport):
         'payload': data_structure
       })
 
-  def _register(self, message_type, callback):
-    '''Register a callback function for a specific command message type.'''
-    self.__callback_register[message_type] = callback
+  def _register(self, message_band, callback):
+    '''Register a callback function for a specific message band.'''
+    self.__callback_register[message_band] = callback
 
   def _register_idle(self, idle_time, callback):
     '''Register a callback function that is run when idling for a given
@@ -141,6 +141,7 @@ class CommonService(QueueTransport):
 
     self.initializing()
     self._register('command', self.__process_command)
+    self._register('transport', self.__process_transport)
 
     if self.__queue_commands is None:
       # can only listen to commands if command queue is defined
@@ -163,20 +164,19 @@ class CommonService(QueueTransport):
 
       self.__update_service_status(self.SERVICE_STATUS_PROCESSING)
 
-      if message and 'channel' in message:
-        processor = self.__callback_register.get(message['channel'])
+      if message and 'band' in message:
+        processor = self.__callback_register.get(message['band'])
         if processor is None:
           self.__log_send_full({
               'source': 'service',
-              'cause': 'received message on unregistered channel',
-              'channel': message['channel'],
+              'cause': 'received message on unregistered band',
               'log': message})
         else:
           processor(message.get('payload'))
       else:
         self.__log_send_full({
             'source': 'service',
-            'cause': 'received message without channel information',
+            'cause': 'received message without band information',
             'log': message})
 
     self.__update_service_status(self.SERVICE_STATUS_SHUTDOWN)
@@ -189,6 +189,12 @@ class CommonService(QueueTransport):
     '''Process an incoming command message from the frontend.'''
     if command == Commands.SHUTDOWN:
       self.__shutdown = True
+
+  def __process_transport(self, message):
+    '''Process an incoming transport message from the frontend.'''
+    print "TRN via Queue:", message
+    self._transport.subscription_callback(message['subscription_id']) \
+      ( message['header'], message['message'] )
 
   #
   # -- Plugin-related functions ----------------------------------------------

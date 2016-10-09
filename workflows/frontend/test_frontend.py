@@ -47,3 +47,46 @@ def test_get_frontend_status(mock_transport, mock_status):
   fe = workflows.frontend.Frontend()
   status = fe.get_status()
   assert status['host'] == fe.get_host_id()
+
+@mock.patch('workflows.frontend.workflows.status.StatusAdvertise')
+def test_connect_queue_communication_to_transport_layer(mock_status):
+  '''Check that communication messages coming in from the service layer via the Queue are
+     passed correctly to the transport layer and vice versa in the other direction.'''
+  transport = mock.Mock()
+  commqueue = mock.Mock()
+
+  fe = workflows.frontend.Frontend(transport=transport)
+  setattr(fe, '_queue_commands', commqueue)
+
+  transport.assert_called_once()
+  transport = transport.return_value
+  transport.connect.assert_called_once()
+
+  # TODO: Deprecated calls
+  fe.parse_band_transport( {
+      'call': 'send',
+      'payload': (str(mock.sentinel.channel), mock.sentinel.message)
+    } )
+  transport.send_message.assert_called_once_with(
+    mock.sentinel.message, '/queue/' + str(mock.sentinel.channel))
+
+  fe.parse_band_transport( {
+      'call': 'subscribe',
+      'channel': mock.sentinel.channel,
+      'subscription_id': mock.sentinel.subid
+    } )
+  transport.subscribe.assert_called_once_with(
+    mock.sentinel.channel,
+    mock.ANY,
+    )
+  callback_function = transport.subscribe.call_args[0][1]
+
+  callback_function(mock.sentinel.header, mock.sentinel.message)
+  commqueue.put.assert_called_once_with( {
+      'band': 'transport',
+      'payload': {
+      'subscription_id': mock.sentinel.subid,
+      'header': mock.sentinel.header,
+      'message': mock.sentinel.message,
+      } # TODO: 'payload' should be deprecated
+    } )

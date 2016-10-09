@@ -16,8 +16,8 @@ def test_start_and_shutdown_waiter_service(mock_time):
   '''Start the waiter service, process some stuff and shut it down again.'''
   cmd_queue = mock.Mock()
   cmd_queue.get.side_effect = [
-    { 'channel': 'stuff', 'payload': mock.sentinel.stuff },
-    { 'channel': 'command',
+    { 'band': 'stuff', 'payload': mock.sentinel.stuff },
+    { 'band': 'command',
       'payload': Commands.SHUTDOWN },
     AssertionError('Not observing commands') ]
   fe_queue = Queue.Queue()
