@@ -77,26 +77,26 @@ class QueueTransport(CommonTransport):
       'payload': args
     })
 
-  def _subscribe(self, sub_id, channel, callback, *args):
+  def _subscribe(self, sub_id, channel, callback, **kwargs):
     '''Forward subscription command to queue.'''
     self.assert_connected()
     self._queue.put_nowait({
       'band': 'transport',
       'call': 'subscribe',
-      'payload': (
-        sub_id,
-        channel) + args
+      'channel': channel,
+      'subscription_id': sub_id,
+      'payload': kwargs,
     })
 
-  def _subscribe_broadcast(self, sub_id, channel, callback, *args):
+  def _subscribe_broadcast(self, sub_id, channel, callback, **kwargs):
     '''Forward broadcast subscription command to queue.'''
     self.assert_connected()
     self._queue.put_nowait({
       'band': 'transport',
       'call': 'subscribe_broadcast',
-      'payload': (
-        sub_id,
-        channel) + args
+      'channel': channel,
+      'subscription_id': sub_id,
+      'payload': kwargs,
     })
 
   def _unsubscribe(self, sub_id):

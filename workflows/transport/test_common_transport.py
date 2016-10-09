@@ -17,7 +17,9 @@ def test_subscribe_unsubscribe_a_channel():
   assert subid
   assert ct.subscription_callback(subid) == mock.sentinel.callback
   ct._subscribe.assert_called_once_with(subid, mock.sentinel.channel,
-        mock.sentinel.callback, mock.sentinel.exclusive, mock.sentinel.ack)
+        mock.sentinel.callback,
+        exclusive=mock.sentinel.exclusive,
+        acknowledgement=mock.sentinel.ack)
 
   ct.unsubscribe(subid)
 
@@ -38,7 +40,7 @@ def test_simple_subscribe_unsubscribe_a_broadcast():
   assert subid
   assert ct.subscription_callback(subid) == mock.sentinel.callback
   ct._subscribe_broadcast.assert_called_once_with(subid, mock.sentinel.channel,
-        mock.sentinel.callback, mock.sentinel.retro)
+        mock.sentinel.callback, retroactive=mock.sentinel.retro)
 
   ct.unsubscribe(subid)
 
@@ -208,8 +210,8 @@ def test_unimplemented_communication_methods_should_fail():
   ct = CommonTransport()
   assert not ct.connect()
   for function, argcount in [
-      ('_subscribe', 5),
-      ('_subscribe_broadcast', 4),
+      ('_subscribe', 3),
+      ('_subscribe_broadcast', 3),
       ('_unsubscribe', 1),
       ('_send', 5),
       ('_broadcast', 5),

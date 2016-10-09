@@ -24,28 +24,32 @@ class CommonTransport(object):
                 False-like value otherwise.'''
     return False
 
-  def subscribe(self, channel, callback, client_id=None, exclusive=False,
-                acknowledgement=False):
+  def subscribe(self, channel, callback, **kwargs):
     '''Listen to a queue, notify via callback function.
        :param channel: Queue name to subscribe to
        :param callback: Function to be called when messages are received
-       :param client_id: Value tying a subscription to one client. This allows
+       :param **kwargs: Further parameters for the transport layer. For example
+              client_id: Value tying a subscription to one client. This allows
                          removing all subscriptions for a client simultaneously
                          when the client goes away.
-       :param exclusive: Attempt to become exclusive subscriber to the queue.
-       :param acknowledgement: If true receipt of each message needs to be
+              exclusive: Attempt to become exclusive subscriber to the queue.
+              acknowledgement: If true receipt of each message needs to be
                                acknowledged.
        :return: A unique subscription ID
     '''
     self.__subscription_id += 1
     self.__subscriptions[self.__subscription_id] = {
-      'channel': channel, 'client': client_id, 'callback': callback
+      'channel': channel,
+      'client': kwargs.get('client_id'),
+      'callback': callback
     }
-    if client_id:
-      self.__clients[client_id]['subscriptions'].add(self.__subscription_id)
-    self._debug('Subscribing to %s for %s with ID %d' % (channel, client_id, self.__subscription_id))
-    self._subscribe(self.__subscription_id, channel, callback, exclusive,
-                    acknowledgement)
+    self._debug('Subscribing to %s for %s with ID %d' % \
+        (channel, kwargs.get('client_id'), self.__subscription_id))
+    if 'client_id' in kwargs:
+      self.__clients[kwargs['client_id']]['subscriptions'].add \
+        (self.__subscription_id)
+      del(kwargs['client_id'])
+    self._subscribe(self.__subscription_id, channel, callback, **kwargs)
     return self.__subscription_id
 
   def unsubscribe(self, subscription):
@@ -61,24 +65,29 @@ class CommonTransport(object):
     self._unsubscribe(subscription)
     del(self.__subscriptions[subscription])
 
-  def subscribe_broadcast(self, channel, callback, client_id=None,
-                          retroactive=False):
+  def subscribe_broadcast(self, channel, callback, **kwargs):
     '''Listen to a broadcast topic, notify via callback function.
        :param channel: Topic name to subscribe to
        :param callback: Function to be called when messages are received
        :param client_id: Value tying a subscription to one client. This allows
                          removing all subscriptions for a client simultaneously
                          when the client goes away.
-       :param retroactive: Ask broker to send old messages if possible
+       :param **kwargs: Further parameters for the transport layer. For example
+              retroactive: Ask broker to send old messages if possible
+       :return: A unique subscription ID
     '''
     self.__subscription_id += 1
     self.__subscriptions[self.__subscription_id] = {
-      'channel': channel, 'client': client_id, 'callback': callback
+      'channel': channel,
+      'client': kwargs.get('client_id'),
+      'callback': callback
     }
-    if client_id:
-      self.__clients[client_id]['subscriptions'].add(self.__subscription_id)
-    self._subscribe_broadcast(self.__subscription_id, channel, callback,
-                              retroactive)
+    if 'client_id' in kwargs:
+      self.__clients[kwargs['client_id']]['subscriptions'].add \
+        (self.__subscription_id)
+      del(kwargs['client_id'])
+    self._subscribe_broadcast(self.__subscription_id, channel, callback, \
+        **kwargs)
     return self.__subscription_id
 
   def subscription_callback(self, subscription):
@@ -218,23 +227,25 @@ class CommonTransport(object):
   # -- Low level communication calls to be implemented by subclass -----------
   #
 
-  def _subscribe(self, sub_id, channel, callback, exclusive, acknowledgement):
+  def _subscribe(self, sub_id, channel, callback, **kwargs):
     '''Listen to a queue, notify via callback function.
        :param sub_id: ID for this subscription in the transport layer
        :param channel: Queue name to subscribe to
        :param callback: Function to be called when messages are received
-       :param exclusive: Attempt to become exclusive subscriber to the queue.
-       :param acknowledgement: If true receipt of each message needs to be
+       :param **kwargs: Further parameters for the transport layer. For example
+              exclusive: Attempt to become exclusive subscriber to the queue.
+              acknowledgement: If true receipt of each message needs to be
                                acknowledged.
     '''
     raise workflows.WorkflowsError("Transport interface not implemented")
 
-  def _subscribe_broadcast(self, sub_id, channel, callback, retroactive):
+  def _subscribe_broadcast(self, sub_id, channel, callback, **kwargs):
     '''Listen to a broadcast topic, notify via callback function.
        :param sub_id: ID for this subscription in the transport layer
        :param channel: Topic name to subscribe to
        :param callback: Function to be called when messages are received
-       :param retroactive: Ask broker to send old messages if possible
+       :param **kwargs: Further parameters for the transport layer. For example
+              retroactive: Ask broker to send old messages if possible
     '''
     raise workflows.WorkflowsError("Transport interface not implemented")
 

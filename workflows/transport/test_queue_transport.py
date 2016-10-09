@@ -132,28 +132,34 @@ def test_forward_subscribe_call():
   '''Test translation of a subscribe() call to Queue message.'''
   mockqueue, queue = setup_queue()
 
-  subid = queue.subscribe(mock.sentinel.channel, mock.sentinel.callback)
+  subid = queue.subscribe(mock.sentinel.channel, mock.sentinel.callback,
+    something=mock.sentinel.something)
 
   mockqueue.put_nowait.assert_called_once_with({
     'band': 'transport',
     'call': 'subscribe',
-    'payload': (
-      subid, mock.sentinel.channel, False, False
-    )
+    'channel': mock.sentinel.channel,
+    'subscription_id': subid,
+    'payload': {
+      'something': mock.sentinel.something,
+    }
   })
 
 def test_forward_subscribe_broadcast_call():
   '''Test translation of a subscribe_broadcast() call to Queue message.'''
   mockqueue, queue = setup_queue()
 
-  subid = queue.subscribe_broadcast(mock.sentinel.channel, mock.sentinel.callback)
+  subid = queue.subscribe_broadcast(mock.sentinel.channel,
+    mock.sentinel.callback, something=mock.sentinel.something)
 
   mockqueue.put_nowait.assert_called_once_with({
     'band': 'transport',
     'call': 'subscribe_broadcast',
-    'payload': (
-      subid, mock.sentinel.channel, False
-    )
+    'channel': mock.sentinel.channel,
+    'subscription_id': subid,
+    'payload': {
+      'something': mock.sentinel.something,
+    }
   })
 
 def test_forward_unsubscribe_call():
