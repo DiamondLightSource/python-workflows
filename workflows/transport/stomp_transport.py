@@ -128,7 +128,6 @@ class StompTransport(CommonTransport):
     if channel:
       destination.append(channel)
     destination = '.'.join(destination)
-    status['stomp.cmdchan'] = '12345'
     import json
     message = json.dumps(status)
     with self._lock:
@@ -138,14 +137,6 @@ class StompTransport(CommonTransport):
           headers={
                     'expires': '%d' % int((90 + time.time()) * 1000)
                   })
-
-  def send_message(self, message, channel):
-    '''Send a message to a topic or queue.'''
-#   TODO: Does not take prefix into account
-    with self._lock:
-      self._conn.send(
-          body=message,
-          destination=channel)
 
   def _subscribe(self, sub_id, channel, callback, **kwargs):
     '''Listen to a queue, notify via callback function.
@@ -172,6 +163,27 @@ class StompTransport(CommonTransport):
 
     with self._lock:
       self._conn.subscribe('/queue/' + channel, sub_id, headers=headers)
+
+  def _send(self, destination, message, **kwargs):
+    '''Send a message to a queue.
+       :param destination: Queue name to send to
+       :param message: A string to be sent
+       :param **kwargs: Further parameters for the transport layer. For example
+              headers: Optional dictionary of header entries
+              expiration: Optional expiration time, relative to sending time
+              transaction: Transaction ID if message should be part of a
+                           transaction
+    '''
+    headers = kwargs.get('headers')
+    if not headers:
+      headers = {}
+#   TODO: Does not take prefix into account
+    destination = '/queue/' + destination
+    with self._lock:
+      self._conn.send(
+          body=message,
+          destination=destination,
+          headers=headers)
 
 
 ## Stomp listener methods #####################################################

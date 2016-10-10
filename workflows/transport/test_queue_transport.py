@@ -53,13 +53,11 @@ def test_forward_send_call():
   mockqueue.put_nowait.assert_called_with({
     'band': 'transport',
     'call': 'send',
-    'payload': (
-      mock.sentinel.destination,
-      str(mock.sentinel.message),
-      mock.sentinel.header,
-      None,
-      None
-    )
+    'payload': {
+      'destination': mock.sentinel.destination,
+      'message': str(mock.sentinel.message),
+      'headers': mock.sentinel.header,
+    }
   })
 
 def test_forward_broadcast_call():

@@ -17,6 +17,10 @@ class CommonService(QueueTransport):
   communicate from the frontend to the service.
   '''
 
+  # Human readable service name -----------------------------------------------
+
+  _service_name = 'unnamed service'
+
   # Overrideable functions ----------------------------------------------------
 
   def initializing(self):
@@ -76,7 +80,6 @@ class CommonService(QueueTransport):
     '''Service constructor. Parameters include optional references to two
        queues: frontend=Queue for messages from the service to the frontend,
        and commands=Queue for messages from the frontend to the service.'''
-    self._service_name = 'unnamed service'
     self.__queue_frontend = kwargs.get('frontend')
     self.__queue_commands = kwargs.get('commands')
     self._transport = workflows.transport.queue_transport.QueueTransport()
@@ -192,7 +195,6 @@ class CommonService(QueueTransport):
 
   def __process_transport(self, message):
     '''Process an incoming transport message from the frontend.'''
-    print "TRN via Queue:", message
     self._transport.subscription_callback(message['subscription_id']) \
       ( message['header'], message['message'] )
 

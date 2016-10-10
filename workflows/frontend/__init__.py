@@ -76,8 +76,8 @@ class Frontend():
     print "TRN:", message
     if self._transport:
       if message['call'] == 'send':
-        self._transport.send_message(message['payload'][1], \
-                                     '/queue/' + message['payload'][0])
+        self._transport.send(message['payload']['destination'],
+                             message['payload']['message'])
       elif message['call'] == 'subscribe':
         self._transport.subscribe(message['channel'],
             lambda cb_header, cb_message:

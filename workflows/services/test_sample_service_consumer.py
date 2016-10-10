@@ -22,4 +22,5 @@ def test_service_subscribes_to_channel():
 def test_service_can_consume_messages():
   '''Check that the service registers an idle event handler.'''
   p = workflows.services.sample_consumer.Consumer()
-  p.consume_message(mock.sentinel.header, mock.sentinel.message)
+  p.consume_message(None, mock.sentinel.message)
+  p.consume_message({'some': 'header'}, mock.sentinel.message)

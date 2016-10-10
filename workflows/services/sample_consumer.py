@@ -1,10 +1,15 @@
 from __future__ import absolute_import, division
 from workflows.services.common_service import CommonService
+import json
+import time
 
 class Consumer(CommonService):
   '''An example service building on top of the workflow.services architecture,
      demonstrating how this architecture can be used.
      This service consumes messages off a queue.'''
+
+  # Human readable service name
+  _service_name = "Message Consumer"
 
   def initializing(self):
     '''Subscribe to a channel.'''
@@ -13,7 +18,8 @@ class Consumer(CommonService):
   def consume_message(self, header, message):
     '''Consume a message'''
     print "=== Consume ===="
-    print header
-    print "----------------"
+    if header:
+      print json.dumps(header, indent=2)
+      print "----------------"
     print message
-    print "================"
+    print "========Received@", (time.time() % 1000) * 1000

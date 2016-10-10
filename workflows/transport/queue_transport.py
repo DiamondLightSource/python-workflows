@@ -32,13 +32,17 @@ class QueueTransport(CommonTransport):
     if not self._connected:
       raise WorkflowsError('Transport not connected')
 
-  def _send(self, *args):
+  def _send(self, destination, message, **kwargs):
     '''Forward message sending command to queue.'''
     self.assert_connected()
+    kwargs.update({
+        'destination': destination,
+        'message': message
+      })
     self._queue.put_nowait({
       'band': 'transport',
       'call': 'send',
-      'payload': args
+      'payload': kwargs
     })
 
   def _broadcast(self, *args):

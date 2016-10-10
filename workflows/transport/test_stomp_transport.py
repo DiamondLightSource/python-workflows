@@ -93,7 +93,6 @@ def test_broadcast_status(mockstomp, mocktime):
   assert kwargs['destination'].startswith('/topic/transient.status')
   statusdict = json.loads(kwargs['body'])
   assert statusdict['status'] == str(mock.sentinel.status)
-  assert 'stomp.cmdchan' in statusdict
 
 @mock.patch('workflows.transport.stomp_transport.stomp')
 def test_send_message(mockstomp):
@@ -103,12 +102,20 @@ def test_send_message(mockstomp):
   stomp = StompTransport()
   stomp.connect()
 
-  stomp.send_message( mock.sentinel.message, channel=str(mock.sentinel.channel) )
+  stomp._send( str(mock.sentinel.channel), mock.sentinel.message )
 
   mockconn.send.assert_called_once()
   args, kwargs = mockconn.send.call_args
-  assert kwargs['destination'] == str(mock.sentinel.channel)
+  assert kwargs['destination'] == '/queue/' + str(mock.sentinel.channel)
   assert kwargs['body'] == mock.sentinel.message
+  assert kwargs.get('headers') in (None, {})
+
+  stomp._send( str(mock.sentinel.channel), mock.sentinel.message, headers=mock.sentinel.headers )
+  assert mockconn.send.call_count == 2
+  args, kwargs = mockconn.send.call_args
+  assert kwargs['destination'] == '/queue/' + str(mock.sentinel.channel)
+  assert kwargs['body'] == mock.sentinel.message
+  assert kwargs['headers'] == mock.sentinel.headers
 
 @pytest.mark.skip(reason="Broken due to changed interface")
 #@mock.patch('workflows.transport.stomp_transport.stomp')

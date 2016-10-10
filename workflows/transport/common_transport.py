@@ -101,19 +101,19 @@ class CommonTransport(object):
             ("Attempting to callback on unknown subscription")
     return self.__subscriptions[subscription]['callback']
 
-  def send(self, destination, message, headers=None, expiration=None,
-           transaction=None):
+  def send(self, destination, message, **kwargs):
     '''Send a message to a queue.
        :param destination: Queue name to send to
        :param message: Either a string or a serializable object to be sent
-       :param headers: Optional dictionary of header entries
-       :param expiration: Optional expiration time, relative to sending time
-       :param transaction: Transaction ID if message should be part of a
+       :param **kwargs: Further parameters for the transport layer. For example
+              headers: Optional dictionary of header entries
+              expiration: Optional expiration time, relative to sending time
+              transaction: Transaction ID if message should be part of a
                            transaction
     '''
     if not isinstance(message, basestring):
       message = json.dumps(message)
-    self._send(destination, message, headers, expiration, transaction)
+    self._send(destination, message, **kwargs)
 
   def broadcast(self, destination, message, headers=None, expiration=None,
                 transaction=None):
@@ -255,13 +255,14 @@ class CommonTransport(object):
     '''
     raise workflows.WorkflowsError("Transport interface not implemented")
 
-  def _send(self, destination, message, headers, expiration, transaction):
+  def _send(self, destination, message, **kwargs):
     '''Send a message to a queue.
        :param destination: Queue name to send to
        :param message: A string to be sent
-       :param headers: Optional dictionary of header entries
-       :param expiration: Optional expiration time, relative to sending time
-       :param transaction: Transaction ID if message should be part of a
+       :param **kwargs: Further parameters for the transport layer. For example
+              headers: Optional dictionary of header entries
+              expiration: Optional expiration time, relative to sending time
+              transaction: Transaction ID if message should be part of a
                            transaction
     '''
     raise workflows.WorkflowsError("Transport interface not implemented")

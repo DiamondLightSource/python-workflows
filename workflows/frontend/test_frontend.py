@@ -62,13 +62,15 @@ def test_connect_queue_communication_to_transport_layer(mock_status):
   transport = transport.return_value
   transport.connect.assert_called_once()
 
-  # TODO: Deprecated calls
   fe.parse_band_transport( {
       'call': 'send',
-      'payload': (str(mock.sentinel.channel), mock.sentinel.message)
+      'payload': {
+        'destination': mock.sentinel.channel,
+        'message': mock.sentinel.message
+      }
     } )
-  transport.send_message.assert_called_once_with(
-    mock.sentinel.message, '/queue/' + str(mock.sentinel.channel))
+  transport.send.assert_called_once_with(mock.sentinel.channel,
+                                         mock.sentinel.message)
 
   fe.parse_band_transport( {
       'call': 'subscribe',
@@ -85,8 +87,8 @@ def test_connect_queue_communication_to_transport_layer(mock_status):
   commqueue.put.assert_called_once_with( {
       'band': 'transport',
       'payload': {
-      'subscription_id': mock.sentinel.subid,
-      'header': mock.sentinel.header,
-      'message': mock.sentinel.message,
-      } # TODO: 'payload' should be deprecated
+        'subscription_id': mock.sentinel.subid,
+        'header': mock.sentinel.header,
+        'message': mock.sentinel.message,
+        }
     } )

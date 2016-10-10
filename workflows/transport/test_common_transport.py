@@ -55,19 +55,21 @@ def test_simple_send_message():
   ct._send = mock.Mock()
 
   ct.send(mock.sentinel.destination, str(mock.sentinel.message),
-        headers=mock.sentinel.headers, expiration=mock.sentinel.expiration,
-        transaction=mock.sentinel.transaction)
+        headers=mock.sentinel.headers,
+        expiration=mock.sentinel.expiration,
+        transaction=mock.sentinel.transaction,
+        something=mock.sentinel.something)
 
   ct._send.assert_called_once_with(mock.sentinel.destination,
-        str(mock.sentinel.message), mock.sentinel.headers,
-        mock.sentinel.expiration,
-        mock.sentinel.transaction)
+        str(mock.sentinel.message), headers=mock.sentinel.headers,
+        expiration=mock.sentinel.expiration,
+        transaction=mock.sentinel.transaction,
+        something=mock.sentinel.something)
 
   ct.send(mock.sentinel.destination, { 'entry': [ 0, 'banana' ] })
 
   ct._send.assert_called_with(mock.sentinel.destination,
-        '{"entry": [0, "banana"]}',
-        None, None, None)
+        '{"entry": [0, "banana"]}')
 
 def test_simple_broadcast_message():
   """Pass string and object messages to broadcast(), should be serialized and
@@ -213,7 +215,7 @@ def test_unimplemented_communication_methods_should_fail():
       ('_subscribe', 3),
       ('_subscribe_broadcast', 3),
       ('_unsubscribe', 1),
-      ('_send', 5),
+      ('_send', 2),
       ('_broadcast', 5),
       ('_ack', 2),
       ('_nack', 2),
