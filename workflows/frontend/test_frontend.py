@@ -64,18 +64,20 @@ def test_connect_queue_communication_to_transport_layer(mock_status):
 
   fe.parse_band_transport( {
       'call': 'send',
-      'payload': {
-        'destination': mock.sentinel.channel,
-        'message': mock.sentinel.message
-      }
+      'payload': (
+        ( mock.sentinel.channel, mock.sentinel.message ),
+        {}
+      )
     } )
   transport.send.assert_called_once_with(mock.sentinel.channel,
                                          mock.sentinel.message)
 
   fe.parse_band_transport( {
       'call': 'subscribe',
-      'channel': mock.sentinel.channel,
-      'subscription_id': mock.sentinel.subid
+      'payload': (
+        ( mock.sentinel.subid, mock.sentinel.channel ),
+        {}
+      )
     } )
   transport.subscribe.assert_called_once_with(
     mock.sentinel.channel,
@@ -85,10 +87,10 @@ def test_connect_queue_communication_to_transport_layer(mock_status):
 
   callback_function(mock.sentinel.header, mock.sentinel.message)
   commqueue.put.assert_called_once_with( {
-      'band': 'transport',
+      'band': 'transport_message',
       'payload': {
-        'subscription_id': mock.sentinel.subid,
-        'header': mock.sentinel.header,
-        'message': mock.sentinel.message,
+          'subscription_id': mock.sentinel.subid,
+          'header': mock.sentinel.header,
+          'message': mock.sentinel.message,
         }
     } )

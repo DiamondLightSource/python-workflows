@@ -53,11 +53,10 @@ def test_forward_send_call():
   mockqueue.put_nowait.assert_called_with({
     'band': 'transport',
     'call': 'send',
-    'payload': {
-      'destination': mock.sentinel.destination,
-      'message': str(mock.sentinel.message),
-      'headers': mock.sentinel.header,
-    }
+    'payload': (
+      ( mock.sentinel.destination, str(mock.sentinel.message) ),
+      { 'headers': mock.sentinel.header }
+    )
   })
 
 def test_forward_broadcast_call():
@@ -72,11 +71,8 @@ def test_forward_broadcast_call():
     'band': 'transport',
     'call': 'broadcast',
     'payload': (
-      mock.sentinel.destination,
-      str(mock.sentinel.message),
-      mock.sentinel.header,
-      None,
-      None
+      (mock.sentinel.destination, str(mock.sentinel.message)),
+      { 'headers': mock.sentinel.header }
     )
   })
 
@@ -84,13 +80,13 @@ def test_forward_transaction_begin_call():
   '''Test translation of a transaction_begin() call to Queue message.'''
   mockqueue, queue = setup_queue()
 
-  tid = queue.transaction_begin()
+  tid = queue.transaction_begin(kwarg=mock.sentinel.kwarg)
 
   mockqueue.put_nowait.assert_called_once_with({
     'band': 'transport',
     'call': 'transaction_begin',
     'payload': (
-      tid,
+      (tid,), { 'kwarg': mock.sentinel.kwarg }
     )
   })
 
@@ -99,14 +95,14 @@ def test_forward_transaction_abort_call():
   mockqueue, queue = setup_queue()
 
   tid = queue.transaction_begin()
-  queue.transaction_abort(tid)
+  queue.transaction_abort(tid, kwarg=mock.sentinel.kwarg)
 
   assert mockqueue.put_nowait.call_count == 2
   mockqueue.put_nowait.assert_called_with({
     'band': 'transport',
     'call': 'transaction_abort',
     'payload': (
-      tid,
+      (tid,), { 'kwarg': mock.sentinel.kwarg }
     )
   })
 
@@ -115,14 +111,14 @@ def test_forward_transaction_commit_call():
   mockqueue, queue = setup_queue()
 
   tid = queue.transaction_begin()
-  queue.transaction_commit(tid)
+  queue.transaction_commit(tid, kwarg=mock.sentinel.kwarg)
 
   assert mockqueue.put_nowait.call_count == 2
   mockqueue.put_nowait.assert_called_with({
     'band': 'transport',
     'call': 'transaction_commit',
     'payload': (
-      tid,
+      (tid,), { 'kwarg': mock.sentinel.kwarg }
     )
   })
 
@@ -131,16 +127,15 @@ def test_forward_subscribe_call():
   mockqueue, queue = setup_queue()
 
   subid = queue.subscribe(mock.sentinel.channel, mock.sentinel.callback,
-    something=mock.sentinel.something)
+    kwarg=mock.sentinel.kwarg)
 
   mockqueue.put_nowait.assert_called_once_with({
     'band': 'transport',
     'call': 'subscribe',
-    'channel': mock.sentinel.channel,
-    'subscription_id': subid,
-    'payload': {
-      'something': mock.sentinel.something,
-    }
+    'payload': (
+      ( subid, mock.sentinel.channel ), # callback can't be transported
+      { 'kwarg': mock.sentinel.kwarg }
+    )
   })
 
 def test_forward_subscribe_broadcast_call():
@@ -148,16 +143,15 @@ def test_forward_subscribe_broadcast_call():
   mockqueue, queue = setup_queue()
 
   subid = queue.subscribe_broadcast(mock.sentinel.channel,
-    mock.sentinel.callback, something=mock.sentinel.something)
+    mock.sentinel.callback, kwarg=mock.sentinel.kwarg)
 
   mockqueue.put_nowait.assert_called_once_with({
     'band': 'transport',
     'call': 'subscribe_broadcast',
-    'channel': mock.sentinel.channel,
-    'subscription_id': subid,
-    'payload': {
-      'something': mock.sentinel.something,
-    }
+    'payload': (
+      ( subid, mock.sentinel.channel, mock.sentinel.callback ),
+      { 'kwarg': mock.sentinel.kwarg }
+    )
   })
 
 def test_forward_unsubscribe_call():
@@ -165,23 +159,44 @@ def test_forward_unsubscribe_call():
   mockqueue, queue = setup_queue()
 
   subid = queue.subscribe(mock.sentinel.channel, mock.sentinel.callback)
-  queue.unsubscribe(subid)
+  queue.unsubscribe(subid, kwarg=mock.sentinel.kwarg)
 
   assert mockqueue.put_nowait.call_count == 2
   mockqueue.put_nowait.assert_called_with({
     'band': 'transport',
     'call': 'unsubscribe',
     'payload': (
-      subid,
+      ( subid, ),
+      { 'kwarg': mock.sentinel.kwarg }
     )
   })
 
-@pytest.mark.skip(reason="TODO")
 def test_forward_ack_call():
-  # def _ack(self, message_id, transaction):
-  pass
+  mockqueue, queue = setup_queue()
 
-@pytest.mark.skip(reason="TODO")
+  queue.ack(mock.sentinel.messageid,
+            kwarg=mock.sentinel.kwarg)
+
+  mockqueue.put_nowait.assert_called_once_with({
+    'band': 'transport',
+    'call': 'ack',
+    'payload': (
+      ( mock.sentinel.messageid, ),
+      { 'kwarg': mock.sentinel.kwarg }
+    )
+  })
+
 def test_forward_nack_call():
-  # def _nack(self, message_id, transaction):
-  pass
+  mockqueue, queue = setup_queue()
+
+  queue.nack(mock.sentinel.messageid,
+            kwarg=mock.sentinel.kwarg)
+
+  mockqueue.put_nowait.assert_called_once_with({
+    'band': 'transport',
+    'call': 'nack',
+    'payload': (
+      ( mock.sentinel.messageid, ),
+      { 'kwarg': mock.sentinel.kwarg }
+    )
+  })

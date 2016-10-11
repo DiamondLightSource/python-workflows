@@ -83,15 +83,14 @@ def test_simple_broadcast_message():
         transaction=mock.sentinel.transaction)
 
   ct._broadcast.assert_called_once_with(mock.sentinel.destination,
-        str(mock.sentinel.message), mock.sentinel.headers,
-        mock.sentinel.expiration,
-        mock.sentinel.transaction)
+        str(mock.sentinel.message), headers=mock.sentinel.headers,
+        expiration=mock.sentinel.expiration,
+        transaction=mock.sentinel.transaction)
 
   ct.broadcast(mock.sentinel.destination, { 'entry': [ 0, 'banana' ] })
 
   ct._broadcast.assert_called_with(mock.sentinel.destination,
-        '{"entry": [0, "banana"]}',
-        None, None, None)
+        '{"entry": [0, "banana"]}')
 
 def test_register_and_drop_clients():
   "Register clients, should get unique IDs, unregister clients."
@@ -216,9 +215,9 @@ def test_unimplemented_communication_methods_should_fail():
       ('_subscribe_broadcast', 3),
       ('_unsubscribe', 1),
       ('_send', 2),
-      ('_broadcast', 5),
-      ('_ack', 2),
-      ('_nack', 2),
+      ('_broadcast', 2),
+      ('_ack', 1),
+      ('_nack', 1),
       ('_transaction_begin', 1),
       ('_transaction_abort', 1),
       ('_transaction_commit', 1),

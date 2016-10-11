@@ -144,7 +144,7 @@ class CommonService(QueueTransport):
 
     self.initializing()
     self._register('command', self.__process_command)
-    self._register('transport', self.__process_transport)
+    self._register('transport_message', self.__process_transport)
 
     if self.__queue_commands is None:
       # can only listen to commands if command queue is defined

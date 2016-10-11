@@ -32,84 +32,92 @@ class QueueTransport(CommonTransport):
     if not self._connected:
       raise WorkflowsError('Transport not connected')
 
-  def _send(self, destination, message, **kwargs):
+  def _send(self, *args, **kwargs):
     '''Forward message sending command to queue.'''
     self.assert_connected()
-    kwargs.update({
-        'destination': destination,
-        'message': message
-      })
     self._queue.put_nowait({
       'band': 'transport',
       'call': 'send',
-      'payload': kwargs
+      'payload': ( args, kwargs )
     })
 
-  def _broadcast(self, *args):
+  def _broadcast(self, *args, **kwargs):
     '''Forward message broadcast command to queue.'''
     self.assert_connected()
     self._queue.put_nowait({
       'band': 'transport',
       'call': 'broadcast',
-      'payload': args
+      'payload': ( args, kwargs )
     })
 
-  def _transaction_begin(self, *args):
+  def _transaction_begin(self, *args, **kwargs):
     '''Forward transaction start command to queue.'''
     self.assert_connected()
     self._queue.put_nowait({
       'band': 'transport',
       'call': 'transaction_begin',
-      'payload': args
+      'payload': ( args, kwargs )
     })
 
-  def _transaction_abort(self, *args):
+  def _transaction_abort(self, *args, **kwargs):
     '''Forward transaction abort command to queue.'''
     self.assert_connected()
     self._queue.put_nowait({
       'band': 'transport',
       'call': 'transaction_abort',
-      'payload': args
+      'payload': ( args, kwargs )
     })
 
-  def _transaction_commit(self, *args):
+  def _transaction_commit(self, *args, **kwargs):
     '''Forward transaction commit command to queue.'''
     self.assert_connected()
     self._queue.put_nowait({
       'band': 'transport',
       'call': 'transaction_commit',
-      'payload': args
+      'payload': ( args, kwargs )
     })
 
-  def _subscribe(self, sub_id, channel, callback, **kwargs):
+  def _subscribe(self, subscription_id, channel, callback, **kwargs):
     '''Forward subscription command to queue.'''
     self.assert_connected()
     self._queue.put_nowait({
       'band': 'transport',
       'call': 'subscribe',
-      'channel': channel,
-      'subscription_id': sub_id,
-      'payload': kwargs,
+      'payload': ( (subscription_id, channel), kwargs )
     })
 
-  def _subscribe_broadcast(self, sub_id, channel, callback, **kwargs):
+  def _subscribe_broadcast(self, *args, **kwargs):
     '''Forward broadcast subscription command to queue.'''
     self.assert_connected()
     self._queue.put_nowait({
       'band': 'transport',
       'call': 'subscribe_broadcast',
-      'channel': channel,
-      'subscription_id': sub_id,
-      'payload': kwargs,
+      'payload': ( args, kwargs )
     })
 
-  def _unsubscribe(self, sub_id):
+  def _unsubscribe(self, *args, **kwargs):
     '''Forward unsubscribe command to queue.'''
     self.assert_connected()
     self._queue.put_nowait({
       'band': 'transport',
       'call': 'unsubscribe',
-      'payload': (
-        sub_id,
-      )
+      'payload': ( args, kwargs )
+    })
+
+  def _ack(self, *args, **kwargs):
+    '''Forward receipt acknowledgement to queue.'''
+    self.assert_connected()
+    self._queue.put_nowait({
+      'band': 'transport',
+      'call': 'ack',
+      'payload': ( args, kwargs )
+    })
+
+  def _nack(self, *args, **kwargs):
+    '''Forward receipt rejection to queue.'''
+    self.assert_connected()
+    self._queue.put_nowait({
+      'band': 'transport',
+      'call': 'nack',
+      'payload': ( args, kwargs )
     })

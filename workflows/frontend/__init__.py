@@ -76,15 +76,15 @@ class Frontend():
     print "TRN:", message
     if self._transport:
       if message['call'] == 'send':
-        self._transport.send(message['payload']['destination'],
-                             message['payload']['message'])
+        self._transport.send(*message['payload'][0], **message['payload'][1])
       elif message['call'] == 'subscribe':
-        self._transport.subscribe(message['channel'],
+        subscription_id, channel = message['payload'][0]
+        self._transport.subscribe(channel,
             lambda cb_header, cb_message:
             self.send_command( {
-                'band': 'transport',
+                'band': 'transport_message',
                 'payload': {
-                  'subscription_id': message['subscription_id'],
+                  'subscription_id': subscription_id,
                   'header': cb_header,
                   'message': cb_message,
                 },
@@ -96,6 +96,9 @@ class Frontend():
     print "To command queue: ", command
     if self._queue_commands:
       self._queue_commands.put(command)
+
+  def parse_band_log(self, message):
+    print "LOG:", message
 
   def parse_band_status(self, message):
     print "STT:", message

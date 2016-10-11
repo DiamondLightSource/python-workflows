@@ -1,6 +1,7 @@
 from __future__ import absolute_import, division
 import workflows.status
 import mock
+import pytest
 
 @mock.patch('workflows.status.threading')
 def test_status_advertiser_starts_and_stops_threads(mock_threading):
@@ -26,22 +27,18 @@ def test_status_advertiser_regularly_passes_status(mock_time, mock_threading, mo
 
   # Run with a failing status function
   sm.side_effect = RuntimeError(mock.sentinel.status_error)
-  try:
+  with pytest.raises(RuntimeError) as excinfo:
     t()
-    assert False, "Expected exception not raised"
-  except RuntimeError, e:
-    assert e.message == mock.sentinel.pause
+  assert excinfo.value.message == mock.sentinel.pause
 
   qm.get.assert_called_once_with(True, 120)
   sm.assert_called_once()
 
   # Run with a working status function
   sm.side_effect = None
-  try:
+  with pytest.raises(RuntimeError) as excinfo:
     t()
-    assert False, "Expected exception not raised"
-  except RuntimeError, e:
-    assert e.message == mock.sentinel.pause
+  assert excinfo.value.message == mock.sentinel.pause
 
   assert qm.get.call_count == 2
   tm.broadcast_status.assert_called_once_with(mock.sentinel.status1)

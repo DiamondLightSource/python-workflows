@@ -52,9 +52,10 @@ class CommonTransport(object):
     self._subscribe(self.__subscription_id, channel, callback, **kwargs)
     return self.__subscription_id
 
-  def unsubscribe(self, subscription):
+  def unsubscribe(self, subscription, **kwargs):
     '''Stop listening to a queue or a broadcast
        :param subscription: Subscription ID to cancel
+       :param **kwargs: Further parameters for the transport layer.
     '''
     if subscription not in self.__subscriptions:
       raise workflows.WorkflowsError \
@@ -62,7 +63,7 @@ class CommonTransport(object):
     if self.__subscriptions[subscription]['client']:
       self.__clients[self.__subscriptions[subscription]['client']] \
         ['subscriptions'].remove(subscription)
-    self._unsubscribe(subscription)
+    self._unsubscribe(subscription, **kwargs)
     del(self.__subscriptions[subscription])
 
   def subscribe_broadcast(self, channel, callback, **kwargs):
@@ -115,57 +116,63 @@ class CommonTransport(object):
       message = json.dumps(message)
     self._send(destination, message, **kwargs)
 
-  def broadcast(self, destination, message, headers=None, expiration=None,
-                transaction=None):
+  def broadcast(self, destination, message, **kwargs):
     '''Broadcast a message.
        :param destination: Topic name to send to
        :param message: Either a string or a serializable object to be sent
-       :param headers: Optional dictionary of header entries
-       :param expiration: Optional expiration time, relative to sending time
-       :param transaction: Transaction ID if message should be part of a
+       :param **kwargs: Further parameters for the transport layer. For example
+              headers: Optional dictionary of header entries
+              expiration: Optional expiration time, relative to sending time
+              transaction: Transaction ID if message should be part of a
                            transaction
     '''
     if not isinstance(message, basestring):
       message = json.dumps(message)
-    self._broadcast(destination, message, headers, expiration, transaction)
+    self._broadcast(destination, message, **kwargs)
 
-  def ack(self, message_id, transaction=None):
+  def ack(self, message_id, **kwargs):
     '''Acknowledge receipt of a message. This only makes sense when the
        'acknowledgment' flag was set for the relevant subscription.
        :param message_id: ID of the message to be acknowledged
-       :param transaction: Transaction ID if acknowledgement should be part of
+       :param **kwargs: Further parameters for the transport layer. For example
+              transaction: Transaction ID if acknowledgement should be part of
                            a transaction
     '''
-    raise workflows.WorkflowsError("Transport interface not implemented")
+    self._ack(message_id, **kwargs)
 
-  def nack(self, message_id, transaction=None):
+  def nack(self, message_id, **kwargs):
     '''Reject receipt of a message. This only makes sense when the
        'acknowledgment' flag was set for the relevant subscription.
        :param message_id: ID of the message to be rejected
-       :param transaction: Transaction ID if rejection should be part of a
+       :param **kwargs: Further parameters for the transport layer. For example
+              transaction: Transaction ID if rejection should be part of a
                            transaction
     '''
-    raise workflows.WorkflowsError("Transport interface not implemented")
+    self._nack(message_id, **kwargs)
 
-  def transaction_begin(self, client_id=None):
+  def transaction_begin(self, **kwargs):
     '''Start a new transaction.
-       :param client_id: Value tying a transaction to one client. This allows
+       :param **kwargs: Further parameters for the transport layer. For example
+              client_id: Value tying a transaction to one client. This allows
                          aborting all transactions for a client simultaneously
                          when the client goes away.
        :return: A transaction ID that can be passed to other functions.
     '''
     self.__transaction_id += 1
     self.__transactions[self.__transaction_id] = {
-      'client': client_id
+      'client': kwargs.get('client_id'),
     }
-    if client_id:
-      self.__clients[client_id]['transactions'].add(self.__transaction_id)
-    self._transaction_begin(self.__transaction_id)
+    if 'client_id' in kwargs:
+      self.__clients[kwargs['client_id']]['transactions'].add \
+        (self.__transaction_id)
+      del(kwargs['client_id'])
+    self._transaction_begin(self.__transaction_id, **kwargs)
     return self.__transaction_id
 
-  def transaction_abort(self, transaction_id):
+  def transaction_abort(self, transaction_id, **kwargs):
     '''Abort a transaction and roll back all operations.
        :param transaction_id: ID of transaction to be aborted.
+       :param **kwargs: Further parameters for the transport layer.
     '''
     if transaction_id not in self.__transactions:
       raise workflows.WorkflowsError("Attempting to abort unknown transaction")
@@ -173,11 +180,12 @@ class CommonTransport(object):
       self.__clients[self.__transactions[transaction_id]['client']] \
         ['transactions'].remove(transaction_id)
     del(self.__transactions[transaction_id])
-    self._transaction_abort(transaction_id)
+    self._transaction_abort(transaction_id, **kwargs)
 
-  def transaction_commit(self, transaction_id):
+  def transaction_commit(self, transaction_id, **kwargs):
     '''Commit a transaction.
        :param transaction_id: ID of transaction to be committed.
+       :param **kwargs: Further parameters for the transport layer.
     '''
     if transaction_id not in self.__transactions:
       raise workflows.WorkflowsError("Attempting to commit unknown transaction")
@@ -185,7 +193,7 @@ class CommonTransport(object):
       self.__clients[self.__transactions[transaction_id]['client']] \
         ['transactions'].remove(transaction_id)
     del(self.__transactions[transaction_id])
-    self._transaction_commit(transaction_id)
+    self._transaction_commit(transaction_id, **kwargs)
 
   #
   # -- Client management calls -----------------------------------------------
@@ -267,51 +275,56 @@ class CommonTransport(object):
     '''
     raise workflows.WorkflowsError("Transport interface not implemented")
 
-  def _broadcast(self, destination, message, headers, expiration,
-                 transaction):
+  def _broadcast(self, destination, message, **kwargs):
     '''Broadcast a message.
        :param destination: Topic name to send to
        :param message: A string to be broadcast
-       :param headers: Optional dictionary of header entries
-       :param expiration: Optional expiration time, relative to sending time
-       :param transaction: Transaction ID if message should be part of a
+       :param **kwargs: Further parameters for the transport layer. For example
+              headers: Optional dictionary of header entries
+              expiration: Optional expiration time, relative to sending time
+              transaction: Transaction ID if message should be part of a
                            transaction
     '''
     raise workflows.WorkflowsError("Transport interface not implemented")
 
-  def _ack(self, message_id, transaction):
+  def _ack(self, message_id, **kwargs):
     '''Acknowledge receipt of a message. This only makes sense when the
        'acknowledgment' flag was set for the relevant subscription.
        :param message_id: ID of the message to be acknowledged
-       :param transaction: Transaction ID if acknowledgement should be part of
+       :param **kwargs: Further parameters for the transport layer. For example
+              transaction: Transaction ID if acknowledgement should be part of
                            a transaction
     '''
     raise workflows.WorkflowsError("Transport interface not implemented")
 
-  def _nack(self, message_id, transaction):
+  def _nack(self, message_id, **kwargs):
     '''Reject receipt of a message. This only makes sense when the
        'acknowledgment' flag was set for the relevant subscription.
        :param message_id: ID of the message to be rejected
-       :param transaction: Transaction ID if rejection should be part of a
+       :param **kwargs: Further parameters for the transport layer. For example
+              transaction: Transaction ID if rejection should be part of a
                            transaction
     '''
     raise workflows.WorkflowsError("Transport interface not implemented")
 
-  def _transaction_begin(self, transaction_id):
+  def _transaction_begin(self, transaction_id, **kwargs):
     '''Start a new transaction.
        :param transaction_id: ID for this transaction in the transport layer.
+       :param **kwargs: Further parameters for the transport layer.
     '''
     raise workflows.WorkflowsError("Transport interface not implemented")
 
-  def _transaction_abort(self, transaction_id):
+  def _transaction_abort(self, transaction_id, **kwargs):
     '''Abort a transaction and roll back all operations.
        :param transaction_id: ID of transaction to be aborted.
+       :param **kwargs: Further parameters for the transport layer.
     '''
     raise workflows.WorkflowsError("Transport interface not implemented")
 
-  def _transaction_commit(self, transaction_id):
+  def _transaction_commit(self, transaction_id, **kwargs):
     '''Commit a transaction.
        :param transaction_id: ID of transaction to be committed.
+       :param **kwargs: Further parameters for the transport layer.
     '''
     raise workflows.WorkflowsError("Transport interface not implemented")
 
