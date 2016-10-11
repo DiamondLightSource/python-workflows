@@ -13,6 +13,7 @@ class CommonTransport(object):
   __subscription_id = 0
   __transactions = {}
   __transaction_id = 0
+  __messages = {}
 
   #
   # -- High level communication calls ----------------------------------------
@@ -41,7 +42,8 @@ class CommonTransport(object):
     self.__subscriptions[self.__subscription_id] = {
       'channel': channel,
       'client': kwargs.get('client_id'),
-      'callback': callback
+      'callback': callback,
+      'ack': kwargs.get('acknowledgement'),
     }
     self._debug('Subscribing to %s for %s with ID %d' % \
         (channel, kwargs.get('client_id'), self.__subscription_id))
@@ -81,7 +83,8 @@ class CommonTransport(object):
     self.__subscriptions[self.__subscription_id] = {
       'channel': channel,
       'client': kwargs.get('client_id'),
-      'callback': callback
+      'callback': callback,
+      'ack': False,
     }
     if 'client_id' in kwargs:
       self.__clients[kwargs['client_id']]['subscriptions'].add \
@@ -132,23 +135,60 @@ class CommonTransport(object):
 
   def ack(self, message_id, **kwargs):
     '''Acknowledge receipt of a message. This only makes sense when the
-       'acknowledgment' flag was set for the relevant subscription.
+       'acknowledgement' flag was set for the relevant subscription.
        :param message_id: ID of the message to be acknowledged
        :param **kwargs: Further parameters for the transport layer. For example
               transaction: Transaction ID if acknowledgement should be part of
                            a transaction
     '''
+    if message_id not in self.__messages:
+      raise workflows.WorkflowsError \
+            ("Attempting to ACK unknown message")
+    if self.__messages[message_id]:
+      self.__clients[self.__messages[message_id]]['messages'] \
+          .remove(message_id)
+    del(self.__messages[message_id])
     self._ack(message_id, **kwargs)
 
   def nack(self, message_id, **kwargs):
     '''Reject receipt of a message. This only makes sense when the
-       'acknowledgment' flag was set for the relevant subscription.
+       'acknowledgement' flag was set for the relevant subscription.
        :param message_id: ID of the message to be rejected
        :param **kwargs: Further parameters for the transport layer. For example
               transaction: Transaction ID if rejection should be part of a
                            transaction
     '''
+    if message_id not in self.__messages:
+      raise workflows.WorkflowsError \
+            ("Attempting to NACK unknown message")
+    if self.__messages[message_id]:
+      self.__clients[self.__messages[message_id]]['messages'] \
+          .remove(message_id)
+    del(self.__messages[message_id])
     self._nack(message_id, **kwargs)
+
+  def register_message(self, subscription, message_id):
+    '''Mark an incoming message to be ACKed/NACKed. This is only relevant when
+       'acknowledgement' flag was set for the relevant subscription, and will
+       raise a WorkflowsError otherwise. The message_id will be tracked, and
+       if it is not ACKed/NACKed, the transport layer will NACK it once it is
+       clear that the message can no longer be processed (ie. when the
+       associated client goes away).
+       :param subscription: ID of the subscription that the incoming message
+                            belongs to.
+       :param message_id: ID of the message to be rejected
+    '''
+    if subscription not in self.__subscriptions:
+      raise workflows.WorkflowsError \
+            ("Attempting to register message for unknown subscription")
+    if not self.__subscriptions[subscription]['ack']:
+      raise workflows.WorkflowsError \
+            ("Attempting to register message for subscription without"
+             "acknowledgement flag set")
+    client = self.__subscriptions[subscription]['client']
+    self.__messages[message_id] = client
+    if client:
+      self.__clients[client]['messages'].add(message_id)
 
   def transaction_begin(self, **kwargs):
     '''Start a new transaction.
@@ -205,7 +245,8 @@ class CommonTransport(object):
        clients go away.'''
     self.__client_id += 1
     self.__clients[self.__client_id] = { 'subscriptions': set(),
-                                         'transactions': set() }
+                                         'transactions': set(),
+                                         'messages': set() }
     return self.__client_id
 
   def drop_client(self, client_id):
@@ -220,6 +261,9 @@ class CommonTransport(object):
     transactions = list(self.__clients[client_id]['transactions'])
     for transaction in transactions:
       self.transaction_abort(transaction)
+    messages = list(self.__clients[client_id]['messages'])
+    for message_id in messages:
+      self.nack(message_id)
     del(self.__clients[client_id])
 
   #
@@ -289,7 +333,7 @@ class CommonTransport(object):
 
   def _ack(self, message_id, **kwargs):
     '''Acknowledge receipt of a message. This only makes sense when the
-       'acknowledgment' flag was set for the relevant subscription.
+       'acknowledgement' flag was set for the relevant subscription.
        :param message_id: ID of the message to be acknowledged
        :param **kwargs: Further parameters for the transport layer. For example
               transaction: Transaction ID if acknowledgement should be part of
@@ -299,7 +343,7 @@ class CommonTransport(object):
 
   def _nack(self, message_id, **kwargs):
     '''Reject receipt of a message. This only makes sense when the
-       'acknowledgment' flag was set for the relevant subscription.
+       'acknowledgement' flag was set for the relevant subscription.
        :param message_id: ID of the message to be rejected
        :param **kwargs: Further parameters for the transport layer. For example
               transaction: Transaction ID if rejection should be part of a

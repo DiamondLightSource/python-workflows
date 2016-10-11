@@ -174,10 +174,12 @@ def test_forward_unsubscribe_call():
 def test_forward_ack_call():
   mockqueue, queue = setup_queue()
 
+  subid = queue.subscribe(mock.sentinel.channel, mock.sentinel.callback, acknowledgement=True)
+  queue.register_message(subid, mock.sentinel.messageid)
   queue.ack(mock.sentinel.messageid,
             kwarg=mock.sentinel.kwarg)
 
-  mockqueue.put_nowait.assert_called_once_with({
+  mockqueue.put_nowait.assert_called_with({
     'band': 'transport',
     'call': 'ack',
     'payload': (
@@ -189,10 +191,12 @@ def test_forward_ack_call():
 def test_forward_nack_call():
   mockqueue, queue = setup_queue()
 
+  subid = queue.subscribe(mock.sentinel.channel, mock.sentinel.callback, acknowledgement=True)
+  queue.register_message(subid, mock.sentinel.messageid)
   queue.nack(mock.sentinel.messageid,
             kwarg=mock.sentinel.kwarg)
 
-  mockqueue.put_nowait.assert_called_once_with({
+  mockqueue.put_nowait.assert_called_with({
     'band': 'transport',
     'call': 'nack',
     'payload': (

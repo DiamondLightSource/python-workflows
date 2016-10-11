@@ -201,9 +201,102 @@ def test_dropping_transactions_when_dropping_client():
   with pytest.raises(workflows.WorkflowsError):
     ct.transaction_commit(t)
 
-@pytest.mark.skip(reason="TODO")
-def test_message_acknowledgments():
+def mock_transport_factory_with_client():
+  '''Set up a CommonTransport with mocked internals and one connected client.'''
+  ct = CommonTransport()
+  ct._ack, ct._nack, ct._transaction_begin, ct._transaction_abort, ct._transaction_commit, ct._subscribe, ct._subscribe_broadcast, ct._unsubscribe = \
+    mock.Mock(), mock.Mock(), mock.Mock(), mock.Mock(), mock.Mock(), mock.Mock(), mock.Mock(), mock.Mock()
+  client = ct.register_client()
+  return ct, client
+
+def test_message_acknowledgements_are_only_available_for_relevant_subscriptions():
+  '''Test messages can not be registered for acknowledgement when the subscription is not set up to do so.'''
+  ct, client = mock_transport_factory_with_client()
+  with pytest.raises(workflows.WorkflowsError):
+    ct.register_message(0, mock.sentinel.message_id)
+
+  subid = ct.subscribe(mock.sentinel.channel, mock.sentinel.callback, client_id=client)
+  with pytest.raises(workflows.WorkflowsError):
+    ct.register_message(subid, mock.sentinel.message_id)
+
+  ct, client = mock_transport_factory_with_client()
+  subid = ct.subscribe(mock.sentinel.channel, mock.sentinel.callback, client_id=client, acknowledgement=False)
+  with pytest.raises(workflows.WorkflowsError):
+    ct.register_message(subid, mock.sentinel.message_id)
+
+  ct, client = mock_transport_factory_with_client()
+  subid = ct.subscribe_broadcast(mock.sentinel.channel, mock.sentinel.callback, client_id=client)
+  with pytest.raises(workflows.WorkflowsError):
+    ct.register_message(subid, mock.sentinel.message_id)
+
+  ct, client = mock_transport_factory_with_client()
+  subid = ct.subscribe_broadcast(mock.sentinel.channel, mock.sentinel.callback, client_id=client, acknowledgement=False)
+  with pytest.raises(workflows.WorkflowsError):
+    ct.register_message(subid, mock.sentinel.message_id)
+
+def test_messages_are_rejected_when_client_goes_away():
   '''Test ack/nack functions. Automatically NACK messages if client goes away.'''
+  ct, client = mock_transport_factory_with_client()
+  subid = ct.subscribe(mock.sentinel.channel, mock.sentinel.callback, client_id=client, acknowledgement=True)
+  ct.register_message(subid, mock.sentinel.message_id)
+  ct.unsubscribe(subid) # this must have no effect
+
+  assert not ct._ack.called
+  assert not ct._nack.called
+
+  ct.drop_client(client)
+  ct._nack.assert_called_once_with(mock.sentinel.message_id)
+
+def test_messages_are_not_rejected_when_client_goes_away_after_acking_message():
+  '''Test ack/nack functions. Do not NACK messages that are already ACKed.'''
+  ct, client = mock_transport_factory_with_client()
+  subid = ct.subscribe(mock.sentinel.channel, mock.sentinel.callback, client_id=client, acknowledgement=True)
+  ct.register_message(subid, mock.sentinel.message_id)
+  ct.ack(mock.sentinel.message_id)
+
+  ct._ack.assert_called_once()
+  assert not ct._nack.called
+
+  ct.drop_client(client)
+
+  ct._ack.assert_called_once()
+  assert not ct._nack.called
+
+def test_messages_are_not_rejected_when_client_goes_away_after_nacking_message():
+  '''Test ack/nack functions. Do not NACK messages that are already NACKed.'''
+  ct, client = mock_transport_factory_with_client()
+  subid = ct.subscribe(mock.sentinel.channel, mock.sentinel.callback, client_id=client, acknowledgement=True)
+  ct.register_message(subid, mock.sentinel.message_id)
+  ct.nack(mock.sentinel.message_id)
+
+  assert not ct._ack.called
+  ct._nack.assert_called_once()
+
+  ct.drop_client(client)
+
+  assert not ct._ack.called
+  ct._nack.assert_called_once()
+
+# TODO:
+# In a subscription with client-id && ack each acked packet with uncommitted transaction-id must be nacked when client goes away (not when txn is aborted)
+@pytest.mark.skip(reason="TODO")
+def test_messages_are_rejected_when_client_goes_away_with_uncommitted_ack():
+  pass
+@pytest.mark.skip(reason="TODO")
+def test_messages_are_rejected_when_client_goes_away_with_uncommitted_nack():
+  pass
+@pytest.mark.skip(reason="TODO")
+def test_messages_are_rejected_when_client_goes_away_with_aborted_ack():
+  pass
+@pytest.mark.skip(reason="TODO")
+def test_messages_are_rejected_when_client_goes_away_with_aborted_nack():
+  pass
+@pytest.mark.skip(reason="TODO")
+def test_messages_are_not_rejected_when_client_goes_away_with_committed_ack():
+  pass
+@pytest.mark.skip(reason="TODO")
+def test_messages_are_not_rejected_when_client_goes_away_with_committed_nack():
+  pass
 
 def test_unimplemented_communication_methods_should_fail():
   '''Check that low-level communication calls raise WorkflowsError when not
