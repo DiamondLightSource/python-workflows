@@ -3,16 +3,15 @@ from __future__ import absolute_import, division
 import workflows.services
 import workflows.services.sample_producer
 import mock
-import pytest
 
 def test_service_can_be_looked_up():
   '''Attempt to look up the service by its name'''
-  service_class = workflows.services.lookup('Producer')
-  assert service_class == workflows.services.sample_producer.Producer
+  service_class = workflows.services.lookup('SampleProducer')
+  assert service_class == workflows.services.sample_producer.SampleProducer
 
 def test_service_registers_idle_timer():
   '''Check that the service registers an idle event handler.'''
-  p = workflows.services.sample_producer.Producer()
+  p = workflows.services.sample_producer.SampleProducer()
   mock_idlereg = mock.Mock()
   setattr(p, '_register_idle', mock_idlereg)
 
@@ -22,7 +21,7 @@ def test_service_registers_idle_timer():
 
 def test_service_produces_messages():
   '''Check that the producer produces messages in the idle event handler.'''
-  p = workflows.services.sample_producer.Producer()
+  p = workflows.services.sample_producer.SampleProducer()
   mock_transport = mock.Mock()
   setattr(p, '_transport', mock_transport)
 

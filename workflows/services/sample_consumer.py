@@ -3,7 +3,7 @@ from workflows.services.common_service import CommonService
 import json
 import time
 
-class Consumer(CommonService):
+class SampleConsumer(CommonService):
   '''An example service building on top of the workflow.services architecture,
      demonstrating how this architecture can be used.
      This service consumes messages off a queue.'''

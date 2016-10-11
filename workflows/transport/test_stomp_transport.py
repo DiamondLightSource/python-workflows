@@ -136,13 +136,13 @@ def test_subscribe_to_channel(mockstomp):
   mockconn.subscribe.assert_called_once()
   args, kwargs = mockconn.subscribe.call_args
   assert args == ('/queue/' + str(mock.sentinel.channel1), 1)
-  assert kwargs == { 'headers': {} }
+  assert kwargs == { 'headers': {}, 'ack': 'auto' }
 
   stomp._subscribe(2, str(mock.sentinel.channel2), mock_cb2, retroactive=True)
   assert mockconn.subscribe.call_count == 2
   args, kwargs = mockconn.subscribe.call_args
   assert args == ('/queue/' + str(mock.sentinel.channel2), 2)
-  assert kwargs == { 'headers': {'activemq.retroactive':'true'} }
+  assert kwargs == { 'headers': {'activemq.retroactive':'true'}, 'ack': 'auto' }
 
   assert mock_cb1.call_count == 0
   listener.on_message({'subscription': 1}, mock.sentinel.message1)
@@ -151,3 +151,9 @@ def test_subscribe_to_channel(mockstomp):
   assert mock_cb2.call_count == 0
   listener.on_message({'subscription': 2}, mock.sentinel.message2)
   mock_cb2.assert_called_once_with({'subscription': 2}, mock.sentinel.message2)
+
+  stomp._subscribe(3, str(mock.sentinel.channel3), mock_cb2, acknowledgement=True)
+  assert mockconn.subscribe.call_count == 3
+  args, kwargs = mockconn.subscribe.call_args
+  assert args == ('/queue/' + str(mock.sentinel.channel3), 3)
+  assert kwargs == { 'headers': {}, 'ack': 'client-individual' }

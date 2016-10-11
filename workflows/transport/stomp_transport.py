@@ -153,6 +153,10 @@ class StompTransport(CommonTransport):
     headers = {}
     if kwargs.get('retroactive'):
       headers['activemq.retroactive'] = 'true'
+    if kwargs.get('acknowledgement'):
+      ack = 'client-individual'
+    else:
+      ack = 'auto'
 
     self._subscription_callbacks[sub_id] = callback
 
@@ -164,7 +168,7 @@ class StompTransport(CommonTransport):
       print '-'*30
 
     with self._lock:
-      self._conn.subscribe('/queue/' + channel, sub_id, headers=headers)
+      self._conn.subscribe('/queue/' + channel, sub_id, headers=headers, ack=ack)
 
   def _send(self, destination, message, **kwargs):
     '''Send a message to a queue.
