@@ -3,7 +3,7 @@ import Queue
 import workflows
 from workflows.transport.queue_transport import QueueTransport
 
-class CommonService(QueueTransport):
+class CommonService(object):
   '''
   Base class for workflow services. A service is a piece of software that runs
   in an isolated environment, communicating only via queues with the outside
@@ -202,7 +202,7 @@ class CommonService(QueueTransport):
   # -- Plugin-related functions ----------------------------------------------
   #
 
-  class __metaclass__(QueueTransport.__metaclass__):
+  class __metaclass__(type):
     '''Define metaclass function to keep a list of all subclasses. This enables
        looking up service mechanisms by name.'''
     def __init__(cls, name, base, attrs):
@@ -211,6 +211,21 @@ class CommonService(QueueTransport):
         cls.service_register = {}
       else:
         cls.service_register[name] = cls
+
+  @classmethod
+  def load(cls, paths):
+    '''Import all python files (except test_*) in directories. This is required
+       for registration of subclasses.'''
+    import imp, pkgutil
+    if isinstance(paths, basestring):
+      paths = list(paths)
+    cls.registered = []
+    for _, name, _ in pkgutil.iter_modules(paths):
+      if not name.startswith('test_'):
+        fid, pathname, desc = imp.find_module(name, paths)
+        imp.load_module(name, fid, pathname, desc)
+        if fid:
+          fid.close()
 
 class Commands():
   SHUTDOWN = 'shutdown'
