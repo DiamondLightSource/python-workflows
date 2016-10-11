@@ -172,6 +172,7 @@ def test_forward_unsubscribe_call():
   })
 
 def test_forward_ack_call():
+  '''Test translation of ack() call to Queue message.'''
   mockqueue, queue = setup_queue()
 
   subid = queue.subscribe(mock.sentinel.channel, mock.sentinel.callback, acknowledgement=True)
@@ -189,6 +190,7 @@ def test_forward_ack_call():
   })
 
 def test_forward_nack_call():
+  '''Test translation of nack() call to Queue message.'''
   mockqueue, queue = setup_queue()
 
   subid = queue.subscribe(mock.sentinel.channel, mock.sentinel.callback, acknowledgement=True)

@@ -27,9 +27,9 @@ class StompTransport(CommonTransport):
     self._subscription_callbacks = {}
     self._lock = threading.RLock()
     self._stomp_listener = stomp.listener.ConnectionListener()
-    self._stomp_listener = stomp.PrintingListener()
+#   self._stomp_listener = stomp.PrintingListener()
     self._stomp_listener.on_message = self._on_message
-    self._stomp_listener.on_before_message = self._on_before_message
+    self._stomp_listener.on_before_message = (lambda x, y: (x, y))
 
   def get_namespace(self):
     '''Return the stomp namespace. This is a prefix used for all topic and
@@ -238,9 +238,6 @@ class StompTransport(CommonTransport):
 
 
 ## Stomp listener methods #####################################################
-
-  def _on_before_message(self, headers, body):
-    return headers, body
 
   def _on_message(self, headers, body):
 #   print "on_message", headers, body

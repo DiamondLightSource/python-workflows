@@ -16,6 +16,7 @@ class Frontend():
     self.__hostid = self._generate_unique_host_id()
     self._service = None
     self._service_name = None
+    self._service_transportid = None
     self._queue_commands = None
     self._queue_frontend = None
     self._service_status = CommonService.SERVICE_STATUS_NONE
@@ -25,9 +26,8 @@ class Frontend():
       self._transport = workflows.transport.lookup(transport)()
     else:
       self._transport = transport()
-    if not self._transport.connect():
-      print "Could not connect to transport layer"
-      self._transport = None
+    assert self._transport.connect(), "Could not connect to transport layer"
+    self._service_transportid = self._transport.register_client()
 
     # Start initial service if one has been requested
     if service is not None:
@@ -71,28 +71,6 @@ class Frontend():
     self._status_advertiser.stop_and_wait()
     print "Fin."
 
-  def parse_band_transport(self, message):
-    print "TRN:", message
-    if self._transport:
-      if message['call'] in ('send', 'ack', 'nack'):
-        getattr(self._transport, message['call']) \
-          (*message['payload'][0], **message['payload'][1])
-      elif message['call'] == 'subscribe':
-        subscription_id, channel = message['payload'][0][:2]
-        self._transport.subscribe(channel,
-            lambda cb_header, cb_message:
-            self.send_command( {
-                'band': 'transport_message',
-                'payload': {
-                  'subscription_id': subscription_id,
-                  'header': cb_header,
-                  'message': cb_message,
-                },
-              } ),
-             *message['payload'][0][2:],
-             **message['payload'][1]
-          )
-
   def send_command(self, command):
     '''Send command to service via the command queue.'''
     print "To command queue: ", command
@@ -106,7 +84,7 @@ class Frontend():
     print "STT:", message
 
   def parse_band_status_update(self, message):
-    print "STU:", message
+#   print "STU:", message
     self._service_status = message['statuscode']
     self._status_advertiser.trigger()
 
@@ -126,11 +104,15 @@ class Frontend():
   def get_status(self):
     '''Returns a dictionary containing all relevant status information to be
        broadcast across the network.'''
-    return { 'host': self.__hostid, 'status': self._service_status, 'service': self._service_name }
+    return { 'host': self.__hostid,
+             'status': self._service_status,
+             'service': self._service_name }
 
   def switch_service(self, new_service):
     '''Start a new service in a subprocess.
-       Service can be passed by name or class.'''
+       :param new_service: Either a service name or a service class.
+       :return: True on success, False on failure.
+    '''
     with self.__lock:
       # Terminate existing service if necessary
       if self._service is not None:
@@ -142,6 +124,9 @@ class Frontend():
       else:
         service_class = new_service
 
+      if not service_class:
+        return False
+
       # Set up queues and connect new service object
       self._queue_commands = multiprocessing.Queue()
       self._queue_frontend = multiprocessing.Queue()
@@ -149,12 +134,18 @@ class Frontend():
         commands=self._queue_commands,
         frontend=self._queue_frontend)
 
+      # Clean out transport layer for new service
+      if self._service_transportid:
+        self._transport.drop_client(self._service_transportid)
+      self._service_transportid = self._transport.register_client()
+
       # Start new service in a separate process
       self._service = multiprocessing.Process(
         target=service_instance.start, args=())
       self._service_name = service_instance.get_name()
       self._service.daemon = True
       self._service.start()
+    return True
 
   def _terminate_service(self):
     '''Force termination of running service.
@@ -166,3 +157,80 @@ class Frontend():
       self._service_status = CommonService.SERVICE_STATUS_END
       self._queue_commands = None
       self._queue_frontend = None
+      if self._service_transportid:
+        self._transport.drop_client(self._service_transportid)
+      self._service_transportid = None
+
+# ---- Transport calls -----------------------------------------------------
+
+  _transaction_mapping = {}
+
+  def parse_band_transport(self, message):
+    '''Treat messages sent from service via queue. These were encoded by
+       transport.queue_transport on the other end. Forward the messages to
+       individual functions parse_band_transport_${call}() depending on the
+       'call' field.
+       param: message: The full queue message data structure.
+    '''
+    try:
+      handler = getattr(self, 'parse_band_transport_' + message['call'])
+    except AttributeError:
+      # TODO: This should go to a log
+      print 'Unknown transport handler for message', message
+      return
+    if 'transaction' in message['payload'][1]:
+      print "Mapping transaction %s to %s for %s" % (
+          str( message['payload'][1]['transaction'] ),
+          str( self._transaction_mapping[message['payload'][1]['transaction']] ),
+          message['call'])
+      message['payload'][1]['transaction'] = \
+        self._transaction_mapping[message['payload'][1]['transaction']]
+    handler(message)
+
+  def parse_band_transport_send(self, message):
+    args, kwargs = message['payload']
+    self._transport.send(*args, **kwargs)
+
+  def parse_band_transport_ack(self, message):
+    args, kwargs = message['payload']
+    self._transport.ack(*args, **kwargs)
+
+  def parse_band_transport_nack(self, message):
+    args, kwargs = message['payload']
+    self._transport.nack(*args, **kwargs)
+
+  def parse_band_transport_transaction_begin(self, message):
+    args, kwargs = message['payload']
+    service_txn_id = args[0]
+    self._transaction_mapping[service_txn_id] = \
+      self._transport.transaction_begin(clientid=self._service_transportid)
+
+  def parse_band_transport_transaction_commit(self, message):
+    args, kwargs = message['payload']
+    service_txn_id = args[0]
+    assert service_txn_id in self._transaction_mapping
+    self._transport.transaction_commit(self._transaction_mapping[service_txn_id])
+    del(self._transaction_mapping[service_txn_id])
+
+  def parse_band_transport_transaction_abort(self, message):
+    args, kwargs = message['payload']
+    service_txn_id = args[0]
+    assert service_txn_id in self._transaction_mapping
+    self._transport.transaction_abort(self._transaction_mapping[service_txn_id])
+    del(self._transaction_mapping[service_txn_id])
+
+  def parse_band_transport_subscribe(self, message):
+    subscription_id, channel = message['payload'][0][:2]
+    self._transport.subscribe(channel,
+      lambda cb_header, cb_message:
+      self.send_command( {
+          'band': 'transport_message',
+          'payload': {
+            'subscription_id': subscription_id,
+            'header': cb_header,
+            'message': cb_message,
+          },
+        } ),
+       *message['payload'][0][2:],
+       **message['payload'][1]
+    )
