@@ -155,10 +155,13 @@ class StompTransport(CommonTransport):
       headers['activemq.retroactive'] = 'true'
     if kwargs.get('acknowledgement'):
       ack = 'client-individual'
+      def callback_bounce(header, message):
+        self.register_message(sub_id, header['message-id'])
+        callback(header, message)
+      self._subscription_callbacks[sub_id] = callback_bounce
     else:
       ack = 'auto'
-
-    self._subscription_callbacks[sub_id] = callback
+      self._subscription_callbacks[sub_id] = callback
 
     with self._lock:
       self._conn.subscribe('/queue/' + channel, sub_id, headers=headers, ack=ack)
@@ -183,6 +186,28 @@ class StompTransport(CommonTransport):
           body=message,
           destination=destination,
           headers=headers)
+
+  def _ack(self, message_id, subscription_id, **kwargs):
+    '''Acknowledge receipt of a message. This only makes sense when the
+       'acknowledgement' flag was set for the relevant subscription.
+       :param message_id: ID of the message to be acknowledged
+       :param subscription: ID of the relevant subscriptiong
+       :param **kwargs: Further parameters for the transport layer. For example
+              transaction: Transaction ID if acknowledgement should be part of
+                           a transaction
+    '''
+    self._conn.ack(message_id, subscription_id, **kwargs)
+
+  def _nack(self, message_id, subscription_id, **kwargs):
+    '''Reject receipt of a message. This only makes sense when the
+       'acknowledgement' flag was set for the relevant subscription.
+       :param message_id: ID of the message to be rejected
+       :param subscription: ID of the relevant subscriptiong
+       :param **kwargs: Further parameters for the transport layer. For example
+              transaction: Transaction ID if rejection should be part of a
+                           transaction
+    '''
+    self._conn.nack(message_id, subscription_id, **kwargs)
 
 
 ## Stomp listener methods #####################################################

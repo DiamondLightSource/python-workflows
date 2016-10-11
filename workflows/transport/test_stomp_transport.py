@@ -157,3 +157,37 @@ def test_subscribe_to_channel(mockstomp):
   args, kwargs = mockconn.subscribe.call_args
   assert args == ('/queue/' + str(mock.sentinel.channel3), 3)
   assert kwargs == { 'headers': {}, 'ack': 'client-individual' }
+
+@pytest.mark.skip(reason="TODO")
+def test_incoming_messages_are_registered_properly():
+  pass
+
+@mock.patch('workflows.transport.stomp_transport.stomp')
+def test_ack_message(mockstomp):
+  '''Test that the _ack function is properly forwarded to stomp.'''
+  stomp = StompTransport()
+  stomp.connect()
+  mockconn = mockstomp.Connection.return_value
+
+  subid = stomp._subscribe(1, str(mock.sentinel.channel3), None, acknowledgement=True)
+  stomp._ack(mock.sentinel.messageid, subid)
+  mockconn.ack.assert_called_once_with(mock.sentinel.messageid, subid)
+
+  stomp._ack(mock.sentinel.messageid, subid, transaction=mock.sentinel.txn)
+  mockconn.ack.assert_called_with(mock.sentinel.messageid, subid,
+                                  transaction=mock.sentinel.txn)
+
+@mock.patch('workflows.transport.stomp_transport.stomp')
+def test_nack_message(mockstomp):
+  '''Test that the _nack function is properly forwarded to stomp.'''
+  stomp = StompTransport()
+  stomp.connect()
+  mockconn = mockstomp.Connection.return_value
+
+  subid = stomp._subscribe(1, str(mock.sentinel.channel3), None, acknowledgement=True)
+  stomp._nack(mock.sentinel.messageid, subid)
+  mockconn.nack.assert_called_once_with(mock.sentinel.messageid, subid)
+
+  stomp._nack(mock.sentinel.messageid, subid, transaction=mock.sentinel.txn)
+  mockconn.nack.assert_called_with(mock.sentinel.messageid, subid,
+                                   transaction=mock.sentinel.txn)

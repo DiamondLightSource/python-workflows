@@ -144,11 +144,11 @@ class CommonTransport(object):
     if message_id not in self.__messages:
       raise workflows.WorkflowsError \
             ("Attempting to ACK unknown message")
-    if self.__messages[message_id]:
-      self.__clients[self.__messages[message_id]]['messages'] \
-          .remove(message_id)
+    subscription, client = self.__messages[message_id]
+    if client:
+      self.__clients[client]['messages'].remove(message_id)
     del(self.__messages[message_id])
-    self._ack(message_id, **kwargs)
+    self._ack(message_id, subscription, **kwargs)
 
   def nack(self, message_id, **kwargs):
     '''Reject receipt of a message. This only makes sense when the
@@ -161,11 +161,22 @@ class CommonTransport(object):
     if message_id not in self.__messages:
       raise workflows.WorkflowsError \
             ("Attempting to NACK unknown message")
-    if self.__messages[message_id]:
-      self.__clients[self.__messages[message_id]]['messages'] \
-          .remove(message_id)
+    subscription, client = self.__messages[message_id]
+    if client:
+      self.__clients[client]['messages'].remove(message_id)
     del(self.__messages[message_id])
-    self._nack(message_id, **kwargs)
+    self._nack(message_id, subscription, **kwargs)
+
+  def subscription_requires_ack(self, subscription):
+    '''Report if messages belonging to a particular subscription require to be
+       acknowledged manually.
+       :param subscription: ID of the subscription to test
+       :return: Boolean value, true if messages need to be ACKed/NACKed.
+    '''
+    if subscription not in self.__subscriptions:
+      raise workflows.WorkflowsError \
+            ("Unknown subscription")
+    return self.__subscriptions[subscription]['ack']
 
   def register_message(self, subscription, message_id):
     '''Mark an incoming message to be ACKed/NACKed. This is only relevant when
@@ -178,15 +189,12 @@ class CommonTransport(object):
                             belongs to.
        :param message_id: ID of the message to be rejected
     '''
-    if subscription not in self.__subscriptions:
-      raise workflows.WorkflowsError \
-            ("Attempting to register message for unknown subscription")
-    if not self.__subscriptions[subscription]['ack']:
+    if not self.subscription_requires_ack(subscription):
       raise workflows.WorkflowsError \
             ("Attempting to register message for subscription without"
              "acknowledgement flag set")
     client = self.__subscriptions[subscription]['client']
-    self.__messages[message_id] = client
+    self.__messages[message_id] = (subscription, client)
     if client:
       self.__clients[client]['messages'].add(message_id)
 
@@ -331,20 +339,22 @@ class CommonTransport(object):
     '''
     raise workflows.WorkflowsError("Transport interface not implemented")
 
-  def _ack(self, message_id, **kwargs):
+  def _ack(self, message_id, subscription, **kwargs):
     '''Acknowledge receipt of a message. This only makes sense when the
        'acknowledgement' flag was set for the relevant subscription.
        :param message_id: ID of the message to be acknowledged
+       :param subscription: ID of the relevant subscriptiong
        :param **kwargs: Further parameters for the transport layer. For example
               transaction: Transaction ID if acknowledgement should be part of
                            a transaction
     '''
     raise workflows.WorkflowsError("Transport interface not implemented")
 
-  def _nack(self, message_id, **kwargs):
+  def _nack(self, message_id, subscription, **kwargs):
     '''Reject receipt of a message. This only makes sense when the
        'acknowledgement' flag was set for the relevant subscription.
        :param message_id: ID of the message to be rejected
+       :param subscription: ID of the relevant subscriptiong
        :param **kwargs: Further parameters for the transport layer. For example
               transaction: Transaction ID if rejection should be part of a
                            transaction

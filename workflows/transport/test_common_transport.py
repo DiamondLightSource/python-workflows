@@ -245,7 +245,7 @@ def test_messages_are_rejected_when_client_goes_away():
   assert not ct._nack.called
 
   ct.drop_client(client)
-  ct._nack.assert_called_once_with(mock.sentinel.message_id)
+  ct._nack.assert_called_once_with(mock.sentinel.message_id, subid)
 
 def test_messages_are_not_rejected_when_client_goes_away_after_acking_message():
   '''Test ack/nack functions. Do not NACK messages that are already ACKed.'''
@@ -254,7 +254,7 @@ def test_messages_are_not_rejected_when_client_goes_away_after_acking_message():
   ct.register_message(subid, mock.sentinel.message_id)
   ct.ack(mock.sentinel.message_id)
 
-  ct._ack.assert_called_once()
+  ct._ack.assert_called_once_with(mock.sentinel.message_id, subid)
   assert not ct._nack.called
 
   ct.drop_client(client)
@@ -270,7 +270,7 @@ def test_messages_are_not_rejected_when_client_goes_away_after_nacking_message()
   ct.nack(mock.sentinel.message_id)
 
   assert not ct._ack.called
-  ct._nack.assert_called_once()
+  ct._nack.assert_called_once_with(mock.sentinel.message_id, subid)
 
   ct.drop_client(client)
 
@@ -309,8 +309,8 @@ def test_unimplemented_communication_methods_should_fail():
       ('_unsubscribe', 1),
       ('_send', 2),
       ('_broadcast', 2),
-      ('_ack', 1),
-      ('_nack', 1),
+      ('_ack', 2),
+      ('_nack', 2),
       ('_transaction_begin', 1),
       ('_transaction_abort', 1),
       ('_transaction_commit', 1),

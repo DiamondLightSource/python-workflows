@@ -104,20 +104,20 @@ class QueueTransport(CommonTransport):
       'payload': ( args, kwargs )
     })
 
-  def _ack(self, *args, **kwargs):
-    '''Forward receipt acknowledgement to queue.'''
+  def _ack(self, messageid, subscription, *args, **kwargs):
+    '''Forward receipt acknowledgement to queue. Drop subscription id.'''
     self.assert_connected()
     self._queue.put_nowait({
       'band': 'transport',
       'call': 'ack',
-      'payload': ( args, kwargs )
+      'payload': ( (messageid, ) + args, kwargs )
     })
 
-  def _nack(self, *args, **kwargs):
-    '''Forward receipt rejection to queue.'''
+  def _nack(self, messageid, subscription, *args, **kwargs):
+    '''Forward receipt rejection to queue. Drop subscription id.'''
     self.assert_connected()
     self._queue.put_nowait({
       'band': 'transport',
       'call': 'nack',
-      'payload': ( args, kwargs )
+      'payload': ( (messageid, ) + args, kwargs )
     })

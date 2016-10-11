@@ -74,8 +74,9 @@ class Frontend():
   def parse_band_transport(self, message):
     print "TRN:", message
     if self._transport:
-      if message['call'] == 'send':
-        self._transport.send(*message['payload'][0], **message['payload'][1])
+      if message['call'] in ('send', 'ack', 'nack'):
+        getattr(self._transport, message['call']) \
+          (*message['payload'][0], **message['payload'][1])
       elif message['call'] == 'subscribe':
         subscription_id, channel = message['payload'][0][:2]
         self._transport.subscribe(channel,

@@ -21,8 +21,8 @@ class SampleTxn(CommonService):
   @staticmethod
   def crashpoint():
     '''Return true if the service should malfunction at this point.'''
+    return False
     # Probability of not crashing is 90%
-    return True
     return random.uniform(0, 1) > 0.90
 
   def receive_message(self, header, message):
@@ -35,31 +35,31 @@ class SampleTxn(CommonService):
     print "MsgID:", header['message-id']
     assert header['message-id']
 
-    txn = self._transport.transaction_begin()
-    print " 1. Txn:", txn
-    if self.crashpoint():
-      self._transport.transaction_abort(txn)
-      print "---  Abort  ---"
-      return
+#    txn = self._transport.transaction_begin()
+#    print " 1. Txn:", txn
+#    if self.crashpoint():
+#      self._transport.transaction_abort(txn)
+#      print "---  Abort  ---"
+#      return
 
-    self._transport.ack(header['message-id'], transaction=txn)
+    self._transport.ack(header['message-id']) # , transaction=txn)
     print " 2. Ack"
-    if self.crashpoint():
-      self._transport.transaction_abort(txn)
-      print "---  Abort  ---"
-      return
+#    if self.crashpoint():
+#      self._transport.transaction_abort(txn)
+#      print "---  Abort  ---"
+#      return
 
-    self._transport.send('transient.destination', message, headers=header, transaction=txn)
+    self._transport.send('transient.destination', message, headers=header) # , transaction=txn)
     print " 3. Send"
 
-    if self.crashpoint():
-      self._transport.transaction_abort(txn)
-      print "---  Abort  ---"
-      return
+#    if self.crashpoint():
+#      self._transport.transaction_abort(txn)
+#      print "---  Abort  ---"
+#      return
 
-    self._transport.transaction_commit(txn)
-    print " 4. Commit"
-    print "===  Done   ==="
+#    self._transport.transaction_commit(txn)
+#    print " 4. Commit"
+#    print "===  Done   ==="
 
 
 class SampleTxnProducer(CommonService):
