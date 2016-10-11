@@ -160,13 +160,6 @@ class StompTransport(CommonTransport):
 
     self._subscription_callbacks[sub_id] = callback
 
-    if kwargs.get('debug', True):
-      print '-'*30
-      print sub_id
-      print channel
-      print callback
-      print '-'*30
-
     with self._lock:
       self._conn.subscribe('/queue/' + channel, sub_id, headers=headers, ack=ack)
 
@@ -198,7 +191,7 @@ class StompTransport(CommonTransport):
     return headers, body
 
   def _on_message(self, headers, body):
-    print "on_message", headers, body
+#   print "on_message", headers, body
     subscription_id = int(headers.get('subscription'))
     with self._lock:
       target_function = self._subscription_callbacks.get(subscription_id)

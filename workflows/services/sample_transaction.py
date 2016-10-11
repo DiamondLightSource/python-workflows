@@ -16,12 +16,13 @@ class SampleTxn(CommonService):
 
   def initializing(self):
     '''Subscribe to a channel. Received messages must be acknowledged.'''
-    self._transport.subscribe('transient.transaction', self.receive_message, acknowledge=True)
+    self._transport.subscribe('transient.transaction', self.receive_message, acknowledgement=True)
 
   @staticmethod
   def crashpoint():
     '''Return true if the service should malfunction at this point.'''
     # Probability of not crashing is 90%
+    return True
     return random.uniform(0, 1) > 0.90
 
   def receive_message(self, header, message):
@@ -31,31 +32,32 @@ class SampleTxn(CommonService):
     print header
     print message
 
-#    assert message['id']
+    print "MsgID:", header['message-id']
+    assert header['message-id']
 
-    txn = self.transaction_begin()
+    txn = self._transport.transaction_begin()
     print " 1. Txn:", txn
-    if crashpoint():
-      self.transaction_abort(txn)
+    if self.crashpoint():
+      self._transport.transaction_abort(txn)
       print "---  Abort  ---"
       return
 
-    self.ack(message['id'], transaction=txn)
+    self._transport.ack(header['message-id'], transaction=txn)
     print " 2. Ack"
-    if crashpoint():
-      self.transaction_abort(txn)
+    if self.crashpoint():
+      self._transport.transaction_abort(txn)
       print "---  Abort  ---"
       return
 
-    self.send('transient.destination', message, headers=header, transaction=txn)
+    self._transport.send('transient.destination', message, headers=header, transaction=txn)
     print " 3. Send"
 
-    if crashpoint():
-      self.transaction_abort(txn)
+    if self.crashpoint():
+      self._transport.transaction_abort(txn)
       print "---  Abort  ---"
       return
 
-    self.transaction_commit(txn)
+    self._transport.transaction_commit(txn)
     print " 4. Commit"
     print "===  Done   ==="
 

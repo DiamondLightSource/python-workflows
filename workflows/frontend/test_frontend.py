@@ -75,13 +75,14 @@ def test_connect_queue_communication_to_transport_layer(mock_status):
   fe.parse_band_transport( {
       'call': 'subscribe',
       'payload': (
-        ( mock.sentinel.subid, mock.sentinel.channel ),
-        {}
+        ( mock.sentinel.subid, mock.sentinel.channel, mock.sentinel.something ),
+        { 'kwarg': mock.sentinel.kwarg }
       )
     } )
   transport.subscribe.assert_called_once_with(
     mock.sentinel.channel,
     mock.ANY,
+    mock.sentinel.something, kwarg=mock.sentinel.kwarg
     )
   callback_function = transport.subscribe.call_args[0][1]
 

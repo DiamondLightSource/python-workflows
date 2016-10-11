@@ -43,9 +43,8 @@ class Frontend():
 
   def run(self):
     print "Current service:", self._service
-    n = 200
+    n = 3600
     while n > 0:
-      print n
       if self._queue_frontend is not None:
         try:
           message = self._queue_frontend.get(True, 1)
@@ -78,7 +77,7 @@ class Frontend():
       if message['call'] == 'send':
         self._transport.send(*message['payload'][0], **message['payload'][1])
       elif message['call'] == 'subscribe':
-        subscription_id, channel = message['payload'][0]
+        subscription_id, channel = message['payload'][0][:2]
         self._transport.subscribe(channel,
             lambda cb_header, cb_message:
             self.send_command( {
@@ -88,7 +87,9 @@ class Frontend():
                   'header': cb_header,
                   'message': cb_message,
                 },
-              } )
+              } ),
+             *message['payload'][0][2:],
+             **message['payload'][1]
           )
 
   def send_command(self, command):
