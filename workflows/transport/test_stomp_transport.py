@@ -106,16 +106,14 @@ def test_send_message(mockstomp):
 
   mockconn.send.assert_called_once()
   args, kwargs = mockconn.send.call_args
-  assert kwargs['destination'] == '/queue/' + str(mock.sentinel.channel)
-  assert kwargs['body'] == mock.sentinel.message
+  assert args == ('/queue/' + str(mock.sentinel.channel), mock.sentinel.message)
   assert kwargs.get('headers') in (None, {})
 
   stomp._send( str(mock.sentinel.channel), mock.sentinel.message, headers=mock.sentinel.headers )
   assert mockconn.send.call_count == 2
   args, kwargs = mockconn.send.call_args
-  assert kwargs['destination'] == '/queue/' + str(mock.sentinel.channel)
-  assert kwargs['body'] == mock.sentinel.message
-  assert kwargs['headers'] == mock.sentinel.headers
+  assert args == ('/queue/' + str(mock.sentinel.channel), mock.sentinel.message)
+  assert kwargs == { 'headers': mock.sentinel.headers }
 
 @mock.patch('workflows.transport.stomp_transport.stomp')
 def test_subscribe_to_channel(mockstomp):
@@ -161,6 +159,25 @@ def test_subscribe_to_channel(mockstomp):
 @pytest.mark.skip(reason="TODO")
 def test_incoming_messages_are_registered_properly():
   pass
+
+@mock.patch('workflows.transport.stomp_transport.stomp')
+def test_transaction_calls(mockstomp):
+  '''Test that calls to create, commit, abort transactions are passed to stomp properly.'''
+  stomp = StompTransport()
+  stomp.connect()
+  mockconn = mockstomp.Connection.return_value
+
+  stomp._transaction_begin(mock.sentinel.txid)
+  mockconn.begin.assert_called_once_with(transaction=mock.sentinel.txid)
+
+  stomp._send('destination', mock.sentinel.message, transaction=mock.sentinel.txid)
+  mockconn.send.assert_called_once_with('/queue/destination', mock.sentinel.message, headers={}, transaction=mock.sentinel.txid)
+
+  stomp._transaction_abort(mock.sentinel.txid)
+  mockconn.abort.assert_called_once_with(mock.sentinel.txid)
+
+  stomp._transaction_commit(mock.sentinel.txid)
+  mockconn.commit.assert_called_once_with(mock.sentinel.txid)
 
 @mock.patch('workflows.transport.stomp_transport.stomp')
 def test_ack_message(mockstomp):

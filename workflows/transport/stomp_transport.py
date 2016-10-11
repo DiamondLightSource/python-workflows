@@ -176,16 +176,41 @@ class StompTransport(CommonTransport):
               transaction: Transaction ID if message should be part of a
                            transaction
     '''
-    headers = kwargs.get('headers')
+    headers = kwargs.get('headers', {})
+    if 'headers' in kwargs:
+      del(kwargs['headers'])
     if not headers:
       headers = {}
 #   TODO: Does not take prefix into account
     destination = '/queue/' + destination
     with self._lock:
       self._conn.send(
-          body=message,
-          destination=destination,
-          headers=headers)
+          destination, message,
+          headers=headers, **kwargs)
+
+  def _transaction_begin(self, transaction_id, **kwargs):
+    '''Start a new transaction.
+       :param transaction_id: ID for this transaction in the transport layer.
+       :param **kwargs: Further parameters for the transport layer.
+    '''
+    with self._lock:
+      self._conn.begin(transaction=transaction_id)
+
+  def _transaction_abort(self, transaction_id, **kwargs):
+    '''Abort a transaction and roll back all operations.
+       :param transaction_id: ID of transaction to be aborted.
+       :param **kwargs: Further parameters for the transport layer.
+    '''
+    with self._lock:
+      self._conn.abort(transaction_id)
+
+  def _transaction_commit(self, transaction_id, **kwargs):
+    '''Commit a transaction.
+       :param transaction_id: ID of transaction to be committed.
+       :param **kwargs: Further parameters for the transport layer.
+    '''
+    with self._lock:
+      self._conn.commit(transaction_id)
 
   def _ack(self, message_id, subscription_id, **kwargs):
     '''Acknowledge receipt of a message. This only makes sense when the
@@ -196,7 +221,8 @@ class StompTransport(CommonTransport):
               transaction: Transaction ID if acknowledgement should be part of
                            a transaction
     '''
-    self._conn.ack(message_id, subscription_id, **kwargs)
+    with self._lock:
+      self._conn.ack(message_id, subscription_id, **kwargs)
 
   def _nack(self, message_id, subscription_id, **kwargs):
     '''Reject receipt of a message. This only makes sense when the
@@ -207,7 +233,8 @@ class StompTransport(CommonTransport):
               transaction: Transaction ID if rejection should be part of a
                            transaction
     '''
-    self._conn.nack(message_id, subscription_id, **kwargs)
+    with self._lock:
+      self._conn.nack(message_id, subscription_id, **kwargs)
 
 
 ## Stomp listener methods #####################################################
