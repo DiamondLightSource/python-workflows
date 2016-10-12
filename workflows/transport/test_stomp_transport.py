@@ -41,6 +41,8 @@ def test_check_config_file_behaviour(mockstomp):
     '--stomp-conf', cfgfile,
     '--stomp-user', mock.sentinel.user])
 
+  # Command line parameters are shared for all instances
+  stomp = StompTransport()
   stomp.connect()
 
   mockstomp.Connection.assert_called_once_with([('localhost', 1234)])
