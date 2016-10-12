@@ -68,6 +68,7 @@ class Frontend():
 
     self._service_status = CommonService.SERVICE_STATUS_TEARDOWN
     self._status_advertiser.trigger()
+    self._terminate_service()
     self._status_advertiser.stop_and_wait()
     print "Fin."
 
@@ -149,17 +150,23 @@ class Frontend():
 
   def _terminate_service(self):
     '''Force termination of running service.
-       Disconnect queues as they may get corrupted'''
+       Disconnect queues, end queue feeder threads.
+       Wait for service process to clear, drop all references.'''
     with self.__lock:
       self._service.terminate()
-      self._service = None
-      self._service_name = None
-      self._service_status = CommonService.SERVICE_STATUS_END
+      self._queue_commands.close()
+      self._queue_frontend.close()
+      self._queue_commands.cancel_join_thread()
+      self._queue_frontend.cancel_join_thread()
       self._queue_commands = None
       self._queue_frontend = None
+      self._service_name = None
+      self._service_status = CommonService.SERVICE_STATUS_END
       if self._service_transportid:
         self._transport.drop_client(self._service_transportid)
       self._service_transportid = None
+      self._service.join() # must wait for process to be actually destroyed
+      self._service = None
 
 # ---- Transport calls -----------------------------------------------------
 
