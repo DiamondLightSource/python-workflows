@@ -17,8 +17,8 @@ class Frontend():
     self._service = None
     self._service_name = None
     self._service_transportid = None
-    self._queue_commands = None
-    self._queue_frontend = None
+    self._pipe_commands = None # frontend -> service
+    self._pipe_service = None  # frontend <- service
     self._service_status = CommonService.SERVICE_STATUS_NONE
 
     # Connect to the network transport layer
@@ -45,9 +45,9 @@ class Frontend():
     print "Current service:", self._service
     n = 3600
     while n > 0:
-      if self._queue_frontend is not None:
+      if self._pipe_service and self._pipe_service.poll(1):
         try:
-          message = self._queue_frontend.get(True, 1)
+          message = self._pipe_service.recv()
           if isinstance(message, dict) and 'band' in message:
             # only dictionaries with 'band' entry are valid messages
             try:
@@ -75,8 +75,8 @@ class Frontend():
   def send_command(self, command):
     '''Send command to service via the command queue.'''
 #   print "To command queue: ", command
-    if self._queue_commands:
-      self._queue_commands.put(command)
+    if self._pipe_commands:
+      self._pipe_commands.send(command)
 
   def parse_band_log(self, message):
     print "LOG:", message
@@ -128,12 +128,12 @@ class Frontend():
       if not service_class:
         return False
 
-      # Set up queues and connect new service object
-      self._queue_commands = multiprocessing.Queue()
-      self._queue_frontend = multiprocessing.Queue()
+      # Set up pipes and connect new service object
+      self._pipe_commands, svc_commands = multiprocessing.Pipe()
+      svc_tofrontend, self._pipe_service = multiprocessing.Pipe()
       service_instance = service_class(
-        commands=self._queue_commands,
-        frontend=self._queue_frontend)
+        commands=svc_commands,
+        frontend=svc_tofrontend)
 
       # Clean out transport layer for new service
       if self._service_transportid:
@@ -154,12 +154,10 @@ class Frontend():
        Wait for service process to clear, drop all references.'''
     with self.__lock:
       self._service.terminate()
-      self._queue_commands.close()
-      self._queue_frontend.close()
-      self._queue_commands.cancel_join_thread()
-      self._queue_frontend.cancel_join_thread()
-      self._queue_commands = None
-      self._queue_frontend = None
+      self._pipe_commands.close()
+      self._pipe_service.close()
+      self._pipe_commands = None
+      self._pipe_service = None
       self._service_name = None
       self._service_status = CommonService.SERVICE_STATUS_END
       if self._service_transportid:

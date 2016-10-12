@@ -78,12 +78,12 @@ class CommonService(object):
 
   def __init__(self, *args, **kwargs):
     '''Service constructor. Parameters include optional references to two
-       queues: frontend=Queue for messages from the service to the frontend,
-       and commands=Queue for messages from the frontend to the service.'''
-    self.__queue_frontend = kwargs.get('frontend')
-    self.__queue_commands = kwargs.get('commands')
+       pipes: frontend= for messages from the service to the frontend,
+       and commands= for messages from the frontend to the service.'''
+    self.__pipe_frontend = kwargs.get('frontend')
+    self.__pipe_commands = kwargs.get('commands')
     self._transport = workflows.transport.queue_transport.QueueTransport()
-    self._transport.set_queue(self.__queue_frontend)
+    self._transport.set_send_function(self.__send_to_frontend)
     self._transport.connect()
     self.__shutdown = False
     self.__callback_register = {}
@@ -91,17 +91,21 @@ class CommonService(object):
     self._idle_callback = None
     self._idle_time = None
 
+  def __send_to_frontend(self, data_structure):
+    '''Put a message in the pipe for the frontend.'''
+    if self.__pipe_frontend:
+      self.__pipe_frontend.send(data_structure)
+
   def _log_send(self, data_structure):
     '''Internal function to format and send log messages.'''
     self.__log_send_full({'log': data_structure, 'source': 'other'})
 
   def __log_send_full(self, data_structure):
     '''Internal function to actually send log messages.'''
-    if self.__queue_frontend:
-      self.__queue_frontend.put_nowait({
-        'band': 'log',
-        'payload': data_structure
-      })
+    self.__send_to_frontend({
+      'band': 'log',
+      'payload': data_structure
+    })
 
   def _register(self, message_band, callback):
     '''Register a callback function for a specific message band.'''
@@ -115,20 +119,18 @@ class CommonService(object):
 
   def _update_status(self, status):
     '''Internal function to actually send status update.'''
-    if self.__queue_frontend:
-      self.__queue_frontend.put_nowait({
-        'band': 'status_update',
-        'status': status
-      })
+    self.__send_to_frontend({
+      'band': 'status_update',
+      'status': status
+    })
 
   def __update_service_status(self, statuscode):
     '''Set the internal status of the service object, and notify frontend.'''
     self.__service_status = statuscode
-    if self.__queue_frontend:
-      self.__queue_frontend.put_nowait({
-        'band': 'status_update',
-        'statuscode': self.__service_status
-      })
+    self.__send_to_frontend({
+      'band': 'status_update',
+      'statuscode': self.__service_status
+    })
 
   def get_name(self):
     '''Return a name for this service.
@@ -146,20 +148,19 @@ class CommonService(object):
     self._register('command', self.__process_command)
     self._register('transport_message', self.__process_transport)
 
-    if self.__queue_commands is None:
+    if self.__pipe_commands is None:
       # can only listen to commands if command queue is defined
       self.__shutdown = True
 
     while not self.__shutdown: # main loop
-
       self.__update_service_status(self.SERVICE_STATUS_IDLE)
 
       if self._idle_time is None:
-        message = self.__queue_commands.get()
+        message = self.__pipe_commands.recv()
       else:
-        try:
-          message = self.__queue_commands.get(True, self._idle_time)
-        except Queue.Empty:
+        if self.__pipe_commands.poll(self._idle_time):
+          message = self.__pipe_commands.recv()
+        else:
           self.__update_service_status(self.SERVICE_STATUS_TIMER)
           if self._idle_callback is not None:
             self._idle_callback()

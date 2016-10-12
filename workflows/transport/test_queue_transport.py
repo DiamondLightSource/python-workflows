@@ -7,50 +7,50 @@ from workflows.transport.queue_transport import QueueTransport
 def test_lookup_and_initialize_queue_transport_layer():
   '''Find the queue transport layer via the lookup mechanism and run
      its constructor with default settings.'''
-  queue = workflows.transport.lookup("QueueTransport")
-  assert queue == QueueTransport
-  queue()
+  qt = workflows.transport.lookup("QueueTransport")
+  assert qt == QueueTransport
+  qt()
 
 def test_add_command_line_help():
   '''Check that trying to add command line parameters does nothing of consequence.'''
   QueueTransport().add_command_line_options(None)
 
-def test_connect_to_a_queue():
+def test_connect_to_a_send_function():
   '''Test the Stomp connection routine.'''
-  mockqueue = mock.Mock()
+  mockfunc = mock.Mock()
 
-  queue = QueueTransport()
-  assert not queue.is_connected()
+  qt = QueueTransport()
+  assert not qt.is_connected()
 
-  assert not queue.connect()
-  assert not queue.is_connected()
+  assert not qt.connect()
+  assert not qt.is_connected()
 
   with pytest.raises(workflows.WorkflowsError):
-    queue.send('', '')
+    qt.send('', '')
 
-  queue.set_queue(mockqueue)
-  assert not queue.is_connected()
+  qt.set_send_function(mockfunc)
+  assert not qt.is_connected()
 
-  assert queue.connect()
-  assert queue.is_connected()
+  assert qt.connect()
+  assert qt.is_connected()
 
-def setup_queue():
-  '''Helper function to create a faux-Queue and a QueueTransport()-instance connected to it.'''
-  mockqueue = mock.Mock()
-  queue = QueueTransport()
-  queue.set_queue(mockqueue)
-  queue.connect()
-  return mockqueue, queue
+def setup_qt():
+  '''Helper function to create a send function and a QueueTransport()-instance using it.'''
+  func = mock.Mock()
+  qt = QueueTransport()
+  qt.set_send_function(func)
+  qt.connect()
+  return func, qt
 
 def test_forward_send_call():
   '''Test translation of a send() call to Queue message.'''
-  mockqueue, queue = setup_queue()
+  mockfunc, qt = setup_qt()
 
-  queue.send(destination=mock.sentinel.destination,
+  qt.send(destination=mock.sentinel.destination,
              message=str(mock.sentinel.message),
 	     headers=mock.sentinel.header)
 
-  mockqueue.put_nowait.assert_called_with({
+  mockfunc.assert_called_with({
     'band': 'transport',
     'call': 'send',
     'payload': (
@@ -61,13 +61,13 @@ def test_forward_send_call():
 
 def test_forward_broadcast_call():
   '''Test translation of a broadcast() call to Queue message.'''
-  mockqueue, queue = setup_queue()
+  mockfunc, qt = setup_qt()
 
-  queue.broadcast(destination=mock.sentinel.destination,
+  qt.broadcast(destination=mock.sentinel.destination,
              message=str(mock.sentinel.message),
 	     headers=mock.sentinel.header)
 
-  mockqueue.put_nowait.assert_called_once_with({
+  mockfunc.assert_called_once_with({
     'band': 'transport',
     'call': 'broadcast',
     'payload': (
@@ -78,11 +78,11 @@ def test_forward_broadcast_call():
 
 def test_forward_transaction_begin_call():
   '''Test translation of a transaction_begin() call to Queue message.'''
-  mockqueue, queue = setup_queue()
+  mockfunc, qt = setup_qt()
 
-  tid = queue.transaction_begin(kwarg=mock.sentinel.kwarg)
+  tid = qt.transaction_begin(kwarg=mock.sentinel.kwarg)
 
-  mockqueue.put_nowait.assert_called_once_with({
+  mockfunc.assert_called_once_with({
     'band': 'transport',
     'call': 'transaction_begin',
     'payload': (
@@ -92,13 +92,13 @@ def test_forward_transaction_begin_call():
 
 def test_forward_transaction_abort_call():
   '''Test translation of a transaction_abort() call to Queue message.'''
-  mockqueue, queue = setup_queue()
+  mockfunc, qt = setup_qt()
 
-  tid = queue.transaction_begin()
-  queue.transaction_abort(tid, kwarg=mock.sentinel.kwarg)
+  tid = qt.transaction_begin()
+  qt.transaction_abort(tid, kwarg=mock.sentinel.kwarg)
 
-  assert mockqueue.put_nowait.call_count == 2
-  mockqueue.put_nowait.assert_called_with({
+  assert mockfunc.call_count == 2
+  mockfunc.assert_called_with({
     'band': 'transport',
     'call': 'transaction_abort',
     'payload': (
@@ -108,13 +108,13 @@ def test_forward_transaction_abort_call():
 
 def test_forward_transaction_commit_call():
   '''Test translation of a transaction_commit() call to Queue message.'''
-  mockqueue, queue = setup_queue()
+  mockfunc, qt = setup_qt()
 
-  tid = queue.transaction_begin()
-  queue.transaction_commit(tid, kwarg=mock.sentinel.kwarg)
+  tid = qt.transaction_begin()
+  qt.transaction_commit(tid, kwarg=mock.sentinel.kwarg)
 
-  assert mockqueue.put_nowait.call_count == 2
-  mockqueue.put_nowait.assert_called_with({
+  assert mockfunc.call_count == 2
+  mockfunc.assert_called_with({
     'band': 'transport',
     'call': 'transaction_commit',
     'payload': (
@@ -124,12 +124,12 @@ def test_forward_transaction_commit_call():
 
 def test_forward_subscribe_call():
   '''Test translation of a subscribe() call to Queue message.'''
-  mockqueue, queue = setup_queue()
+  mockfunc, qt = setup_qt()
 
-  subid = queue.subscribe(mock.sentinel.channel, mock.sentinel.callback,
+  subid = qt.subscribe(mock.sentinel.channel, mock.sentinel.callback,
     kwarg=mock.sentinel.kwarg)
 
-  mockqueue.put_nowait.assert_called_once_with({
+  mockfunc.assert_called_once_with({
     'band': 'transport',
     'call': 'subscribe',
     'payload': (
@@ -140,12 +140,12 @@ def test_forward_subscribe_call():
 
 def test_forward_subscribe_broadcast_call():
   '''Test translation of a subscribe_broadcast() call to Queue message.'''
-  mockqueue, queue = setup_queue()
+  mockfunc, qt = setup_qt()
 
-  subid = queue.subscribe_broadcast(mock.sentinel.channel,
+  subid = qt.subscribe_broadcast(mock.sentinel.channel,
     mock.sentinel.callback, kwarg=mock.sentinel.kwarg)
 
-  mockqueue.put_nowait.assert_called_once_with({
+  mockfunc.assert_called_once_with({
     'band': 'transport',
     'call': 'subscribe_broadcast',
     'payload': (
@@ -156,13 +156,13 @@ def test_forward_subscribe_broadcast_call():
 
 def test_forward_unsubscribe_call():
   '''Test translation of an unsubscribe() call to Queue message.'''
-  mockqueue, queue = setup_queue()
+  mockfunc, qt = setup_qt()
 
-  subid = queue.subscribe(mock.sentinel.channel, mock.sentinel.callback)
-  queue.unsubscribe(subid, kwarg=mock.sentinel.kwarg)
+  subid = qt.subscribe(mock.sentinel.channel, mock.sentinel.callback)
+  qt.unsubscribe(subid, kwarg=mock.sentinel.kwarg)
 
-  assert mockqueue.put_nowait.call_count == 2
-  mockqueue.put_nowait.assert_called_with({
+  assert mockfunc.call_count == 2
+  mockfunc.assert_called_with({
     'band': 'transport',
     'call': 'unsubscribe',
     'payload': (
@@ -173,14 +173,14 @@ def test_forward_unsubscribe_call():
 
 def test_forward_ack_call():
   '''Test translation of ack() call to Queue message.'''
-  mockqueue, queue = setup_queue()
+  mockfunc, qt = setup_qt()
 
-  subid = queue.subscribe(mock.sentinel.channel, mock.sentinel.callback, acknowledgement=True)
-  queue.register_message(subid, mock.sentinel.messageid)
-  queue.ack(mock.sentinel.messageid,
+  subid = qt.subscribe(mock.sentinel.channel, mock.sentinel.callback, acknowledgement=True)
+  qt.register_message(subid, mock.sentinel.messageid)
+  qt.ack(mock.sentinel.messageid,
             kwarg=mock.sentinel.kwarg)
 
-  mockqueue.put_nowait.assert_called_with({
+  mockfunc.assert_called_with({
     'band': 'transport',
     'call': 'ack',
     'payload': (
@@ -191,14 +191,14 @@ def test_forward_ack_call():
 
 def test_forward_nack_call():
   '''Test translation of nack() call to Queue message.'''
-  mockqueue, queue = setup_queue()
+  mockfunc, qt = setup_qt()
 
-  subid = queue.subscribe(mock.sentinel.channel, mock.sentinel.callback, acknowledgement=True)
-  queue.register_message(subid, mock.sentinel.messageid)
-  queue.nack(mock.sentinel.messageid,
+  subid = qt.subscribe(mock.sentinel.channel, mock.sentinel.callback, acknowledgement=True)
+  qt.register_message(subid, mock.sentinel.messageid)
+  qt.nack(mock.sentinel.messageid,
             kwarg=mock.sentinel.kwarg)
 
-  mockqueue.put_nowait.assert_called_with({
+  mockfunc.assert_called_with({
     'band': 'transport',
     'call': 'nack',
     'payload': (

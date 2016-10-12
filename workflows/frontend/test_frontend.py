@@ -24,7 +24,10 @@ def test_frontend_connects_to_transport_layer(mock_transport, mock_status, mock_
 @mock.patch('workflows.frontend.workflows.transport')
 def test_start_service_in_frontend(mock_transport, mock_status, mock_mp):
   mock_service = mock.Mock()
-  mock_mp.Queue.return_value = mock.sentinel.Queue
+  mock_mp.Pipe.side_effect = [
+      (mock.sentinel.pipe1, mock.sentinel.pipe2),
+      (mock.sentinel.pipe3, mock.sentinel.pipe4),
+      None ]
 
   # initialize frontend
   fe = workflows.frontend.Frontend()
@@ -37,7 +40,7 @@ def test_start_service_in_frontend(mock_transport, mock_status, mock_mp):
   fe.switch_service(mock_service)
 
   # check service was started properly
-  mock_service.assert_called_once_with(commands=mock.sentinel.Queue, frontend=mock.sentinel.Queue)
+  mock_service.assert_called_once_with(commands=mock.sentinel.pipe2, frontend=mock.sentinel.pipe3)
   mock_mp.Process.assert_called_once_with(target=mock_service.return_value.start, args=())
   mock_mp.Process.return_value.start.assert_called_once()
 
@@ -56,7 +59,7 @@ def test_connect_queue_communication_to_transport_layer(mock_status):
   commqueue = mock.Mock()
 
   fe = workflows.frontend.Frontend(transport=transport)
-  setattr(fe, '_queue_commands', commqueue)
+  setattr(fe, '_pipe_commands', commqueue)
 
   transport.assert_called_once()
   transport = transport.return_value
@@ -87,7 +90,7 @@ def test_connect_queue_communication_to_transport_layer(mock_status):
   callback_function = transport.subscribe.call_args[0][1]
 
   callback_function(mock.sentinel.header, mock.sentinel.message)
-  commqueue.put.assert_called_once_with( {
+  commqueue.send.assert_called_once_with( {
       'band': 'transport_message',
       'payload': {
           'subscription_id': mock.sentinel.subid,
