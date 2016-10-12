@@ -28,7 +28,9 @@ class CommonTransport(object):
   def subscribe(self, channel, callback, **kwargs):
     '''Listen to a queue, notify via callback function.
        :param channel: Queue name to subscribe to
-       :param callback: Function to be called when messages are received
+       :param callback: Function to be called when messages are received.
+                        The callback will pass two arguments, the header as a
+                        dictionary structure, and the message.
        :param **kwargs: Further parameters for the transport layer. For example
               client_id: Value tying a subscription to one client. This allows
                          removing all subscriptions for a client simultaneously
@@ -71,7 +73,9 @@ class CommonTransport(object):
   def subscribe_broadcast(self, channel, callback, **kwargs):
     '''Listen to a broadcast topic, notify via callback function.
        :param channel: Topic name to subscribe to
-       :param callback: Function to be called when messages are received
+       :param callback: Function to be called when messages are received.
+                        The callback will pass two arguments, the header as a
+                        dictionary structure, and the message.
        :param client_id: Value tying a subscription to one client. This allows
                          removing all subscriptions for a client simultaneously
                          when the client goes away.
