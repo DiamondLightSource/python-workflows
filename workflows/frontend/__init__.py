@@ -73,7 +73,7 @@ class Frontend():
 
   def send_command(self, command):
     '''Send command to service via the command queue.'''
-    print "To command queue: ", command
+#   print "To command queue: ", command
     if self._queue_commands:
       self._queue_commands.put(command)
 
@@ -179,10 +179,10 @@ class Frontend():
       print 'Unknown transport handler for message', message
       return
     if 'transaction' in message['payload'][1]:
-      print "Mapping transaction %s to %s for %s" % (
-          str( message['payload'][1]['transaction'] ),
-          str( self._transaction_mapping[message['payload'][1]['transaction']] ),
-          message['call'])
+#     print "Mapping transaction %s to %s for %s" % (
+#         str( message['payload'][1]['transaction'] ),
+#         str( self._transaction_mapping[message['payload'][1]['transaction']] ),
+#         message['call'])
       message['payload'][1]['transaction'] = \
         self._transaction_mapping[message['payload'][1]['transaction']]
     handler(message)

@@ -22,6 +22,7 @@ class SampleProducer(CommonService):
   def create_message(self):
     '''Create and send a unique message for this service.'''
     self.counter += 1
+    print "Sending message #%d" % self.counter
     self._transport.send("transient.destination",
                          "Message #%d\n++++++++Produced@ %f" % (
                            self.counter,
