@@ -202,7 +202,7 @@ class CommonService(object):
       ( message['header'], message['message'] )
 
   #
-  # -- Plugin-related functions ----------------------------------------------
+  # -- Plugin-related function -----------------------------------------------
   #
 
   class __metaclass__(type):
@@ -214,21 +214,6 @@ class CommonService(object):
         cls.service_register = {}
       else:
         cls.service_register[name] = cls
-
-  @classmethod
-  def load(cls, paths):
-    '''Import all python files (except test_*) in directories. This is required
-       for registration of subclasses.'''
-    import imp, pkgutil
-    if isinstance(paths, basestring):
-      paths = list(paths)
-    cls.registered = []
-    for _, name, _ in pkgutil.iter_modules(paths):
-      if not name.startswith('test_'):
-        fid, pathname, desc = imp.find_module(name, paths)
-        imp.load_module(name, fid, pathname, desc)
-        if fid:
-          fid.close()
 
 class Commands():
   SHUTDOWN = 'shutdown'

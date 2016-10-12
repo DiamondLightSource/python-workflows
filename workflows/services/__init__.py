@@ -1,4 +1,5 @@
 from __future__ import absolute_import, division
+import workflows
 from workflows.services.common_service import CommonService
 
 def lookup(service):
@@ -14,10 +15,4 @@ def get_known_services():
   '''
   return CommonService.service_register
 
-def import_services(path):
-  '''Import all python files in this path to register services.
-     :param path: A path or list of paths containing files to import.
-  '''
-  return CommonService.load(path)
-
-import_services(__path__)
+workflows.load_plugins(__path__)

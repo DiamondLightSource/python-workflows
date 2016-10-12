@@ -1,4 +1,5 @@
 from __future__ import absolute_import, division
+import workflows
 from workflows.transport.common_transport import CommonTransport
 
 default_transport = 'StompTransport'
@@ -17,4 +18,4 @@ def get_known_transports():
   '''Return a dictionary of all known transport mechanisms.'''
   return CommonTransport.transport_register
 
-CommonTransport.load(__path__)
+workflows.load_plugins(__path__)
