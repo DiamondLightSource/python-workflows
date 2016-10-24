@@ -168,6 +168,21 @@ class StompTransport(CommonTransport):
     with self._lock:
       self._conn.subscribe('/queue/' + channel, sub_id, headers=headers, ack=ack)
 
+  def _subscribe_broadcast(self, sub_id, channel, callback, **kwargs):
+    '''Listen to a broadcast topic, notify via callback function.
+       :param sub_id: ID for this subscription in the transport layer
+       :param channel: Topic name to subscribe to
+       :param callback: Function to be called when messages are received
+       :param **kwargs: Further parameters for the transport layer. For example
+              retroactive: Ask broker to send old messages if possible
+    '''
+    headers = {}
+    if kwargs.get('retroactive'):
+      headers['activemq.retroactive'] = 'true'
+    self._subscription_callbacks[sub_id] = callback
+    with self._lock:
+      self._conn.subscribe('/topic/' + channel, sub_id, headers=headers)
+
   def _send(self, destination, message, **kwargs):
     '''Send a message to a queue.
        :param destination: Queue name to send to

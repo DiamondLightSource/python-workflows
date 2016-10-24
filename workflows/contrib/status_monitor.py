@@ -16,18 +16,25 @@ class Terminal():
     self._lock = threading.RLock()
     self._node_status = {}
 
-  def update_status(self, header, body):
-    print header, body
+  def update_status(self, header, message):
+    #################
+    # This is a bug in the message handling API.
+    # The function should have receive a deserialized message.
+    import json
+    message = json.loads(message)
+    #################
+
+    print header, message
     with self._lock:
-      if body['host'] not in self._node_status or \
-          int(header['timestamp']) >= self._node_status[body['host']]['last_seen']:
-        self._node_status[body['host']] = body
-        self._node_status[body['host']]['last_seen'] = int(header['timestamp'])
+      if message['host'] not in self._node_status or \
+          int(header['timestamp']) >= self._node_status[message['host']]['last_seen']:
+        self._node_status[message['host']] = message
+        self._node_status[message['host']]['last_seen'] = int(header['timestamp'])
 
   def run(self):
     print "\n", '='*47
     print "service_monitor started. End with Ctrl+C\n", '='*47
-    self._transport.subscribe('/topic/transient.status.demo', self.update_status, retroactive=True)
+    self._transport.subscribe_broadcast('transient.status.demo', self.update_status, retroactive=True)
     try:
       while True:
         print ""

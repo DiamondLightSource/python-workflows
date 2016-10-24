@@ -21,6 +21,6 @@ def test_status_monitor_connects_to_transport_layer(mock_transport, mock_time):
   mock_trn.return_value.connect.assert_called_once_with()
 
   mon.run()
-  mock_trn.return_value.subscribe.assert_called_once_with(mock.ANY, mon.update_status, retroactive=True)
+  mock_trn.return_value.subscribe_broadcast.assert_called_once_with(mock.ANY, mon.update_status, retroactive=True)
 
   mock_trn.return_value.disconnect.assert_called_once()

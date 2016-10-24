@@ -118,8 +118,8 @@ def test_send_message(mockstomp):
   assert kwargs == { 'headers': mock.sentinel.headers }
 
 @mock.patch('workflows.transport.stomp_transport.stomp')
-def test_subscribe_to_channel(mockstomp):
-  '''Test subscribing to a channel and callback functions.'''
+def test_subscribe_to_queue(mockstomp):
+  '''Test subscribing to a queue (producer-consumer) and callback functions.'''
   mock_cb1 = mock.Mock()
   mock_cb2 = mock.Mock()
   mockconn = mock.Mock()
@@ -157,6 +157,41 @@ def test_subscribe_to_channel(mockstomp):
   args, kwargs = mockconn.subscribe.call_args
   assert args == ('/queue/' + str(mock.sentinel.channel3), 3)
   assert kwargs == { 'headers': {}, 'ack': 'client-individual' }
+
+@mock.patch('workflows.transport.stomp_transport.stomp')
+def test_subscribe_to_broadcast(mockstomp):
+  '''Test subscribing to a topic (publish-subscribe) and callback functions.'''
+  mock_cb1 = mock.Mock()
+  mock_cb2 = mock.Mock()
+  mockconn = mock.Mock()
+  mockstomp.Connection.return_value = mockconn
+  stomp = StompTransport()
+  stomp.connect()
+
+  mockconn.set_listener.assert_called_once()
+  listener = mockconn.set_listener.call_args[0][1]
+  assert listener is not None
+
+  stomp._subscribe_broadcast(1, str(mock.sentinel.channel1), mock_cb1)
+
+  mockconn.subscribe.assert_called_once()
+  args, kwargs = mockconn.subscribe.call_args
+  assert args == ('/topic/' + str(mock.sentinel.channel1), 1)
+  assert kwargs == { 'headers': {} }
+
+  stomp._subscribe_broadcast(2, str(mock.sentinel.channel2), mock_cb2, retroactive=True)
+  assert mockconn.subscribe.call_count == 2
+  args, kwargs = mockconn.subscribe.call_args
+  assert args == ('/topic/' + str(mock.sentinel.channel2), 2)
+  assert kwargs == { 'headers': {'activemq.retroactive':'true'} }
+
+  assert mock_cb1.call_count == 0
+  listener.on_message({'subscription': 1}, mock.sentinel.message1)
+  mock_cb1.assert_called_once_with({'subscription': 1}, mock.sentinel.message1)
+
+  assert mock_cb2.call_count == 0
+  listener.on_message({'subscription': 2}, mock.sentinel.message2)
+  mock_cb2.assert_called_once_with({'subscription': 2}, mock.sentinel.message2)
 
 @pytest.mark.skip(reason="TODO")
 def test_incoming_messages_are_registered_properly():
