@@ -61,7 +61,7 @@ def test_simple_send_message():
         something=mock.sentinel.something)
 
   ct._send.assert_called_once_with(mock.sentinel.destination,
-        str(mock.sentinel.message), headers=mock.sentinel.headers,
+        '"' + str(mock.sentinel.message) + '"', headers=mock.sentinel.headers,
         expiration=mock.sentinel.expiration,
         transaction=mock.sentinel.transaction,
         something=mock.sentinel.something)
@@ -83,7 +83,7 @@ def test_simple_broadcast_message():
         transaction=mock.sentinel.transaction)
 
   ct._broadcast.assert_called_once_with(mock.sentinel.destination,
-        str(mock.sentinel.message), headers=mock.sentinel.headers,
+        '"' + str(mock.sentinel.message) + '"', headers=mock.sentinel.headers,
         expiration=mock.sentinel.expiration,
         transaction=mock.sentinel.transaction)
 

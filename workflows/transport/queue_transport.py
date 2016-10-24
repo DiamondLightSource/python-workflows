@@ -125,3 +125,18 @@ class QueueTransport(CommonTransport):
       'call': 'nack',
       'payload': ( (messageid, ) + args, kwargs )
     })
+
+  #
+  # -- Internal message mangling functions -----------------------------------
+  #
+
+  # Since the queue transport can work directly with serializable content there
+  # is no need to pre-serialize.
+
+  @staticmethod
+  def _mangle_for_sending(message):
+    return message
+
+  @staticmethod
+  def _mangle_for_receiving(message):
+    return message

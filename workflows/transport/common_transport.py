@@ -119,8 +119,7 @@ class CommonTransport(object):
               transaction: Transaction ID if message should be part of a
                            transaction
     '''
-    if not isinstance(message, basestring):
-      message = json.dumps(message)
+    message = self._mangle_for_sending(message)
     self._send(destination, message, **kwargs)
 
   def broadcast(self, destination, message, **kwargs):
@@ -133,8 +132,7 @@ class CommonTransport(object):
               transaction: Transaction ID if message should be part of a
                            transaction
     '''
-    if not isinstance(message, basestring):
-      message = json.dumps(message)
+    message = self._mangle_for_sending(message)
     self._broadcast(destination, message, **kwargs)
 
   def ack(self, message_id, **kwargs):
@@ -385,6 +383,18 @@ class CommonTransport(object):
        :param **kwargs: Further parameters for the transport layer.
     '''
     raise workflows.WorkflowsError("Transport interface not implemented")
+
+  #
+  # -- Internal message mangling functions -----------------------------------
+  #
+
+  @staticmethod
+  def _mangle_for_sending(message):
+    return json.dumps(message)
+
+  @staticmethod
+  def _mangle_for_receiving(message):
+    return json.loads(message)
 
   #
   # -- Plugin-related function -----------------------------------------------
