@@ -10,16 +10,20 @@ def test_subscribe_unsubscribe_a_channel():
   ct = CommonTransport()
   ct._subscribe = mock.Mock()
   ct._unsubscribe = mock.Mock()
+  mock_callback = mock.Mock()
 
-  subid = ct.subscribe(mock.sentinel.channel, mock.sentinel.callback,
+  subid = ct.subscribe(mock.sentinel.channel, mock_callback,
         exclusive=mock.sentinel.exclusive, acknowledgement=mock.sentinel.ack)
 
   assert subid
-  assert ct.subscription_callback(subid) == mock.sentinel.callback
+  assert ct.subscription_callback(subid) == mock_callback
   ct._subscribe.assert_called_once_with(subid, mock.sentinel.channel,
-        mock.sentinel.callback,
+        mock.ANY,
         exclusive=mock.sentinel.exclusive,
         acknowledgement=mock.sentinel.ack)
+  callback = ct._subscribe.call_args[0][2]
+  callback(mock.sentinel.header, '"asdf"')
+  mock_callback.assert_called_once_with(mock.sentinel.header, 'asdf')
 
   ct.unsubscribe(subid)
 
@@ -33,14 +37,18 @@ def test_simple_subscribe_unsubscribe_a_broadcast():
   ct = CommonTransport()
   ct._subscribe_broadcast = mock.Mock()
   ct._unsubscribe = mock.Mock()
+  mock_callback = mock.Mock()
 
-  subid = ct.subscribe_broadcast(mock.sentinel.channel, mock.sentinel.callback,
+  subid = ct.subscribe_broadcast(mock.sentinel.channel, mock_callback,
         retroactive=mock.sentinel.retro)
 
   assert subid
-  assert ct.subscription_callback(subid) == mock.sentinel.callback
+  assert ct.subscription_callback(subid) == mock_callback
   ct._subscribe_broadcast.assert_called_once_with(subid, mock.sentinel.channel,
-        mock.sentinel.callback, retroactive=mock.sentinel.retro)
+        mock.ANY, retroactive=mock.sentinel.retro)
+  callback = ct._subscribe_broadcast.call_args[0][2]
+  callback(mock.sentinel.header, '"asdf"')
+  mock_callback.assert_called_once_with(mock.sentinel.header, 'asdf')
 
   ct.unsubscribe(subid)
 

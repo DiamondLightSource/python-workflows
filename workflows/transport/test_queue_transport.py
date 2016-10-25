@@ -142,17 +142,23 @@ def test_forward_subscribe_broadcast_call():
   '''Test translation of a subscribe_broadcast() call to Queue message.'''
   mockfunc, qt = setup_qt()
 
+  mock_callback = mock.Mock()
+
   subid = qt.subscribe_broadcast(mock.sentinel.channel,
-    mock.sentinel.callback, kwarg=mock.sentinel.kwarg)
+    mock_callback, kwarg=mock.sentinel.kwarg)
 
   mockfunc.assert_called_once_with({
     'band': 'transport',
     'call': 'subscribe_broadcast',
     'payload': (
-      ( subid, mock.sentinel.channel, mock.sentinel.callback ),
+      ( subid, mock.sentinel.channel, mock.ANY ),
       { 'kwarg': mock.sentinel.kwarg }
     )
   })
+
+  callback = mockfunc.call_args[0][0]['payload'][0][2]
+  callback(mock.sentinel.header, mock.sentinel.message)
+  mock_callback.assert_called_once_with(mock.sentinel.header, mock.sentinel.message)
 
 def test_forward_unsubscribe_call():
   '''Test translation of an unsubscribe() call to Queue message.'''

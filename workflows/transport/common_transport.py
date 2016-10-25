@@ -53,7 +53,9 @@ class CommonTransport(object):
       self.__clients[kwargs['client_id']]['subscriptions'].add \
         (self.__subscription_id)
       del(kwargs['client_id'])
-    self._subscribe(self.__subscription_id, channel, callback, **kwargs)
+    def callback_bounce(header, message):
+      callback(header, self._mangle_for_receiving(message))
+    self._subscribe(self.__subscription_id, channel, callback_bounce, **kwargs)
     return self.__subscription_id
 
   def unsubscribe(self, subscription, **kwargs):
@@ -94,8 +96,10 @@ class CommonTransport(object):
       self.__clients[kwargs['client_id']]['subscriptions'].add \
         (self.__subscription_id)
       del(kwargs['client_id'])
-    self._subscribe_broadcast(self.__subscription_id, channel, callback, \
-        **kwargs)
+    def callback_bounce(header, message):
+      callback(header, self._mangle_for_receiving(message))
+    self._subscribe_broadcast(self.__subscription_id, channel,
+        callback_bounce, **kwargs)
     return self.__subscription_id
 
   def subscription_callback(self, subscription):
