@@ -17,13 +17,6 @@ class Terminal():
     self._node_status = {}
 
   def update_status(self, header, message):
-    #################
-    # This is a bug in the message handling API.
-    # The function should have receive a deserialized message.
-    import json
-    message = json.loads(message)
-    #################
-
     print header, message
     with self._lock:
       if message['host'] not in self._node_status or \
