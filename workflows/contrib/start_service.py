@@ -1,5 +1,4 @@
 from __future__ import absolute_import, division
-import sys
 import workflows
 import workflows.services
 import workflows.transport
@@ -39,5 +38,5 @@ def run(cmdline_args, program_name = 'start_service',
     ).run()
 
 if __name__ == '__main__':
+  import sys
   run(sys.argv[1:])
-
