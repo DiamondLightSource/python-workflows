@@ -1,6 +1,6 @@
 from setuptools import setup, find_packages
 
-package_version = '0.9'
+package_version = '0.10'
 
 # to release:
 #  - increment number
