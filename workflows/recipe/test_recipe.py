@@ -19,8 +19,7 @@ def generate_recipes():
         ]
       }
 
-  class B(workflows.recipe.Recipe):
-    recipe = {
+  recipe_b = {
         1: { 'service': 'A service',
              'queue': 'some.queue',
              'output': 2,
@@ -32,8 +31,9 @@ def generate_recipes():
            (1, {}),
         ]
       }
+  b = workflows.recipe.Recipe(recipe_b)
 
-  return A(), B()
+  return A(), b
 
 def test_can_generate_recipe_objects():
   '''Test generation of recipes.'''
@@ -42,6 +42,7 @@ def test_can_generate_recipe_objects():
   # Check that both recipies are valid
   A.validate()
   B.validate()
+  assert len(B.recipe) == 3
 
 def test_validate_tests_for_empty_recipe():
   '''Validating a recipe that has not been defined must throw an error.'''

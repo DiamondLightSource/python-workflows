@@ -9,6 +9,11 @@ class Recipe(object):
   '''The processing recipe is encoded in this dictionary.'''
   # TODO: Describe format
 
+  def __init__(self, recipe=None):
+    '''Constructor allows passing in a recipe dictionary.'''
+    if recipe:
+      self.recipe = recipe
+
   def validate(self):
     '''Check whether the encoded recipe is valid. It must describe a directed
        acyclical graph, all connections must be defined, etc.'''
