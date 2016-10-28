@@ -44,6 +44,14 @@ def test_can_generate_recipe_objects():
   B.validate()
   assert len(B.recipe) == 3
 
+def test_serializing_and_deserializing_recipes():
+  '''Test generation of recipes.'''
+  A, B = generate_recipes()
+
+  # Check that both recipies are valid
+  assert A.deserialize(A.serialize()) == A.recipe
+  assert B.deserialize(B.serialize()) == B.recipe
+
 def test_validate_tests_for_empty_recipe():
   '''Validating a recipe that has not been defined must throw an error.'''
   A, _ = generate_recipes()

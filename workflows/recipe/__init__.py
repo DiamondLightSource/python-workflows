@@ -1,3 +1,4 @@
+import json
 import workflows
 
 class Recipe(object):
@@ -11,8 +12,30 @@ class Recipe(object):
 
   def __init__(self, recipe=None):
     '''Constructor allows passing in a recipe dictionary.'''
-    if recipe:
+    if isinstance(recipe, basestring):
+      self.recipe = self.deserialize(recipe)
+    elif recipe:
       self.recipe = recipe
+
+  @staticmethod
+  def deserialize(string):
+    '''Clean up a recipe that has been stored as serialized json string.'''
+    recipe = json.loads(string)
+    for k in list(recipe.iterkeys()):
+      if k != 'start' and int(k):
+        recipe[int(k)] = recipe[k]
+        del(recipe[k])
+    if 'start' in recipe:
+      recipe['start'] = [ tuple(x) for x in recipe['start'] ]
+    return recipe
+
+  def serialize(self):
+    '''Write out the current recipe as serialized json string.'''
+    return json.dumps(self.recipe)
+
+  def __getitem__(self, item):
+    '''Allow direct dictionary access to recipe elements.'''
+    return self.recipe.__getitem__(item)
 
   def validate(self):
     '''Check whether the encoded recipe is valid. It must describe a directed
@@ -25,7 +48,7 @@ class Recipe(object):
       raise workflows.WorkflowsError('Invalid recipe: "start" node missing')
     if not self.recipe['start']:
       raise workflows.WorkflowsError('Invalid recipe: "start" node empty')
-    if not all(isinstance(x, tuple) and len(x) == 2 for x in self.recipe['start']):
+    if not all(isinstance(x, (list, tuple)) and len(x) == 2 for x in self.recipe['start']):
       raise workflows.WorkflowsError('Invalid recipe: "start" node invalid')
     if any(x[0] == 'start' for x in self.recipe['start']):
       raise workflows.WorkflowsError('Invalid recipe: "start" node points to itself')
