@@ -44,6 +44,19 @@ def test_can_generate_recipe_objects():
   B.validate()
   assert len(B.recipe) == 3
 
+def test_equality_and_inequality_operator():
+  '''Check that recipe objects can be compared with recipe objects and
+     string representations of recipe objects.'''
+  A, _ = generate_recipes()
+  B, _ = generate_recipes()
+
+  assert A == B
+  assert A == B.serialize()
+
+  del(B.recipe[1])
+  assert A != B
+  assert A != B.serialize()
+
 def test_serializing_and_deserializing_recipes():
   '''Test generation of recipes.'''
   A, B = generate_recipes()

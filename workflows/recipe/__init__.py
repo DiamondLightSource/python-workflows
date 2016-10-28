@@ -37,6 +37,21 @@ class Recipe(object):
     '''Allow direct dictionary access to recipe elements.'''
     return self.recipe.__getitem__(item)
 
+  def __eq__(self, other):
+    '''Overload equality operator (!=) to allow comparing recipe objects
+       with one another and with their string representations.'''
+    if isinstance(other, Recipe):
+      return self.recipe == other.recipe
+    return self.recipe == self.deserialize(other)
+
+  def __ne__(self, other):
+    '''Overload inequality operator (!=) to allow comparing recipe objects
+       with one another and with their string representations.'''
+    result = self.__eq__(other)
+    if result is NotImplemented:
+      return result
+    return not result
+
   def validate(self):
     '''Check whether the encoded recipe is valid. It must describe a directed
        acyclical graph, all connections must be defined, etc.'''
