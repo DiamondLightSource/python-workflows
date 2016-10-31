@@ -1,4 +1,5 @@
 import json
+import string
 import workflows
 
 class Recipe(object):
@@ -109,3 +110,44 @@ class Recipe(object):
     for node in self.recipe:
       if node not in touched_nodes:
         raise workflows.WorkflowsError('Invalid recipe: Recipe contains unreferenced node "%s"' % str(node))
+
+  def apply_parameters(self, parameters):
+    '''Recursively apply dictionary entries in 'parameters' to {item}s in recipe
+       structure, leaving undefined {item}s as they are.
+       Examples:
+
+       parameters = { 'x':'5' }
+       apply_parameters( { '{x}': '{y}' }, parameters )
+          => { '5': '{y}' }
+
+       parameters = { 'y':'5' }
+       apply_parameters( { '{x}': '{y}' }, parameters )
+          => { '{x}': '5' }
+
+       parameters = { 'x':'3', 'y':'5' }
+       apply_parameters( { '{x}': '{y}' }, parameters )
+          => { '3': '5' }
+    '''
+
+    class SafeDict(dict):
+      '''A dictionary that returns undefined keys as {keyname}.
+         This can be used to selectively replace variables in datastructures.'''
+      def __missing__(self, key):
+        return '{' + key + '}'
+
+    params = SafeDict(parameters)
+
+    def _recursive_apply(item):
+      '''Helper function to recursively apply replacements.'''
+      if isinstance(item, basestring):
+        return string.Formatter().vformat(item, (), params)
+      if isinstance(item, dict):
+        return { _recursive_apply(key): _recursive_apply(value) for
+                 key, value in item.iteritems() }
+      if isinstance(item, tuple):
+        return tuple(_recursive_apply(list(item)))
+      if isinstance(item, list):
+        return [ _recursive_apply(x) for x in item ]
+      return item
+
+    self.recipe = _recursive_apply(self.recipe)

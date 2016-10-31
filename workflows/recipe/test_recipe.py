@@ -8,11 +8,11 @@ def generate_recipes():
   class A(workflows.recipe.Recipe):
     recipe = {
         1: { 'service': 'A service',
-             'queue': 'some.queue',
+             'queue': 'some.queue.{first}',
              'output': [ 2 ],
            },
         2: { 'service': 'B service',
-             'queue': 'another.queue',
+             'queue': 'another.queue.{name}',
            },
         'start': [
            (1, {}),
@@ -21,7 +21,7 @@ def generate_recipes():
 
   recipe_b = {
         1: { 'service': 'A service',
-             'queue': 'some.queue',
+             'queue': 'some.queue.{first}',
              'output': 2,
            },
         2: { 'service': 'C service',
@@ -175,3 +175,13 @@ def test_validate_tests_for_cycles():
     A.validate()
   assert 'cycle' in excinfo.value.message
 
+def test_replacing_parameters_in_recipe():
+  '''Recipe may contain placeholders that should be replaced with actual values by running apply_parameters.'''
+  A, _ = generate_recipes()
+
+  replacements = {'name': 'replacement'}
+
+  A.apply_parameters(replacements)
+
+  assert A.recipe[1]['queue'] == 'some.queue.{first}'
+  assert A.recipe[2]['queue'] == 'another.queue.replacement'
