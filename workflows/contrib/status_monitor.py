@@ -140,4 +140,3 @@ class Monitor():
       '''User pressed CTRL+C'''
       pass
     self._transport.disconnect()
-    self._transport = None
