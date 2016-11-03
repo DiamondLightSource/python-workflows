@@ -70,6 +70,7 @@ class Monitor():
       stdscr.addstr(0, 0, "workflows service monitor -- quit with Ctrl+C", curses.A_BOLD)
       stdscr.refresh()
       self.message_box = self._boxwin(5, curses.COLS, 2, 0, title='last seen message', color_pair=1)
+      self.message_box.scrollok(True)
       self.cards = []
 
   def _get_card(self, number):
