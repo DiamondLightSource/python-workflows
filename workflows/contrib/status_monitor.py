@@ -56,17 +56,18 @@ class Monitor():
     curses.wrapper(self._run)
 
   def _boxwin(self, height, width, row, column, title=None, title_x=7, color_pair=None):
-    box = curses.newwin(height, width, row, column)
-    box.clear()
-    if color_pair:
-      box.attron(curses.color_pair(color_pair))
-    box.border(*self.border_chars)
-    if title:
-      box.addstr(0, title_x, " " + title + " ")
-    if color_pair:
-      box.attroff(curses.color_pair(color_pair))
-    box.noutrefresh()
-    return curses.newwin(height - 2, width - 2, row + 1, column + 1)
+    with self._lock:
+      box = curses.newwin(height, width, row, column)
+      box.clear()
+      if color_pair:
+        box.attron(curses.color_pair(color_pair))
+      box.border(*self.border_chars)
+      if title:
+        box.addstr(0, title_x, " " + title + " ")
+      if color_pair:
+        box.attroff(curses.color_pair(color_pair))
+      box.noutrefresh()
+      return curses.newwin(height - 2, width - 2, row + 1, column + 1)
 
   def _redraw_screen(self, stdscr):
     '''Redraw screen. This could be to initialize, or to redraw after resizing.'''
@@ -103,12 +104,13 @@ class Monitor():
 
   def _run(self, stdscr):
     '''Start the actual service monitor'''
-    curses.use_default_colors()
-    curses.curs_set(False)
-    curses.init_pair(1, curses.COLOR_RED, -1)
-    curses.init_pair(2, curses.COLOR_BLACK, -1)
-    curses.init_pair(3, curses.COLOR_GREEN, -1)
-    self._redraw_screen(stdscr)
+    with self._lock:
+      curses.use_default_colors()
+      curses.curs_set(False)
+      curses.init_pair(1, curses.COLOR_RED, -1)
+      curses.init_pair(2, curses.COLOR_BLACK, -1)
+      curses.init_pair(3, curses.COLOR_GREEN, -1)
+      self._redraw_screen(stdscr)
 
     try:
       while not self.shutdown:
@@ -118,45 +120,47 @@ class Monitor():
         cardnumber = 0
         for host, status in overview.iteritems():
           age = (now - int(status['last_seen'] / 1000))
-          if age > 90:
-            with self._lock:
+          with self._lock:
+            if age > 90:
               del(self._node_status[host])
-          else:
-            card = self._get_card(cardnumber)
-            card.erase()
-            card.move(0, 0)
-            card.addstr('Host: ', curses.color_pair(3))
-            card.addstr(host)
-            card.move(1, 0)
-            card.addstr('Service: ', curses.color_pair(3))
-            if 'service' in status and status['service']:
-              card.addstr(status['service'])
             else:
-              card.addstr('---', curses.color_pair(2))
-            card.move(2, 0)
-            card.addstr('State: ', curses.color_pair(3))
-            if 'status' in status:
-              status_code = status['status']
-              state_string = CommonService.human_readable_state.get(status_code, str(status_code))
-              state_color = None
-              if status_code in (CommonService.SERVICE_STATUS_PROCESSING, CommonService.SERVICE_STATUS_TIMER):
-                state_color = curses.color_pair(3) + curses.A_BOLD
-              if status_code == CommonService.SERVICE_STATUS_IDLE:
-                state_color = curses.color_pair(2) + curses.A_BOLD
-              if status_code == CommonService.SERVICE_STATUS_ERROR:
-                state_color = curses.color_pair(1)
-              if state_color:
-                card.addstr(state_string, state_color)
+              card = self._get_card(cardnumber)
+              card.erase()
+              card.move(0, 0)
+              card.addstr('Host: ', curses.color_pair(3))
+              card.addstr(host)
+              card.move(1, 0)
+              card.addstr('Service: ', curses.color_pair(3))
+              if 'service' in status and status['service']:
+                card.addstr(status['service'])
               else:
-                card.addstr(state_string)
-            card.move(3, 0)
-            if age >= 10:
-              card.addstr("last seen %d seconds ago" % age, curses.color_pair(1) + (0 if age < 60 else curses.A_BOLD))
-            card.noutrefresh()
-            cardnumber = cardnumber + 1
+                card.addstr('---', curses.color_pair(2))
+              card.move(2, 0)
+              card.addstr('State: ', curses.color_pair(3))
+              if 'status' in status:
+                status_code = status['status']
+                state_string = CommonService.human_readable_state.get(status_code, str(status_code))
+                state_color = None
+                if status_code in (CommonService.SERVICE_STATUS_PROCESSING, CommonService.SERVICE_STATUS_TIMER):
+                  state_color = curses.color_pair(3) + curses.A_BOLD
+                if status_code == CommonService.SERVICE_STATUS_IDLE:
+                  state_color = curses.color_pair(2) + curses.A_BOLD
+                if status_code == CommonService.SERVICE_STATUS_ERROR:
+                  state_color = curses.color_pair(1)
+                if state_color:
+                  card.addstr(state_string, state_color)
+                else:
+                  card.addstr(state_string)
+              card.move(3, 0)
+              if age >= 10:
+                card.addstr("last seen %d seconds ago" % age, curses.color_pair(1) + (0 if age < 60 else curses.A_BOLD))
+              card.noutrefresh()
+              cardnumber = cardnumber + 1
         if cardnumber < len(self.cards):
-          self._erase_card(cardnumber)
-        curses.doupdate()
+          with self._lock:
+            self._erase_card(cardnumber)
+        with self._lock:
+          curses.doupdate()
         time.sleep(0.2)
     except KeyboardInterrupt:
       '''User pressed CTRL+C'''
