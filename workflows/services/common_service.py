@@ -75,6 +75,21 @@ class CommonService(object):
   SERVICE_STATUS_NONE = -1     # Node has no service instance loaded
   SERVICE_STATUS_TEARDOWN = -2 # Node is shutting down
 
+  # Number to short string conversion
+
+  human_readable_state = {
+    SERVICE_STATUS_NEW: 'constructing',
+    SERVICE_STATUS_STARTING: 'starting',
+    SERVICE_STATUS_IDLE: 'idle',
+    SERVICE_STATUS_TIMER: 'timer event',
+    SERVICE_STATUS_PROCESSING: 'processing',
+    SERVICE_STATUS_SHUTDOWN: 'shutting down',
+    SERVICE_STATUS_END: 'shutdown',
+    SERVICE_STATUS_ERROR: 'error',
+    SERVICE_STATUS_NONE: 'no service loaded',
+    SERVICE_STATUS_TEARDOWN: 'shutdown',
+  }
+
   # Not so overrideable functions ---------------------------------------------
 
   def __init__(self, *args, **kwargs):

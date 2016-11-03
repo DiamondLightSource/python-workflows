@@ -1,6 +1,7 @@
 from __future__ import absolute_import, division
 import curses
 import time
+from workflows.services.common_service import CommonService
 import workflows.transport
 import threading
 
@@ -78,7 +79,8 @@ class Monitor():
       if number < len(self.cards):
         return self.cards[number]
       if number == len(self.cards):
-        self.cards.append(self._boxwin(6, 35, 7, 35 * number, color_pair=3))
+        max_cards_horiz = int(curses.COLS / 35)
+        self.cards.append(self._boxwin(6, 35, 7 + 6 * (number // max_cards_horiz), 35 * (number % max_cards_horiz), color_pair=3))
         return self.cards[number]
       raise RuntimeError("Card number too high")
 
@@ -89,7 +91,8 @@ class Monitor():
         self._erase_card(number + 1)
       if number > (len(self.cards) - 1):
         return
-      obliterate = curses.newwin(6, 35, 7, 35 * number)
+      max_cards_horiz = int(curses.COLS / 35)
+      obliterate = curses.newwin(6, 35, 7 + 6 * (number // max_cards_horiz), 35 * (number % max_cards_horiz))
       obliterate.erase()
       obliterate.noutrefresh()
       del(self.cards[number])
@@ -122,15 +125,29 @@ class Monitor():
             card.addstr(host)
             card.move(1, 0)
             card.addstr('Service: ', curses.color_pair(3))
-            card.addstr(status['service'])
+            if 'service' in status and status['service']:
+              card.addstr(status['service'])
+            else:
+              card.addstr('---', curses.color_pair(2))
             card.move(2, 0)
             card.addstr('State: ', curses.color_pair(3))
-            card.addstr(str(status['status']))
+            if 'status' in status:
+              status_code = status['status']
+              state_string = CommonService.human_readable_state.get(status_code, str(status_code))
+              state_color = None
+              if status_code in (CommonService.SERVICE_STATUS_PROCESSING, CommonService.SERVICE_STATUS_TIMER):
+                state_color = curses.color_pair(3)
+              if status_code == CommonService.SERVICE_STATUS_IDLE:
+                state_color = curses.color_pair(2)
+              if status_code == CommonService.SERVICE_STATUS_ERROR:
+                state_color = curses.color_pair(1)
+              if state_color:
+                card.addstr(state_string, state_color)
+              else:
+                card.addstr(state_string)
             card.move(3, 0)
-            if age < 10:
-              card.addstr("status is current")
-            else:
-              card.addstr("last seen %d seconds ago" % age, curses.color_pair(1))
+            if age >= 10:
+              card.addstr("last seen %d seconds ago" % age, curses.color_pair(1) + (0 if age < 60 else curses.A_BOLD))
             card.noutrefresh()
             cardnumber = cardnumber + 1
         if cardnumber < len(self.cards):
