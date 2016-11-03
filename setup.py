@@ -1,12 +1,11 @@
 from setuptools import setup, find_packages
 
-package_version = '0.11'
+package_version = '0.12'
 
 # to release:
 #  - increment number
-#  - git add -u; git commit -m "${number} release"
-#  - git tag -a v${number}
-#  - git push; git push origin v${number}
+#  - export NUMBER="0.12"
+#  - git add -u; git commit -m "v${NUMBER} release"; git tag -a v${NUMBER} -m v${NUMBER}; git push; git push origin v${NUMBER}
 #  - python setup.py register sdist upload
 
 setup(name='workflows',

@@ -100,6 +100,7 @@ class CommonService(object):
     self.__pipe_commands = kwargs.get('commands')
     self._transport = workflows.transport.queue_transport.QueueTransport()
     self._transport.set_send_function(self.__send_to_frontend)
+    self._transport.connect()
     self.__shutdown = False
     self.__callback_register = {}
     self.__update_service_status(self.SERVICE_STATUS_NEW)
@@ -160,19 +161,13 @@ class CommonService(object):
 
     # Reset logging. Logging must be passed via the queue. Existing handlers
     # may be broken as they were copied into a new process, so should be discarded.
-    root = logging.getLogger()
-    map(root.removeHandler, root.handlers[:])
-    map(root.removeFilter, root.filters[:])
-    logging.shutdown()
     reload(logging)
-
     # Re-enable logging to console
     logger = logging.getLogger()
     logger.setLevel(logging.DEBUG)
     console = logging.StreamHandler()
     logger.addHandler(console)
 
-    self._transport.connect()
     self.__update_service_status(self.SERVICE_STATUS_STARTING)
 
     self.initializing()
