@@ -140,9 +140,9 @@ class Monitor():
               state_string = CommonService.human_readable_state.get(status_code, str(status_code))
               state_color = None
               if status_code in (CommonService.SERVICE_STATUS_PROCESSING, CommonService.SERVICE_STATUS_TIMER):
-                state_color = curses.color_pair(3)
+                state_color = curses.color_pair(3) + curses.A_BOLD
               if status_code == CommonService.SERVICE_STATUS_IDLE:
-                state_color = curses.color_pair(2)
+                state_color = curses.color_pair(2) + curses.A_BOLD
               if status_code == CommonService.SERVICE_STATUS_ERROR:
                 state_color = curses.color_pair(1)
               if state_color:

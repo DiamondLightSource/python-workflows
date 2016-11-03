@@ -23,3 +23,4 @@ class SampleConsumer(CommonService):
       print "----------------"
     print message
     print "========Received@", (time.time() % 1000) * 1000
+    time.sleep(0.1)
