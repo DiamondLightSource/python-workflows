@@ -23,7 +23,7 @@ class Monitor():
     self._lock = threading.RLock()
     self._node_status = {}
     self.message_box = None
-    self._transport.subscribe_broadcast('transient.status.demo', self.update_status, retroactive=True)
+    self._transport.subscribe_broadcast('transient.status', self.update_status, retroactive=True)
 
   def update_status(self, header, message):
     '''Process incoming status message. Acquire lock for status dictionary before updating.'''
