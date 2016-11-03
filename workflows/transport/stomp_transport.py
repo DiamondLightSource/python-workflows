@@ -128,7 +128,7 @@ class StompTransport(CommonTransport):
 
   def broadcast_status(self, status, channel=None):
     '''Broadcast transient status information to all listeners'''
-    destination = ['/topic/transient.status', self.get_namespace()]
+    destination = ['/topic/' + self._namespace + 'transient.status']
     if channel:
       destination.append(channel)
     destination = '.'.join(destination)

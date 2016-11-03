@@ -274,5 +274,5 @@ def test_namespace_is_used_correctly(mockstomp):
   assert mockconn.subscribe.call_args[0] == ('/topic/ns.sub_topic', 2)
 
   stomp.broadcast_status('some status', channel='extra')
-  assert mockconn.send.call_args[0] == ('/topic/transient.status.ns.extra', '"some status"')
+  assert mockconn.send.call_args[0] == ('/topic/ns.transient.status.extra', '"some status"')
 
