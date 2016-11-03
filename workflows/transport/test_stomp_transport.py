@@ -45,6 +45,10 @@ def test_check_config_file_behaviour(mockstomp):
   stomp = StompTransport()
   stomp.connect()
 
+  # Reset configuration for subsequent tests by reloading StompTransport
+  reload(workflows.transport.stomp_transport)
+  globals()['StompTransport'] = workflows.transport.stomp_transport.StompTransport
+
   mockstomp.Connection.assert_called_once_with([('localhost', 1234)])
   mockconn.connect.assert_called_once_with(mock.sentinel.user, 'somesecret', wait=True)
   assert stomp.get_namespace() == 'namespace'
@@ -52,10 +56,9 @@ def test_check_config_file_behaviour(mockstomp):
 @mock.patch('workflows.transport.stomp_transport.stomp')
 def test_instantiate_link_and_connect_to_broker(mockstomp):
   '''Test the Stomp connection routine.'''
-  mockconn = mock.Mock()
-  mockstomp.Connection.return_value = mockconn
-
   stomp = StompTransport()
+  mockconn = mockstomp.Connection.return_value
+
   assert not stomp.is_connected()
 
   stomp.connect()
@@ -80,11 +83,10 @@ def test_instantiate_link_and_connect_to_broker(mockstomp):
 @mock.patch('workflows.transport.stomp_transport.stomp')
 def test_broadcast_status(mockstomp, mocktime):
   '''Test the status broadcast function.'''
-  mockconn = mock.Mock()
-  mockstomp.Connection.return_value = mockconn
   mocktime.time.return_value = 20000
   stomp = StompTransport()
   stomp.connect()
+  mockconn = mockstomp.Connection.return_value
 
   stomp.broadcast_status({ 'status': str(mock.sentinel.status) })
 
@@ -92,17 +94,17 @@ def test_broadcast_status(mockstomp, mocktime):
   args, kwargs = mockconn.send.call_args
   # expiration should be 90 seconds in the future
   assert int(kwargs['headers']['expires']) == 1000 * (20000 + 90)
-  assert kwargs['destination'].startswith('/topic/transient.status')
-  statusdict = json.loads(kwargs['body'])
+  destination, message = args
+  assert destination.startswith('/topic/transient.status')
+  statusdict = json.loads(message)
   assert statusdict['status'] == str(mock.sentinel.status)
 
 @mock.patch('workflows.transport.stomp_transport.stomp')
 def test_send_message(mockstomp):
   '''Test the message sending function.'''
-  mockconn = mock.Mock()
-  mockstomp.Connection.return_value = mockconn
   stomp = StompTransport()
   stomp.connect()
+  mockconn = mockstomp.Connection.return_value
 
   stomp._send( str(mock.sentinel.channel), mock.sentinel.message )
 
@@ -117,15 +119,18 @@ def test_send_message(mockstomp):
   assert args == ('/queue/' + str(mock.sentinel.channel), mock.sentinel.message)
   assert kwargs == { 'headers': mock.sentinel.headers }
 
+@pytest.mark.skip(reason="TODO")
+def test_send_broadcast():
+  '''Test the broadcast sending function.'''
+
 @mock.patch('workflows.transport.stomp_transport.stomp')
 def test_subscribe_to_queue(mockstomp):
   '''Test subscribing to a queue (producer-consumer) and callback functions.'''
   mock_cb1 = mock.Mock()
   mock_cb2 = mock.Mock()
-  mockconn = mock.Mock()
-  mockstomp.Connection.return_value = mockconn
   stomp = StompTransport()
   stomp.connect()
+  mockconn = mockstomp.Connection.return_value
 
   mockconn.set_listener.assert_called_once()
   listener = mockconn.set_listener.call_args[0][1]
@@ -163,10 +168,9 @@ def test_subscribe_to_broadcast(mockstomp):
   '''Test subscribing to a topic (publish-subscribe) and callback functions.'''
   mock_cb1 = mock.Mock()
   mock_cb2 = mock.Mock()
-  mockconn = mock.Mock()
-  mockstomp.Connection.return_value = mockconn
   stomp = StompTransport()
   stomp.connect()
+  mockconn = mockstomp.Connection.return_value
 
   mockconn.set_listener.assert_called_once()
   listener = mockconn.set_listener.call_args[0][1]
@@ -245,3 +249,30 @@ def test_nack_message(mockstomp):
   stomp._nack(mock.sentinel.messageid, subid, transaction=mock.sentinel.txn)
   mockconn.nack.assert_called_with(mock.sentinel.messageid, subid,
                                    transaction=mock.sentinel.txn)
+
+@mock.patch('workflows.transport.stomp_transport.stomp')
+def test_namespace_is_used_correctly(mockstomp):
+  '''Test that a configured namespace is correctly used when subscribing and sending messages.'''
+  StompTransport.defaults['--stomp-prfx'] = 'ns'
+  stomp = StompTransport()
+  mockconn = mockstomp.Connection.return_value
+  stomp.connect()
+  assert stomp.get_namespace() == 'ns'
+
+  stomp._send( 'some_queue', mock.sentinel.message1 )
+  mockconn.send.assert_called_once()
+  assert mockconn.send.call_args[0] == ('/queue/ns.some_queue', mock.sentinel.message1)
+
+# stomp._broadcast( 'some_topic', mock.sentinel.message2 )
+# assert mockconn.send.call_args[0] == ('/topic/ns.some_topic', mock.sentinel.message2)
+
+  stomp._subscribe( 1, 'sub_queue', None )
+  mockconn.subscribe.assert_called_once()
+  assert mockconn.subscribe.call_args[0] == ('/queue/ns.sub_queue', 1)
+
+  stomp._subscribe_broadcast( 2, 'sub_topic', None )
+  assert mockconn.subscribe.call_args[0] == ('/topic/ns.sub_topic', 2)
+
+  stomp.broadcast_status('some status', channel='extra')
+  assert mockconn.send.call_args[0] == ('/topic/transient.status.ns.extra', '"some status"')
+

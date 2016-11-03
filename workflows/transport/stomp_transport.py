@@ -15,14 +15,14 @@ class StompTransport(CommonTransport):
     '--stomp-port': 61613,
     '--stomp-user': 'admin',
     '--stomp-pass': 'password',
-    '--stomp-prfx': 'demo'
+    '--stomp-prfx': '',
   }
   # Effective configuration
   config = {}
 
   def __init__(self):
     self._connected = False
-    self._namespace = None
+    self._namespace = ''
     self._idcounter = 0
     self._subscription_callbacks = {}
     self._lock = threading.RLock()
@@ -34,6 +34,8 @@ class StompTransport(CommonTransport):
   def get_namespace(self):
     '''Return the stomp namespace. This is a prefix used for all topic and
        queue names.'''
+    if self._namespace.endswith('.'):
+      return self._namespace[:-1]
     return self._namespace
 
   @classmethod
@@ -111,7 +113,7 @@ class StompTransport(CommonTransport):
       self._namespace = \
         self.config.get('--stomp-prfx', self.defaults.get('--stomp-prfx'))
       if self._namespace:
-        self._namespace + '.'
+        self._namespace = self._namespace + '.'
       self._connected = True
     return True
 
@@ -126,9 +128,7 @@ class StompTransport(CommonTransport):
 
   def broadcast_status(self, status, channel=None):
     '''Broadcast transient status information to all listeners'''
-    destination = ['/topic/transient.status']
-    if self.get_namespace():
-      destination.append(self.get_namespace())
+    destination = ['/topic/transient.status', self.get_namespace()]
     if channel:
       destination.append(channel)
     destination = '.'.join(destination)
@@ -136,8 +136,7 @@ class StompTransport(CommonTransport):
     message = json.dumps(status)
     with self._lock:
       self._conn.send(
-          body=message,
-          destination=destination,
+          destination, message,
           headers={
                     'expires': '%d' % int((90 + time.time()) * 1000)
                   })
@@ -166,7 +165,7 @@ class StompTransport(CommonTransport):
       self._subscription_callbacks[sub_id] = callback
 
     with self._lock:
-      self._conn.subscribe('/queue/' + channel, sub_id, headers=headers, ack=ack)
+      self._conn.subscribe('/queue/' + self._namespace + channel, sub_id, headers=headers, ack=ack)
 
   def _subscribe_broadcast(self, sub_id, channel, callback, **kwargs):
     '''Listen to a broadcast topic, notify via callback function.
@@ -181,7 +180,7 @@ class StompTransport(CommonTransport):
       headers['activemq.retroactive'] = 'true'
     self._subscription_callbacks[sub_id] = callback
     with self._lock:
-      self._conn.subscribe('/topic/' + channel, sub_id, headers=headers)
+      self._conn.subscribe('/topic/' + self._namespace + channel, sub_id, headers=headers)
 
   def _send(self, destination, message, **kwargs):
     '''Send a message to a queue.
@@ -198,8 +197,7 @@ class StompTransport(CommonTransport):
       del(kwargs['headers'])
     if not headers:
       headers = {}
-#   TODO: Does not take prefix into account
-    destination = '/queue/' + destination
+    destination = '/queue/' + self._namespace + destination
     with self._lock:
       self._conn.send(
           destination, message,
