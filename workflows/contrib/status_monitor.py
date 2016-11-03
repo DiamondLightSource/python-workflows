@@ -13,6 +13,11 @@ class Monitor():
   cards = {}
   '''Register card shown for seen services'''
 
+  border_chars = ()
+  '''Characters used for frame borders.'''
+  border_chars_text = ('|', '|', '=', '=', '/', '\\', '\\', '/')
+  '''Example alternative set of frame border characters.'''
+
   def __init__(self, transport=None):
     '''Set up monitor and connect to the network transport layer'''
     if transport is None or isinstance(transport, basestring):
@@ -50,13 +55,12 @@ class Monitor():
        curses environment.'''
     curses.wrapper(self._run)
 
-  @staticmethod
-  def _boxwin(height, width, row, column, title=None, title_x=7, color_pair=None):
+  def _boxwin(self, height, width, row, column, title=None, title_x=7, color_pair=None):
     box = curses.newwin(height, width, row, column)
     box.clear()
     if color_pair:
       box.attron(curses.color_pair(color_pair))
-    box.box()
+    box.border(*self.border_chars)
     if title:
       box.addstr(0, title_x, " " + title + " ")
     if color_pair:
