@@ -10,13 +10,15 @@ def generate_recipes():
         1: { 'service': 'A service',
              'queue': 'some.queue.{first}',
              'output': [ 2 ],
+             'error': 2,
            },
         2: { 'service': 'B service',
              'queue': 'another.queue.{name}',
            },
         'start': [
            (1, {}),
-        ]
+        ],
+        'error': [ 2 ],
       }
 
   recipe_b = {
@@ -73,7 +75,7 @@ def test_validate_tests_for_empty_recipe():
     A.validate()
 
 def test_validate_tests_for_invalid_nodes():
-  '''Check that the recipe contains only numeric nodes and a non-empty 'start' node.'''
+  '''Check that the recipe contains only numeric nodes, a non-empty 'start' node, and an optional 'error' node.'''
   A, _ = generate_recipes()
   A.recipe['xnode'] = None
   with pytest.raises(workflows.WorkflowsError) as excinfo:
@@ -105,6 +107,34 @@ def test_validate_tests_for_invalid_nodes():
   with pytest.raises(workflows.WorkflowsError) as excinfo:
     A.validate()
   assert 'start' in excinfo.value.message
+
+  A, _ = generate_recipes()
+  del(A.recipe['error'])
+  A.validate()
+
+  A.recipe['error'] = []
+  A.validate()
+
+  A.recipe['error'] = 1
+  A.validate()
+
+  A.recipe['error'] = [ 1, 2 ]
+  A.validate()
+
+  A.recipe['error'] = "something"
+  with pytest.raises(workflows.WorkflowsError) as excinfo:
+    A.validate()
+  assert 'error' in excinfo.value.message
+
+  A.recipe['error'] = [ "start", 2 ]
+  with pytest.raises(workflows.WorkflowsError) as excinfo:
+    A.validate()
+  assert 'error' in excinfo.value.message
+
+  A.recipe['error'] = "error"
+  with pytest.raises(workflows.WorkflowsError) as excinfo:
+    A.validate()
+  assert 'error' in excinfo.value.message
 
 def test_validate_tests_for_invalid_links():
   '''Check that the nodes in recipes have valid output/error links to other nodes.'''

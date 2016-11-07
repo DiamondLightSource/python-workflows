@@ -23,7 +23,7 @@ class Recipe(object):
     '''Clean up a recipe that has been stored as serialized json string.'''
     recipe = json.loads(string)
     for k in list(recipe.iterkeys()):
-      if k != 'start' and int(k):
+      if k not in ('start', 'error') and int(k):
         recipe[int(k)] = recipe[k]
         del(recipe[k])
     if 'start' in recipe:
@@ -64,18 +64,29 @@ class Recipe(object):
       raise workflows.WorkflowsError('Invalid recipe: "start" node missing')
     if not self.recipe['start']:
       raise workflows.WorkflowsError('Invalid recipe: "start" node empty')
-    if not all(isinstance(x, (list, tuple)) and len(x) == 2 for x in self.recipe['start']):
+    if not all(isinstance(x, (list, tuple)) and len(x) == 2
+               for x in self.recipe['start']):
       raise workflows.WorkflowsError('Invalid recipe: "start" node invalid')
     if any(x[0] == 'start' for x in self.recipe['start']):
       raise workflows.WorkflowsError('Invalid recipe: "start" node points to itself')
 
+    # Check that 'error' node points to regular nodes only
+    if 'error' in self.recipe:
+      if isinstance(self.recipe['error'], (list, tuple, basestring)):
+        if 'start' in self.recipe['error']:
+          raise workflows.WorkflowsError('Invalid recipe: "error" node points to "start" node')
+        if 'error' in self.recipe['error']:
+          raise workflows.WorkflowsError('Invalid recipe: "error" node points to itself')
+
     # All other nodes must be numeric
-    nodes = filter(lambda x: not isinstance(x, int) and x != 'start', self.recipe)
+    nodes = filter(lambda x: not isinstance(x, int)
+                             and x not in ('start', 'error'),
+                   self.recipe)
     if nodes:
       raise workflows.WorkflowsError('Invalid recipe: Node "%s" is not numeric' % nodes[0])
 
     # Detect cycles
-    touched_nodes = set(['start'])
+    touched_nodes = set(['start', 'error'])
     def flatten_links(struct):
       '''Take an output/error link object, list or dictionary and return flat list of linked nodes.'''
       if struct is None: return []
@@ -105,6 +116,12 @@ class Recipe(object):
             find_cycles(path + [n])
     for link in self.recipe['start']:
       find_cycles(['start', link[0]])
+    if 'error' in self.recipe:
+      if isinstance(self.recipe['error'], (list, tuple)):
+        for link in self.recipe['error']:
+          find_cycles(['error', link])
+      else:
+        find_cycles(['error', self.recipe['error']])
 
     # Test recipe for unreferenced nodes
     for node in self.recipe:
