@@ -126,6 +126,23 @@ def test_validate_tests_for_invalid_nodes():
     A.validate()
   assert 'error' in excinfo.value.message
 
+def test_validate_tests_for_invalid_links():
+  '''Check that the nodes in recipes have valid output/error links to other nodes.'''
+
+  # Part 1: Check outgoing links from start/error node:
+  A, _ = generate_recipes()
+  A.recipe['start'] = [ ('asdf', None) ]
+  with pytest.raises(workflows.WorkflowsError):
+    A.validate()
+
+  A.recipe['start'] = [ (1, None), (2, None) ]
+  A.validate()
+
+  A.recipe['start'] = [ (1, None), (99, None) ]
+  with pytest.raises(workflows.WorkflowsError):
+    A.validate()
+
+  A, _ = generate_recipes()
   A.recipe['error'] = [ "start", 2 ]
   with pytest.raises(workflows.WorkflowsError) as excinfo:
     A.validate()
@@ -136,19 +153,7 @@ def test_validate_tests_for_invalid_nodes():
     A.validate()
   assert 'error' in excinfo.value.message
 
-def test_validate_tests_for_invalid_links():
-  '''Check that the nodes in recipes have valid output/error links to other nodes.'''
-
-  # Part 1: Check outgoing links from start node:
-  A, _ = generate_recipes()
-  A.recipe['start'] = [ ('asdf', None) ]
-  with pytest.raises(workflows.WorkflowsError):
-    A.validate()
-
-  A.recipe['start'] = [ (1, None), (2, None) ]
-  A.validate()
-
-  A.recipe['start'] = [ (1, None), (99, None) ]
+  A.recipe['error'] = 99
   with pytest.raises(workflows.WorkflowsError):
     A.validate()
 
