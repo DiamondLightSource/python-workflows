@@ -37,6 +37,6 @@ def run(cmdline_args, program_name = 'start_service',
       transport=options.transport,
     ).run()
 
-if __name__ == '__main__':
+if __name__ == '__main__':  # pragma: no cover
   import sys
   run(sys.argv[1:])
