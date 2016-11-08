@@ -190,6 +190,10 @@ class Recipe(object):
     if not other.recipe:
       return Recipe(self.recipe)
 
+    # If own recipe empty, use other recipe
+    if not self.recipe:
+      return Recipe(other.recipe)
+
     # Assuming both recipes are valid
     self.validate()
     other.validate()

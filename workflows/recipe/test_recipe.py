@@ -231,6 +231,9 @@ def test_merging_recipes():
   C = A.merge(None)
   assert A == C
 
+  C = workflows.recipe.Recipe().merge(A)
+  assert A == C
+
   C = A.merge(workflows.recipe.Recipe())
   assert A == C
 
