@@ -1,4 +1,5 @@
 from __future__ import absolute_import, division
+import mock
 import pytest
 import workflows
 import workflows.recipe
@@ -220,3 +221,39 @@ def test_replacing_parameters_in_recipe():
 
   assert A.recipe[1]['queue'] == 'some.queue.{first}'
   assert A.recipe[2]['queue'] == 'another.queue.replacement'
+
+def test_merging_recipes():
+  '''Test recipes can be merged and merging results in a valid minimal DAG.'''
+  A, B = generate_recipes()
+
+  # Merging empty recipes returns original recipe
+  C = A.merge(None)
+  assert A == C
+
+  C = A.merge(workflows.recipe.Recipe())
+  assert A == C
+
+  C = A.merge(B)
+
+  # Merge function should not modify original recipes
+  assert A, B == generate_recipes()
+
+  # Result will have 6 nodes: start, error, A1, A2, B1, B2
+  assert len(C.recipe) == 6
+
+  # Start node contains two different pointers to 'A service'
+  assert 'start' in C.recipe
+  assert len(C.recipe['start']) == 2
+  assert C.recipe['start'][0] == (1, {})
+  assert C.recipe['start'][1] == (mock.ANY, {})
+  assert C.recipe['start'][0][0] != C.recipe['start'][1][0]
+  assert C.recipe[C.recipe['start'][0][0]]['service'] == 'A service'
+  assert C.recipe[C.recipe['start'][1][0]]['service'] == 'A service'
+
+  # Error node points to 'B service'
+  assert 'error' in C.recipe
+  assert len(C.recipe['error']) == 1
+  assert C.recipe[C.recipe['error'][0]]['service'] == 'B service'
+
+  # There is a 'C service'
+  assert any(map(lambda x: (isinstance(x, dict) and x.get('service') == 'C service'), C.recipe.itervalues()))

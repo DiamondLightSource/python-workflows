@@ -168,3 +168,94 @@ class Recipe(object):
       return item
 
     self.recipe = _recursive_apply(self.recipe)
+
+  def merge(self, other):
+    '''Merge two recipes together, returning a single recipe containing all
+       nodes.
+       Note: This does NOT yet return a minimal recipe.
+       :param other: A Recipe object that should be merged with the current
+                     Recipe object.
+       :return: A new Recipe object containing information from both recipes.
+    '''
+
+    # Merging empty values returns a copy of the original
+    if not other:
+      return Recipe(self.recipe)
+
+    # When a string is passed, merge with a constructed recipe object
+    if isinstance(other, basestring):
+      return self.merge(Recipe(other))
+
+    # Merging empty recipes returns a copy of the original
+    if not other.recipe:
+      return Recipe(self.recipe)
+
+    # Assuming both recipes are valid
+    self.validate()
+    other.validate()
+
+    # Start from current recipe
+    new_recipe = self.recipe
+
+    # Find the maximum index of the current recipe
+    max_index = max(1, *filter(lambda x:isinstance(x, int), self.recipe.keys()))
+    next_index = max_index + 1
+
+    # Set up a translation table for indices and copy all entries
+    translation = {}
+    for key, value in other.recipe.iteritems():
+      if isinstance(key, int):
+        if key not in translation:
+          translation[key] = next_index
+          next_index = next_index + 1
+        new_recipe[translation[key]] = value
+
+    # Rewrite all copied entries to point to new keys
+    def translate(x):
+      if isinstance(x, list):
+        return list(map(translate, x))
+      elif isinstance(x, tuple):
+        return tuple(map(translate, x))
+      elif isinstance(x, dict):
+        return { k: translate(v) for k, v in x.iteritems() }
+      else:
+        return translation[x]
+    for idx in translation.itervalues():
+      if 'output' in new_recipe[idx]:
+        new_recipe[idx]['output'] = translate(new_recipe[idx]['output'])
+      if 'error' in new_recipe[idx]:
+        new_recipe[idx]['error'] = translate(new_recipe[idx]['error'])
+
+    # Join 'start' nodes
+    for (idx, param) in other.recipe['start']:
+      new_recipe['start'].append((translate(idx), param))
+
+    # Join 'error' nodes
+    if 'error' in other.recipe:
+      if 'error' not in new_recipe:
+        new_recipe['error'] = translate(other.recipe['error'])
+      else:
+        if isinstance(new_recipe['error'], (list, tuple)):
+          new_recipe['error'] = list(new_recipe['error'])
+        else:
+          new_recipe['error'] = list([new_recipe['error']])
+        if isinstance(other.recipe['error'], (list, tuple)):
+          new_recipe['error'].extend(translate(other.recipe['error']))
+        else:
+          new_recipe['error'].append(translate(other.recipe['error']))
+
+#   # Minimize DAG
+#   queuehash, topichash = {}, {}
+#   for k, v in new_recipe.iteritems():
+#     if isinstance(v, dict):
+#       if 'queue' in v:
+#         queuehash[v['queue']] = queuehash.get(v['queue'], [])
+#         queuehash[v['queue']].append(k)
+#       if 'topic' in v:
+#         topichash[v['topic']] = topichash.get(v['topic'], [])
+#         topichash[v['topic']].append(k)
+#
+#   print queuehash
+#   print topichash
+
+    return Recipe(new_recipe)
