@@ -243,6 +243,5 @@ class CommonService(object):
         cls.service_register[name] = cls
 
 class Commands():
+  '''A list of command strings used for communicating with the frontend.'''
   SHUTDOWN = 'shutdown'
-  SUBSCRIBE = 'subscribe'
-  UNSUBSCRIBE = 'unsubscribe'

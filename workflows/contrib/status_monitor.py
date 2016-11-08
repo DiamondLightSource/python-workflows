@@ -6,6 +6,7 @@ import workflows.transport
 import threading
 
 class Monitor():
+  '''A sample implementation of a status monitor showing all running services'''
 
   shutdown = False
   '''Set to true to end the main loop and shut down the service monitor.'''

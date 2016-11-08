@@ -5,6 +5,7 @@ import pytest
 
 @mock.patch('workflows.status.threading')
 def test_status_advertiser_starts_and_stops_threads(mock_threading):
+  '''The status advertiser should run in its own thread. To this end the Thread functions need to be called.'''
   s = workflows.status.StatusAdvertise()
   mock_threading.Thread.assert_called_once()
   s.start()
@@ -16,6 +17,7 @@ def test_status_advertiser_starts_and_stops_threads(mock_threading):
 @mock.patch('workflows.status.threading')
 @mock.patch('workflows.status.time')
 def test_status_advertiser_regularly_passes_status(mock_time, mock_threading, mock_queue):
+  '''Check that the status advertiser calls a status function and passes the results on properly.'''
   sm = mock.Mock() # status mock
   tm = mock.Mock() # transport mock
   qm = mock_queue.Queue.return_value
@@ -53,6 +55,7 @@ def test_status_advertiser_regularly_passes_status(mock_time, mock_threading, mo
 @mock.patch('workflows.status.threading')
 @mock.patch('workflows.status.time')
 def test_status_advertiser_external_triggering(mock_time, mock_threading, mock_queue):
+  '''Check that the status advertiser can be triggered by external sources.'''
   sm = mock.Mock() # status mock
   tm = mock.Mock() # transport mock
   qm = mock_queue.Queue.return_value
@@ -66,6 +69,7 @@ def test_status_advertiser_external_triggering(mock_time, mock_threading, mock_q
 @mock.patch('workflows.status.Queue')
 @mock.patch('workflows.status.threading')
 def test_status_advertiser_sends_last_update_when_stopping(mock_threading, mock_queue):
+  '''Check that the status advertiser sends a final update when shutting down.'''
   tm = mock.Mock() # transport mock
   qm = mock_queue.Queue.return_value
   mock_threading.Queue.return_value = qm

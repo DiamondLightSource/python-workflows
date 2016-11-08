@@ -6,6 +6,7 @@ import mock
 @mock.patch('workflows.contrib.status_monitor.time')
 @mock.patch('workflows.contrib.status_monitor.workflows.transport')
 def test_status_monitor_connects_to_transport_layer(mock_transport, mock_time, mock_curses):
+  '''Check that the status monitor properly connects to the transport layer and sets up relevant subscriptions.'''
   mock_time.sleep.side_effect = KeyboardInterrupt()
 
   status_monitor.Monitor()

@@ -71,12 +71,12 @@ class Recipe(object):
       raise workflows.WorkflowsError('Invalid recipe: "start" node points to itself')
 
     # Check that 'error' node points to regular nodes only
-    if 'error' in self.recipe:
-      if isinstance(self.recipe['error'], (list, tuple, basestring)):
-        if 'start' in self.recipe['error']:
-          raise workflows.WorkflowsError('Invalid recipe: "error" node points to "start" node')
-        if 'error' in self.recipe['error']:
-          raise workflows.WorkflowsError('Invalid recipe: "error" node points to itself')
+    if 'error' in self.recipe and \
+        isinstance(self.recipe['error'], (list, tuple, basestring)):
+      if 'start' in self.recipe['error']:
+        raise workflows.WorkflowsError('Invalid recipe: "error" node points to "start" node')
+      if 'error' in self.recipe['error']:
+        raise workflows.WorkflowsError('Invalid recipe: "error" node points to itself')
 
     # All other nodes must be numeric
     nodes = filter(lambda x: not isinstance(x, int)

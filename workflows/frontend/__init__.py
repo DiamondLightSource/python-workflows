@@ -10,6 +10,11 @@ import workflows.status
 import workflows.transport
 
 class Frontend():
+  '''The frontend class encapsulates the actual service. It controls the
+     service process and keeps the connection to the transport layer. It
+     can process control messages directly, or pass messages on to the
+     service. On initialization a status advertising thread is started,
+     which keeps running in the background.'''
   logger = logging.getLogger('workflows.frontend')
 
   def __init__(self, transport=None, service=None):

@@ -7,6 +7,7 @@ import workflows.recipe
 def generate_recipes():
   '''Generate two recipe objects for testing.'''
   class A(workflows.recipe.Recipe):
+    '''Testing recipe class by overriding the 'recipe' property.'''
     recipe = {
         1: { 'service': 'A service',
              'queue': 'some.queue.{first}',
