@@ -12,7 +12,8 @@ class QueueTransport(CommonTransport):
     self._connected = False
     self._send_fun = None
 
-  def add_command_line_options(self, optparser):
+  @staticmethod
+  def add_command_line_options(optparser):
     '''This type of transport does not offer command line options.'''
 
   def set_send_function(self, function):

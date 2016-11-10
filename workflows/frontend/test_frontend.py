@@ -6,6 +6,7 @@ import mock
 @mock.patch('workflows.frontend.workflows.status.StatusAdvertise')
 @mock.patch('workflows.frontend.workflows.transport')
 def test_frontend_connects_to_transport_layer(mock_transport, mock_status, mock_mp):
+  '''Frontend should call connect method on transport layer module.'''
   workflows.frontend.Frontend()
   mock_transport.lookup.assert_called_once_with(None)
   mock_transport.lookup.return_value.assert_called_once_with()
@@ -23,6 +24,7 @@ def test_frontend_connects_to_transport_layer(mock_transport, mock_status, mock_
 @mock.patch('workflows.frontend.workflows.status.StatusAdvertise')
 @mock.patch('workflows.frontend.workflows.transport')
 def test_start_service_in_frontend(mock_transport, mock_status, mock_mp):
+  '''Check that the service is being run and connected to the frontend properly via the correct pipes.'''
   mock_service = mock.Mock()
   mock_mp.Pipe.side_effect = [
       (mock.sentinel.pipe1, mock.sentinel.pipe2),
@@ -47,6 +49,7 @@ def test_start_service_in_frontend(mock_transport, mock_status, mock_mp):
 @mock.patch('workflows.frontend.workflows.status.StatusAdvertise')
 @mock.patch('workflows.frontend.workflows.transport')
 def test_get_frontend_status(mock_transport, mock_status):
+  '''Check that the get_status-method works and contains the correct host-id.'''
   fe = workflows.frontend.Frontend()
   status = fe.get_status()
   assert status['host'] == fe.get_host_id()

@@ -19,7 +19,8 @@ class CommonTransport(object):
   # -- High level communication calls ----------------------------------------
   #
 
-  def connect(self):
+  @staticmethod
+  def connect():
     '''Connect the transport class. This function has to be overridden.
        :return: True-like value when connection successful,
                 False-like value otherwise.'''
@@ -293,7 +294,8 @@ class CommonTransport(object):
   # -- Low level communication calls to be implemented by subclass -----------
   #
 
-  def _subscribe(self, sub_id, channel, callback, **kwargs):
+  @staticmethod
+  def _subscribe(sub_id, channel, callback, **kwargs):
     '''Listen to a queue, notify via callback function.
        :param sub_id: ID for this subscription in the transport layer
        :param channel: Queue name to subscribe to
@@ -305,7 +307,8 @@ class CommonTransport(object):
     '''
     raise workflows.WorkflowsError("Transport interface not implemented")
 
-  def _subscribe_broadcast(self, sub_id, channel, callback, **kwargs):
+  @staticmethod
+  def _subscribe_broadcast(sub_id, channel, callback, **kwargs):
     '''Listen to a broadcast topic, notify via callback function.
        :param sub_id: ID for this subscription in the transport layer
        :param channel: Topic name to subscribe to
@@ -315,13 +318,15 @@ class CommonTransport(object):
     '''
     raise workflows.WorkflowsError("Transport interface not implemented")
 
-  def _unsubscribe(self, sub_id):
+  @staticmethod
+  def _unsubscribe(sub_id):
     '''Stop listening to a queue or a broadcast
        :param sub_id: ID for this subscription in the transport layer
     '''
     raise workflows.WorkflowsError("Transport interface not implemented")
 
-  def _send(self, destination, message, **kwargs):
+  @staticmethod
+  def _send(destination, message, **kwargs):
     '''Send a message to a queue.
        :param destination: Queue name to send to
        :param message: A string to be sent
@@ -333,7 +338,8 @@ class CommonTransport(object):
     '''
     raise workflows.WorkflowsError("Transport interface not implemented")
 
-  def _broadcast(self, destination, message, **kwargs):
+  @staticmethod
+  def _broadcast(destination, message, **kwargs):
     '''Broadcast a message.
        :param destination: Topic name to send to
        :param message: A string to be broadcast
@@ -345,7 +351,8 @@ class CommonTransport(object):
     '''
     raise workflows.WorkflowsError("Transport interface not implemented")
 
-  def _ack(self, message_id, subscription, **kwargs):
+  @staticmethod
+  def _ack(message_id, subscription, **kwargs):
     '''Acknowledge receipt of a message. This only makes sense when the
        'acknowledgement' flag was set for the relevant subscription.
        :param message_id: ID of the message to be acknowledged
@@ -356,7 +363,8 @@ class CommonTransport(object):
     '''
     raise workflows.WorkflowsError("Transport interface not implemented")
 
-  def _nack(self, message_id, subscription, **kwargs):
+  @staticmethod
+  def _nack(message_id, subscription, **kwargs):
     '''Reject receipt of a message. This only makes sense when the
        'acknowledgement' flag was set for the relevant subscription.
        :param message_id: ID of the message to be rejected
@@ -367,21 +375,24 @@ class CommonTransport(object):
     '''
     raise workflows.WorkflowsError("Transport interface not implemented")
 
-  def _transaction_begin(self, transaction_id, **kwargs):
+  @staticmethod
+  def _transaction_begin(transaction_id, **kwargs):
     '''Start a new transaction.
        :param transaction_id: ID for this transaction in the transport layer.
        :param **kwargs: Further parameters for the transport layer.
     '''
     raise workflows.WorkflowsError("Transport interface not implemented")
 
-  def _transaction_abort(self, transaction_id, **kwargs):
+  @staticmethod
+  def _transaction_abort(transaction_id, **kwargs):
     '''Abort a transaction and roll back all operations.
        :param transaction_id: ID of transaction to be aborted.
        :param **kwargs: Further parameters for the transport layer.
     '''
     raise workflows.WorkflowsError("Transport interface not implemented")
 
-  def _transaction_commit(self, transaction_id, **kwargs):
+  @staticmethod
+  def _transaction_commit(transaction_id, **kwargs):
     '''Commit a transaction.
        :param transaction_id: ID of transaction to be committed.
        :param **kwargs: Further parameters for the transport layer.

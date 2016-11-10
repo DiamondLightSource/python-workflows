@@ -50,6 +50,8 @@ class Frontend():
     self._status_advertiser.start()
 
   def run(self):
+    '''The main loop of the frontend. Here incoming messages from the service
+       are processed and forwarded to the corresponding callback methods.'''
     self.logger.info("Current service: " + str(self._service))
     n = 3600
     while n > 0:
@@ -87,12 +89,15 @@ class Frontend():
       self._pipe_commands.send(command)
 
   def parse_band_log(self, message):
+    '''Process incoming logging messages from the service.'''
     self.logger.debug("LOG: " + str(message))
 
   def parse_band_status(self, message):
+    '''Process incoming status messages from the service.'''
     self.logger.debug("STT: " + str(message))
 
   def parse_band_status_update(self, message):
+    '''Process incoming status updates from the service.'''
     self.logger.debug("Status update: " + str(message))
     self._service_status = message['statuscode']
     self._status_advertiser.trigger()
@@ -101,7 +106,8 @@ class Frontend():
     '''Get a cached copy of the host id.'''
     return self.__hostid
 
-  def _generate_unique_host_id(self):
+  @staticmethod
+  def _generate_unique_host_id():
     '''Generate a unique ID, that is somewhat guaranteed to be unique among all
        instances running at the same time.'''
     import socket
@@ -201,24 +207,34 @@ class Frontend():
     handler(message)
 
   def parse_band_transport_send(self, message):
+    '''Counterpart to the transport.send call from the service.
+       Forward the call to the real transport layer.'''
     args, kwargs = message['payload']
     self._transport.send(*args, **kwargs)
 
   def parse_band_transport_ack(self, message):
+    '''Counterpart to the transport.ack call from the service.
+       Forward the call to the real transport layer.'''
     args, kwargs = message['payload']
     self._transport.ack(*args, **kwargs)
 
   def parse_band_transport_nack(self, message):
+    '''Counterpart to the transport.nack call from the service.
+       Forward the call to the real transport layer.'''
     args, kwargs = message['payload']
     self._transport.nack(*args, **kwargs)
 
   def parse_band_transport_transaction_begin(self, message):
+    '''Counterpart to the transport.transaction_begin call from the service.
+       Forward the call to the real transport layer.'''
     args, kwargs = message['payload']
     service_txn_id = args[0]
     self._transaction_mapping[service_txn_id] = \
       self._transport.transaction_begin(clientid=self._service_transportid)
 
   def parse_band_transport_transaction_commit(self, message):
+    '''Counterpart to the transport.transaction_begin call from the service.
+       Forward the call to the real transport layer.'''
     args, kwargs = message['payload']
     service_txn_id = args[0]
     assert service_txn_id in self._transaction_mapping
@@ -226,6 +242,8 @@ class Frontend():
     del(self._transaction_mapping[service_txn_id])
 
   def parse_band_transport_transaction_abort(self, message):
+    '''Counterpart to the transport.transaction_abort call from the service.
+       Forward the call to the real transport layer.'''
     args, kwargs = message['payload']
     service_txn_id = args[0]
     assert service_txn_id in self._transaction_mapping
@@ -233,6 +251,8 @@ class Frontend():
     del(self._transaction_mapping[service_txn_id])
 
   def parse_band_transport_subscribe(self, message):
+    '''Counterpart to the transport.subscribe call from the service.
+       Forward the call to the real transport layer.'''
     subscription_id, channel = message['payload'][0][:2]
     self._transport.subscribe(channel,
       lambda cb_header, cb_message:
