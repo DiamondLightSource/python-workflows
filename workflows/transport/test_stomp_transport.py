@@ -119,7 +119,6 @@ def test_send_message(mockstomp):
   assert args == ('/queue/' + str(mock.sentinel.channel), mock.sentinel.message)
   assert kwargs == { 'headers': mock.sentinel.headers }
 
-@pytest.mark.skip(reason="TODO")
 @mock.patch('workflows.transport.stomp_transport.stomp')
 def test_send_broadcast(mockstomp):
   '''Test the broadcast sending function.'''

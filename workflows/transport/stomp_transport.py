@@ -203,6 +203,27 @@ class StompTransport(CommonTransport):
           destination, message,
           headers=headers, **kwargs)
 
+  def _broadcast(self, destination, message, **kwargs):
+    '''Broadcast a message.
+       :param destination: Topic name to send to
+       :param message: A string to be broadcast
+       :param **kwargs: Further parameters for the transport layer. For example
+              headers: Optional dictionary of header entries
+              expiration: Optional expiration time, relative to sending time
+              transaction: Transaction ID if message should be part of a
+                           transaction
+    '''
+    headers = kwargs.get('headers', {})
+    if 'headers' in kwargs:
+      del(kwargs['headers'])
+    if not headers:
+      headers = {}
+    destination = '/topic/' + self._namespace + destination
+    with self._lock:
+      self._conn.send(
+          destination, message,
+          headers=headers, **kwargs)
+
   def _transaction_begin(self, transaction_id, **kwargs):
     '''Start a new transaction.
        :param transaction_id: ID for this transaction in the transport layer.
