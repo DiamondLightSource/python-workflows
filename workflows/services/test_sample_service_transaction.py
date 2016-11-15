@@ -39,3 +39,10 @@ def test_txnproducer_produces_messages():
   calls = mock_transport.send.call_args_list
   assert calls[0][0][0] == calls[1][0][0] # same destination
   assert calls[0][0][1] != calls[1][0][1] # different message
+
+def test_crash_function_crashes_sometimes():
+  '''The crash should happen sometimes. Neither never nor always.'''
+  fn = workflows.services.sample_transaction.SampleTxn.crashpoint
+
+  assert any(fn() for i in range(100))
+  assert not all(fn() for i in range(100))

@@ -120,8 +120,25 @@ def test_send_message(mockstomp):
   assert kwargs == { 'headers': mock.sentinel.headers }
 
 @pytest.mark.skip(reason="TODO")
-def test_send_broadcast():
+@mock.patch('workflows.transport.stomp_transport.stomp')
+def test_send_broadcast(mockstomp):
   '''Test the broadcast sending function.'''
+  stomp = StompTransport()
+  stomp.connect()
+  mockconn = mockstomp.Connection.return_value
+
+  stomp._broadcast( str(mock.sentinel.channel), mock.sentinel.message )
+
+  mockconn.send.assert_called_once()
+  args, kwargs = mockconn.send.call_args
+  assert args == ('/topic/' + str(mock.sentinel.channel), mock.sentinel.message)
+  assert kwargs.get('headers') in (None, {})
+
+  stomp._broadcast( str(mock.sentinel.channel), mock.sentinel.message, headers=mock.sentinel.headers )
+  assert mockconn.send.call_count == 2
+  args, kwargs = mockconn.send.call_args
+  assert args == ('/topic/' + str(mock.sentinel.channel), mock.sentinel.message)
+  assert kwargs == { 'headers': mock.sentinel.headers }
 
 @mock.patch('workflows.transport.stomp_transport.stomp')
 def test_subscribe_to_queue(mockstomp):

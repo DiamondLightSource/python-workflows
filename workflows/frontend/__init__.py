@@ -92,10 +92,6 @@ class Frontend():
     '''Process incoming logging messages from the service.'''
     self.logger.debug("LOG: " + str(message))
 
-  def parse_band_status(self, message):
-    '''Process incoming status messages from the service.'''
-    self.logger.debug("STT: " + str(message))
-
   def parse_band_status_update(self, message):
     '''Process incoming status updates from the service.'''
     self.logger.debug("Status update: " + str(message))
