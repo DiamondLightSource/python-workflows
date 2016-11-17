@@ -208,6 +208,12 @@ class Frontend():
     args, kwargs = message['payload']
     self._transport.send(*args, **kwargs)
 
+  def parse_band_transport_broadcast(self, message):
+    '''Counterpart to the transport.broadcast call from the service.
+       Forward the call to the real transport layer.'''
+    args, kwargs = message['payload']
+    self._transport.broadcast(*args, **kwargs)
+
   def parse_band_transport_ack(self, message):
     '''Counterpart to the transport.ack call from the service.
        Forward the call to the real transport layer.'''
