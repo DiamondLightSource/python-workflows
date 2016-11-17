@@ -17,6 +17,7 @@ class StompTransport(CommonTransport):
     '--stomp-user': 'admin',
     '--stomp-pass': 'password',
     '--stomp-prfx': '',
+    '--stomp-conf': '',
   }
   # Effective configuration
   config = {}

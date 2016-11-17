@@ -1,10 +1,10 @@
 from setuptools import setup, find_packages
 
-package_version = '0.14'
+package_version = '0.15'
 
 # to release:
 #  - increment number
-#  - export NUMBER="0.14"
+#  - export NUMBER="0.15"
 #  - git add -u; git commit -m "v${NUMBER} release"; git tag -a v${NUMBER} -m v${NUMBER}; git push; git push origin v${NUMBER}
 #  - python setup.py register sdist upload
 
