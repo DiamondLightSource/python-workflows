@@ -1,4 +1,5 @@
 from __future__ import absolute_import, division
+import ConfigParser
 import stomp
 import threading
 import time
@@ -43,21 +44,24 @@ class StompTransport(CommonTransport):
     '''callback function for optionparser'''
     cls.config[opt] = value
     if opt == '--stomp-conf':
-      import ConfigParser
-      cfgparser = ConfigParser.ConfigParser(allow_no_value=True)
-      if not cfgparser.read(value):
-        raise WorkflowsError('Could not read from configuration file %s' % value)
-      for cfgoption, target in [
+      cls.load_configuration_file(value)
+
+  @classmethod
+  def load_configuration_file(cls, filename):
+    cfgparser = ConfigParser.ConfigParser(allow_no_value=True)
+    if not cfgparser.read(filename):
+      raise WorkflowsError('Could not read from configuration file %s' % filename)
+    for cfgoption, target in [
           ('host', '--stomp-host'),
           ('port', '--stomp-port'),
           ('password', '--stomp-pass'),
           ('username', '--stomp-user'),
           ('prefix', '--stomp-prfx'),
           ]:
-        try:
-          cls.defaults[target] = cfgparser.get('stomp', cfgoption)
-        except ConfigParser.NoOptionError:
-          pass
+      try:
+        cls.defaults[target] = cfgparser.get('stomp', cfgoption)
+      except ConfigParser.NoOptionError:
+        pass
 
   @classmethod
   def add_command_line_options(cls, optparser):
