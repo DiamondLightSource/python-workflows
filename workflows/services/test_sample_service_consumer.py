@@ -10,7 +10,7 @@ def test_service_can_be_looked_up():
   assert service_class == workflows.services.sample_consumer.SampleConsumer
 
 def test_service_subscribes_to_channel():
-  '''Check that the service registers an idle event handler.'''
+  '''Check that the service subscribes to some location.'''
   p = workflows.services.sample_consumer.SampleConsumer()
   mock_transport = mock.Mock()
   setattr(p, '_transport', mock_transport)

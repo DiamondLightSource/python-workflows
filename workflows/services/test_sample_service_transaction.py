@@ -40,9 +40,67 @@ def test_txnproducer_produces_messages():
   assert calls[0][0][0] == calls[1][0][0] # same destination
   assert calls[0][0][1] != calls[1][0][1] # different message
 
-def test_crash_function_crashes_sometimes():
+def test_txnservice_subscribes_to_channel():
+  '''Check that the service subscribes to a queue with acknowledgements enabled.'''
+  p = workflows.services.sample_transaction.SampleTxn()
+  mock_transport = mock.Mock()
+  setattr(p, '_transport', mock_transport)
+
+  p.initializing()
+
+  mock_transport.subscribe.assert_called_once_with(mock.ANY, p.receive_message, acknowledgement=True)
+
+def test_txnservice_crash_function_crashes_sometimes():
   '''The crash should happen sometimes. Neither never nor always.'''
   fn = workflows.services.sample_transaction.SampleTxn.crashpoint
 
   assert any(fn() for i in range(100))
   assert not all(fn() for i in range(100))
+
+def setup_txnservice(crashpattern):
+  '''Common fixture for TXN tests'''
+  p = workflows.services.sample_transaction.SampleTxn()
+  mock_crash, mock_transport = mock.Mock(), mock.Mock()
+  p.crashpoint = mock_crash
+  mock_crash.side_effect = crashpattern
+  mock_transport.transaction_begin.return_value = mock.sentinel.txn
+  setattr(p, '_transport', mock_transport)
+  header = { 'message-id': mock.sentinel.message_id }
+  message = mock.sentinel.message
+  p.receive_message(header, message)
+
+  return p, mock_transport
+
+def test_txnservice_uses_transactions_correctly():
+  '''The TXN service should consume messages in a transaction. When the service fails the messages must not be consumed.'''
+  p, mock_transport = setup_txnservice([True])
+
+  mock_transport.transaction_begin.assert_called_once_with()
+  mock_transport.ack.assert_not_called()
+  mock_transport.send.assert_not_called()
+  mock_transport.transaction_commit.assert_not_called()
+  mock_transport.transaction_abort.assert_called_once_with(mock.sentinel.txn)
+
+  p, mock_transport = setup_txnservice([False, True])
+
+  mock_transport.transaction_begin.assert_called_once_with()
+  mock_transport.ack.assert_called_once_with(mock.sentinel.message_id, transaction=mock.sentinel.txn)
+  mock_transport.send.assert_not_called()
+  mock_transport.transaction_commit.assert_not_called()
+  mock_transport.transaction_abort.assert_called_once_with(mock.sentinel.txn)
+
+  p, mock_transport = setup_txnservice([False, False, True])
+
+  mock_transport.transaction_begin.assert_called_once_with()
+  mock_transport.ack.assert_called_once_with(mock.sentinel.message_id, transaction=mock.sentinel.txn)
+  mock_transport.send.assert_called_once_with(mock.ANY, mock.sentinel.message, transaction=mock.sentinel.txn)
+  mock_transport.transaction_commit.assert_not_called()
+  mock_transport.transaction_abort.assert_called_once_with(mock.sentinel.txn)
+
+  p, mock_transport = setup_txnservice([False, False, False])
+
+  mock_transport.transaction_begin.assert_called_once_with()
+  mock_transport.ack.assert_called_once_with(mock.sentinel.message_id, transaction=mock.sentinel.txn)
+  mock_transport.send.assert_called_once_with(mock.ANY, mock.sentinel.message, transaction=mock.sentinel.txn)
+  mock_transport.transaction_commit.assert_called_once_with(mock.sentinel.txn)
+  mock_transport.transaction_abort.assert_not_called()

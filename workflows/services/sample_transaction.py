@@ -48,7 +48,7 @@ class SampleTxn(CommonService):
       print "---  Abort  ---"
       return
 
-    self._transport.send('transient.destination', message, headers=header, transaction=txn)
+    self._transport.send('transient.destination', message, transaction=txn)
     print " 3. Send"
 
     if self.crashpoint():
