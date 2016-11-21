@@ -101,6 +101,9 @@ class CommonService(object):
     self._idle_callback = None
     self._idle_time = None
 
+    # Logger will be overwritten in start() function
+    self.log = logging.getLogger(self._logger_name)
+
   def __send_to_frontend(self, data_structure):
     '''Put a message in the pipe for the frontend.'''
     if self.__pipe_frontend:
