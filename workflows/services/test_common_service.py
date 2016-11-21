@@ -4,6 +4,7 @@ import workflows.services
 from workflows.services.common_service import Commands, CommonService
 import mock
 from multiprocessing import Pipe
+import pytest
 
 def test_instantiate_basic_service():
   '''Create a basic service object'''
@@ -11,6 +12,7 @@ def test_instantiate_basic_service():
 
   assert service.get_name() is not None
 
+@pytest.mark.skip(reason="Deprecated")
 def test_logging_to_frontend():
   '''Log messages should be passed to frontend'''
   fe_pipe = mock.Mock()
@@ -22,28 +24,6 @@ def test_logging_to_frontend():
   assert fe_pipe.send.called_once_with \
     ({'band': 'logging',
       'payload': { 'log': mock.sentinel.logmessage, 'source': 'other' }})
-
-def test_logging_to_dummy():
-  '''Should run without errors, message should be dropped.'''
-  service = CommonService()
-  service.log(mock.sentinel.logmessage)
-
-def test_send_status_updates_to_frontend():
-  '''Status updates should be passed to frontend'''
-  fe_pipe = mock.Mock()
-  service = CommonService(frontend=fe_pipe)
-
-  service.update_status(mock.sentinel.status)
-
-  fe_pipe.send.assert_called()
-  assert fe_pipe.send.called_once_with \
-    ({'band': 'status_update',
-      'status': mock.sentinel.status })
-
-def test_send_status_dummy():
-  '''Should run without errors, status should be dropped.'''
-  service = CommonService()
-  service.update_status(mock.sentinel.status)
 
 def test_receive_and_follow_shutdown_command():
   '''Receive a shutdown message via the command pipe and act on it.
@@ -180,8 +160,8 @@ def test_log_unknown_band_data():
     if message.get('band') == 'log':
       messages.append(message.get('payload'))
   assert len(messages) == 2
-  assert messages[0]['source'] == 'service'
-  assert str(messages[0]['log']['band']) == str(mock.sentinel.band)
-  assert messages[1]['source'] == 'service'
-  assert messages[1]['log'].get('band') == None
-
+  assert messages[0].name == 'workflows.service'
+  assert 'unregistered band' in messages[0].message
+  assert str(mock.sentinel.band) in messages[0].message
+  assert messages[1].name == 'workflows.service'
+  assert 'without band' in messages[1].message

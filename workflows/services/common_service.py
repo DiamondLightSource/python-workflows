@@ -2,6 +2,7 @@ from __future__ import absolute_import, division
 import logging
 import Queue
 import workflows
+import workflows.logging
 from workflows.transport.queue_transport import QueueTransport
 
 class CommonService(object):
@@ -22,6 +23,10 @@ class CommonService(object):
 
   _service_name = 'unnamed service'
 
+  # Logger name ---------------------------------------------------------------
+
+  _logger_name = 'workflows.service'
+
   # Overrideable functions ----------------------------------------------------
 
   def initializing(self):
@@ -30,16 +35,6 @@ class CommonService(object):
        subscriptions with the messaging layer, and register callbacks.
        This function can be overridden by specific service implementations.'''
     pass
-
-  def log(self, logmessage):
-    '''Pass a log message to the frontend.
-       This function can be overridden by specific service implementations.'''
-    self._log_send(logmessage)
-
-  def update_status(self, status):
-    '''Pass a status update to the frontend.
-       This function can be overridden by specific service implementations.'''
-    self._update_status(status)
 
   def in_shutdown(self):
     '''Service shutdown. This function is run before the service is terminated.
@@ -112,15 +107,11 @@ class CommonService(object):
     if self.__pipe_frontend:
       self.__pipe_frontend.send(data_structure)
 
-  def _log_send(self, data_structure):
-    '''Internal function to format and send log messages.'''
-    self.__log_send_full({'log': data_structure, 'source': 'other'})
-
-  def __log_send_full(self, data_structure):
-    '''Internal function to actually send log messages.'''
+  def _log_send(self, logrecord):
+    '''Forward log records to the frontend.'''
     self.__send_to_frontend({
       'band': 'log',
-      'payload': data_structure
+      'payload': logrecord
     })
 
   def _register(self, message_band, callback):
@@ -132,13 +123,6 @@ class CommonService(object):
        time span (in seconds).'''
     self._idle_callback = callback
     self._idle_time = idle_time
-
-  def _update_status(self, status):
-    '''Internal function to actually send status update.'''
-    self.__send_to_frontend({
-      'band': 'status_update',
-      'status': status
-    })
 
   def __update_service_status(self, statuscode):
     '''Set the internal status of the service object, and notify frontend.'''
@@ -153,20 +137,40 @@ class CommonService(object):
        Change the name by overwriting self._service_name.'''
     return self._service_name
 
+  def initialize_logging(self):
+    '''Reset the logging for the service process. All logged messages are
+       forwarded to the frontend. If any filtering is desired, then this must
+       take place on the service side.
+       This initialization routine can be overridden by the service.'''
+    # Reset logging to pass logrecords into the queue to the frontend only.
+    # Existing handlers may be broken as they were copied into a new process,
+    # so should be discarded.
+    # Upon reloading logging all derived classes must be reloaded, too.
+    reload(logging)
+    reload(workflows.logging)
+
+    # Re-enable logging to console
+    root_logger = logging.getLogger()
+
+    # By default pass all warning (and higher) level messages to the frontend
+    root_logger.setLevel(logging.WARN)
+    root_logger.addHandler(workflows.logging.CallbackHandler(self._log_send))
+
+    # Additionally, write all critical messages directly to console
+    console = logging.StreamHandler()
+    console.setLevel(logging.CRITICAL)
+    root_logger.addHandler(console)
+
+
   def start(self):
     '''Start listening to command queue, process commands in main loop,
        set status, etc...
        This function is most likely called by the frontend in a separate
        process.'''
 
-    # Reset logging. Logging must be passed via the queue. Existing handlers
-    # may be broken as they were copied into a new process, so should be discarded.
-    reload(logging)
-    # Re-enable logging to console
-    logger = logging.getLogger()
-    logger.setLevel(logging.DEBUG)
-    console = logging.StreamHandler()
-    logger.addHandler(console)
+    self.initialize_logging()
+
+    self.log = logging.getLogger(self._logger_name)
 
     self.__update_service_status(self.SERVICE_STATUS_STARTING)
 
@@ -197,17 +201,11 @@ class CommonService(object):
       if message and 'band' in message:
         processor = self.__callback_register.get(message['band'])
         if processor is None:
-          self.__log_send_full({
-              'source': 'service',
-              'cause': 'received message on unregistered band',
-              'log': message})
+          self.log.warn('received message on unregistered band\n%s', message)
         else:
           processor(message.get('payload'))
       else:
-        self.__log_send_full({
-            'source': 'service',
-            'cause': 'received message without band information',
-            'log': message})
+        self.log.warn('received message without band information\n%s', message)
 
     self.__update_service_status(self.SERVICE_STATUS_SHUTDOWN)
 
