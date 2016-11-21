@@ -12,7 +12,8 @@ def test_callback_handler_works_within_logging_framework():
   log.setLevel(logging.INFO)
 
   cbh = workflows.logging.CallbackHandler(cbmock)
-  log.addHandler(workflows.logging.CallbackHandler(cbmock))
+  cbh.handleError = mock.Mock()
+  log.addHandler(cbh)
   log.info(logmsg)
 
   cbmock.assert_called_once()
@@ -23,3 +24,19 @@ def test_callback_handler_works_within_logging_framework():
   assert logrec.levelname == 'INFO'
   assert logrec.message   == logmsg
   assert logrec.funcName.startswith('test_')
+  assert not cbh.handleError.called
+
+  # Now check that the callback handler can handle errors in the
+  # callback function.
+  logmsg = 'Test message for error in logging'
+  cbmock.side_effect=AttributeError('Some failure')
+
+  log.info(logmsg)
+
+  assert cbmock.call_count == 2
+  assert cbmock.call_args == ((mock.ANY,), {})
+  logrec = cbmock.call_args[0][0]
+  assert isinstance(logrec, logging.LogRecord)
+  assert logrec.message == logmsg
+  cbh.handleError.assert_called_once()
+  assert cbh.handleError.call_args == cbmock.call_args
