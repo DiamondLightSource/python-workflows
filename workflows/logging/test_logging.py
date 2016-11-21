@@ -4,6 +4,8 @@ import mock
 import workflows.logging
 
 def test_callback_handler_works_within_logging_framework():
+  '''Check that the callback handler can be used by Python logging
+     and works as expected.'''
   cbmock = mock.Mock()
   logmsg = 'Test message for callback'
   log = logging.getLogger('workflows.tests.logging.callback')
