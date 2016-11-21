@@ -21,8 +21,15 @@ class CommonTransport(object):
 
   @staticmethod
   def connect():
-    '''Connect the transport class. This function has to be overridden.
+    '''Connect the transport class. This function must be overridden.
        :return: True-like value when connection successful,
+                False-like value otherwise.'''
+    return False
+
+  @staticmethod
+  def is_connected():
+    '''Returns the current connection status. This function must be overridden.
+       :return: True-like value when connection is available,
                 False-like value otherwise.'''
     return False
 
