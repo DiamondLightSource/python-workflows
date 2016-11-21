@@ -19,7 +19,10 @@ class Frontend():
 
   def __init__(self, transport=None, service=None):
     '''Create a frontend instance. Connect to the transport layer, start any
-       requested service and begin broadcasting status information.'''
+       requested service and begin broadcasting status information.
+       :param transport: Either the name of a transport class, a transport
+                         class, or a transport class object.
+    '''
     self.__lock = threading.RLock()
     self.__hostid = self._generate_unique_host_id()
     self._service = None
@@ -32,8 +35,10 @@ class Frontend():
     # Connect to the network transport layer
     if transport is None or isinstance(transport, basestring):
       self._transport = workflows.transport.lookup(transport)()
-    else:
+    elif hasattr(transport, '__call__'):
       self._transport = transport()
+    else:
+      self._transport = transport
     assert self._transport.connect(), "Could not connect to transport layer"
     self._service_transportid = self._transport.register_client()
 

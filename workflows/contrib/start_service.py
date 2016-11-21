@@ -28,11 +28,21 @@ class ServiceStarter(object):
     '''Plugin hook to manipulate the Frontend object before starting it. If a
        value is returned here it will replace the Frontend object.'''
 
-  def parser_factory(self, program_name, version):
-    '''Create an OptionParser with pre-populated options for services etc.
+  @staticmethod
+  def on_transport_preparation(transport):
+    '''Plugin hook to intercept/manipulate the Transport object before passing
+       it to the Frontend object.'''
+
+  def run(self, cmdline_args=None, program_name='start_service',
+        version=workflows.version()):
+    '''Example command line interface to start services.
+       :param cmdline_args: List of command line arguments to pass to parser
        :param program_name: Name of the command line tool to display in help
        :param version: Version number to print when run with '--version'
     '''
+
+    # Set up parser
+
     parser = OptionParser(
       usage=program_name + ' [options]' if program_name else None,
       version=version
@@ -47,41 +57,38 @@ class ServiceStarter(object):
         ", ".join(workflows.transport.get_known_transports()))
     workflows.transport.add_command_line_options(parser)
 
-    self.on_parser_preparation(parser)
+    # Call on_parser_preparation hook
 
-    return parser
+    parser = self.on_parser_preparation(parser) or parser
 
-  def run(self, cmdline_args=None, program_name='start_service',
-        version=workflows.version()):
-    '''Example command line interface to start services.
-       :param cmdline_args: List of command line arguments to pass to parser
-       :param program_name: Name of the command line tool to display in help
-       :param version: Version number to print when run with '--version'
-    '''
-
-    if cmdline_args is None:
-      cmdline_args = sys.argv[1:]
-
-    parser = self.parser_factory(program_name, version)
-
-    retval = self.on_parser_preparation(parser)
-    if retval:
-      parser = retval
+    # Parse command line options
 
     (options, args) = parser.parse_args(cmdline_args)
 
-    retval = self.on_parsing(options, args)
-    if retval:
-      (options, args) = retval
+    # Call on_parsing hook
+
+    (options, args) = retval = self.on_parsing(options, args) or (options, args)
+
+    # Create Transport object
+
+    transport = workflows.transport.lookup(options.transport)()
+
+    # Call on_transport_preparation hook
+
+    transport = self.on_transport_preparation(transport) or transport
+
+    # Create Frontend object
 
     frontend = workflows.frontend.Frontend(
       service=options.service,
-      transport=options.transport,
+      transport=transport,
     )
 
-    retval = self.on_frontend_preparation(frontend)
-    if retval:
-      frontend = retval
+    # Call on_frontend_preparation hook
+
+    frontend = self.on_frontend_preparation(frontend) or frontend
+
+    # Start Frontend
 
     frontend.run()
 
