@@ -12,18 +12,22 @@ def test_instantiate_basic_service():
 
   assert service.get_name() is not None
 
-@pytest.mark.skip(reason="Deprecated")
 def test_logging_to_frontend():
   '''Log messages should be passed to frontend'''
   fe_pipe = mock.Mock()
   service = CommonService(frontend=fe_pipe)
 
-  service.log(mock.sentinel.logmessage)
+  # Start service to initialize logging
+  service.start()
+
+  # Note that by default only warning and higher are passed to frontend
+  service.log.warn(mock.sentinel.logmessage)
 
   fe_pipe.send.assert_called()
-  assert fe_pipe.send.called_once_with \
-    ({'band': 'logging',
-      'payload': { 'log': mock.sentinel.logmessage, 'source': 'other' }})
+  assert fe_pipe.send.call_args == (({'band': 'log', 'payload': mock.ANY},), {})
+  logrec = fe_pipe.send.call_args[0][0]['payload']
+  assert logrec.levelname == 'WARNING'
+  assert str(mock.sentinel.logmessage) in logrec.message
 
 def test_receive_and_follow_shutdown_command():
   '''Receive a shutdown message via the command pipe and act on it.

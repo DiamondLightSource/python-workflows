@@ -25,7 +25,7 @@ class CommonService(object):
 
   # Logger name ---------------------------------------------------------------
 
-  _logger_name = 'workflows.service'
+  _logger_name = 'workflows.service'  # The logger can be accessed via self.log
 
   # Overrideable functions ----------------------------------------------------
 
@@ -41,7 +41,6 @@ class CommonService(object):
        No more commands are received, but communications can still be sent.
        This function can be overridden by specific service implementations.'''
     pass
-
 
   # Internal service status codes ---------------------------------------------
   # These codes will be sent to the frontend to indicate the current state of
@@ -140,8 +139,7 @@ class CommonService(object):
   def initialize_logging(self):
     '''Reset the logging for the service process. All logged messages are
        forwarded to the frontend. If any filtering is desired, then this must
-       take place on the service side.
-       This initialization routine can be overridden by the service.'''
+       take place on the service side.'''
     # Reset logging to pass logrecords into the queue to the frontend only.
     # Existing handlers may be broken as they were copied into a new process,
     # so should be discarded.
@@ -160,7 +158,6 @@ class CommonService(object):
     console = logging.StreamHandler()
     console.setLevel(logging.CRITICAL)
     root_logger.addHandler(console)
-
 
   def start(self):
     '''Start listening to command queue, process commands in main loop,
