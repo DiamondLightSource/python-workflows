@@ -15,7 +15,7 @@ class Frontend():
      can process control messages directly, or pass messages on to the
      service. On initialization a status advertising thread is started,
      which keeps running in the background.'''
-  logger = logging.getLogger('workflows.frontend')
+  log = logging.getLogger('workflows.frontend')
 
   def __init__(self, transport=None, service=None):
     '''Create a frontend instance. Connect to the transport layer, start any
@@ -52,7 +52,7 @@ class Frontend():
   def run(self):
     '''The main loop of the frontend. Here incoming messages from the service
        are processed and forwarded to the corresponding callback methods.'''
-    self.logger.info("Current service: " + str(self._service))
+    self.log.info("Current service: " + str(self._service))
     n = 3600
     while n > 0:
       if self._pipe_service and self._pipe_service.poll(1):
@@ -64,14 +64,14 @@ class Frontend():
               handler = getattr(self, 'parse_band_' + message['band'])
             except AttributeError:
               handler = None
-              self.logger.warn("Unknown band " + str(message['band']))
+              self.log.warn("Unknown band " + str(message['band']))
             if handler:
 #              try:
                 handler(message)
 #              except Exception:
 #                print 'Uh oh. What to do.'
           else:
-            self.logger.warn("Invalid message received " + str(message))
+            self.log.warn("Invalid message received " + str(message))
         except Queue.Empty:
           pass
       n = n - 1
@@ -80,7 +80,7 @@ class Frontend():
     self._status_advertiser.trigger()
     self._terminate_service()
     self._status_advertiser.stop_and_wait()
-    self.logger.info("Fin. Terminating.")
+    self.log.info("Fin. Terminating.")
 
   def send_command(self, command):
     '''Send command to service via the command queue.'''
@@ -90,11 +90,11 @@ class Frontend():
 
   def parse_band_log(self, message):
     '''Process incoming logging messages from the service.'''
-    self.logger.debug("LOG: " + str(message))
+    self.log.debug("LOG: " + str(message))
 
   def parse_band_status_update(self, message):
     '''Process incoming status updates from the service.'''
-    self.logger.debug("Status update: " + str(message))
+    self.log.debug("Status update: " + str(message))
     self._service_status = message['statuscode']
     self._status_advertiser.trigger()
 
