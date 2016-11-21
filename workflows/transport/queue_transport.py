@@ -91,13 +91,13 @@ class QueueTransport(CommonTransport):
       'payload': ( (subscription_id, channel), kwargs )
     })
 
-  def _subscribe_broadcast(self, *args, **kwargs):
+  def _subscribe_broadcast(self, subscription_id, channel, callback, **kwargs):
     '''Forward broadcast subscription command to queue.'''
     self.assert_connected()
     self._send_fun({
       'band': 'transport',
       'call': 'subscribe_broadcast',
-      'payload': ( args, kwargs )
+      'payload': ( (subscription_id, channel), kwargs )
     })
 
   def _unsubscribe(self, *args, **kwargs):

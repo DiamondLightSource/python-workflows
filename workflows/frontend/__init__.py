@@ -274,3 +274,21 @@ class Frontend():
        *message['payload'][0][2:],
        **message['payload'][1]
     )
+
+  def parse_band_transport_subscribe_broadcast(self, message):
+    '''Counterpart to the transport.subscribe_broadcast call from the service.
+       Forward the call to the real transport layer.'''
+    subscription_id, channel = message['payload'][0][:2]
+    self._transport.subscribe_broadcast(channel,
+      lambda cb_header, cb_message:
+      self.send_command( {
+          'band': 'transport_message',
+          'payload': {
+            'subscription_id': subscription_id,
+            'header': cb_header,
+            'message': cb_message,
+          },
+        } ),
+       *message['payload'][0][2:],
+       **message['payload'][1]
+    )

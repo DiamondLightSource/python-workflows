@@ -151,14 +151,10 @@ def test_forward_subscribe_broadcast_call():
     'band': 'transport',
     'call': 'subscribe_broadcast',
     'payload': (
-      ( subid, mock.sentinel.channel, mock.ANY ),
+      ( subid, mock.sentinel.channel ), # callback can't be transported
       { 'kwarg': mock.sentinel.kwarg }
     )
   })
-
-  callback = mockfunc.call_args[0][0]['payload'][0][2]
-  callback(mock.sentinel.header, mock.sentinel.message)
-  mock_callback.assert_called_once_with(mock.sentinel.header, mock.sentinel.message)
 
 def test_forward_unsubscribe_call():
   '''Test translation of an unsubscribe() call to Queue message.'''
