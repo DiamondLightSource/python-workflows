@@ -146,9 +146,10 @@ class CommonService(object):
     # Reset logging to pass logrecords into the queue to the frontend only.
     # Existing handlers may be broken as they were copied into a new process,
     # so should be discarded.
-    # Upon reloading logging all derived classes must be reloaded, too.
-    reload(logging)
-    reload(workflows.logging)
+    for loggername in [None] + list(logging.Logger.manager.loggerDict.keys()):
+      logger = logging.getLogger(loggername)
+      while logger.handlers:
+        logger.removeHandler(logger.handlers[0])
 
     # Re-enable logging to console
     root_logger = logging.getLogger()
