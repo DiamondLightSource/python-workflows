@@ -10,6 +10,9 @@ class SampleProducer(CommonService):
   # Human readable service name
   _service_name = "Message Producer"
 
+  # Logger name
+  _logger_name = "workflows.service.sample_producer"
+
   counter = 0
 
   def initializing(self):
@@ -17,12 +20,13 @@ class SampleProducer(CommonService):
        received from the frontend. This is the place to request channel
        subscriptions with the messaging layer, and register callbacks.
        This function can be overridden by specific service implementations.'''
+    self.log.info('Starting message producer')
     self._register_idle(3, self.create_message)
 
   def create_message(self):
     '''Create and send a unique message for this service.'''
     self.counter += 1
-    print "Sending message #%d" % self.counter
+    self.log.info('Sending message #%d', self.counter)
     self._transport.send("transient.destination",
                          "Message #%d\n++++++++Produced@ %f" % (
                            self.counter,
