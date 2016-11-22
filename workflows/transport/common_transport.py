@@ -1,5 +1,6 @@
 from __future__ import absolute_import, division
 import json
+import logging
 import workflows
 
 class CommonTransport(object):
@@ -14,6 +15,8 @@ class CommonTransport(object):
   __transactions = {}
   __transaction_id = 0
   __messages = {}
+
+  log = logging.getLogger('workflows.transport')
 
   #
   # -- High level communication calls ----------------------------------------
@@ -55,8 +58,8 @@ class CommonTransport(object):
       'callback': callback,
       'ack': kwargs.get('acknowledgement'),
     }
-    self._debug('Subscribing to %s for %s with ID %d' % \
-        (channel, kwargs.get('client_id'), self.__subscription_id))
+    self.log.debug('Subscribing to %s for %s with ID %d',
+        channel, kwargs.get('client_id'), self.__subscription_id)
     if 'client_id' in kwargs:
       self.__clients[kwargs['client_id']]['subscriptions'].add \
         (self.__subscription_id)
@@ -287,15 +290,6 @@ class CommonTransport(object):
     for message_id in messages:
       self.nack(message_id)
     del(self.__clients[client_id])
-
-  #
-  # -- Debugging -------------------------------------------------------------
-  #
-
-  @staticmethod
-  def _debug(debug_info):
-    '''An overrideable central debugging function.'''
-    print(debug_info)
 
   #
   # -- Low level communication calls to be implemented by subclass -----------
