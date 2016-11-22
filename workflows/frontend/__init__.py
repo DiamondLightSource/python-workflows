@@ -15,7 +15,6 @@ class Frontend():
      can process control messages directly, or pass messages on to the
      service. On initialization a status advertising thread is started,
      which keeps running in the background.'''
-  log = logging.getLogger('workflows.frontend')
 
   def __init__(self, transport=None, service=None):
     '''Create a frontend instance. Connect to the transport layer, start any
@@ -31,6 +30,27 @@ class Frontend():
     self._pipe_commands = None # frontend -> service
     self._pipe_service = None  # frontend <- service
     self._service_status = CommonService.SERVICE_STATUS_NONE
+
+    # Set up logging
+    class logadapter():
+      '''A helper class that acts like a dictionary, but actually reads its
+         values from the get_status() function.'''
+      status_fn = self.get_status
+      status = status_fn()
+
+      def __iter__(self):
+        '''Update cached status values, renaming the keys for logging.
+           Return a dictionary key iterator.'''
+        self.status = { 'workflows_' + k: v
+                        for k, v in self.status_fn().iteritems() }
+        return self.status.__iter__()
+
+      def __getitem__(self, key):
+        '''Return a value from the status dictionary.'''
+        return self.status.__getitem__(key)
+    self.log = logging.LoggerAdapter(
+                   logging.getLogger('workflows.frontend'),
+                   logadapter())
 
     # Connect to the network transport layer
     if transport is None or isinstance(transport, basestring):
