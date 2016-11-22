@@ -157,6 +157,10 @@ class CommonService(object):
     root_logger.setLevel(logging.WARN)
     root_logger.addHandler(workflows.logging.CallbackHandler(self._log_send))
 
+    # Set up the service logger and pass all info (and higher) level messages
+    self.log = logging.getLogger(self._logger_name)
+    self.log.setLevel(logging.INFO)
+
     # Additionally, write all critical messages directly to console
     console = logging.StreamHandler()
     console.setLevel(logging.CRITICAL)
@@ -167,10 +171,7 @@ class CommonService(object):
        set status, etc...
        This function is most likely called by the frontend in a separate
        process.'''
-
     self.initialize_logging()
-
-    self.log = logging.getLogger(self._logger_name)
 
     self.__update_service_status(self.SERVICE_STATUS_STARTING)
 
