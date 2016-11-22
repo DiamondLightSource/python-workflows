@@ -95,7 +95,15 @@ class Frontend():
 
   def parse_band_log(self, message):
     '''Process incoming logging messages from the service.'''
-    self.log.debug("LOG: " + str(message))
+    if 'payload' in message and hasattr(message['payload'], 'name'):
+      record = message['payload']
+      for k, v in self.get_status().iteritems():
+        setattr(record, 'workflows_' + k, v)
+      logging.getLogger(record.name).handle(record)
+    else:
+      self.log.warn("Received broken record on log band\nMessage: %s\nRecord: %s",
+                    str(message),
+                    str(hasattr(message.get('payload'), '__dict__') and message['payload'].__dict__))
 
   def parse_band_status_update(self, message):
     '''Process incoming status updates from the service.'''
@@ -122,6 +130,7 @@ class Frontend():
        broadcast across the network.'''
     return { 'host': self.__hostid,
              'status': self._service_status,
+             'statustext': CommonService.human_readable_state.get(self._service_status),
              'service': self._service_name }
 
   def switch_service(self, new_service):
