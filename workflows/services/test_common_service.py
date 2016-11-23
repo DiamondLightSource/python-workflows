@@ -169,3 +169,35 @@ def test_log_unknown_band_data():
   assert str(mock.sentinel.band) in messages[0].message
   assert messages[1].name == 'workflows.service'
   assert 'without band' in messages[1].message
+
+def test_service_initialization_crashes_are_handlerd_correctly():
+  '''Log messages should be passed to frontend'''
+  fe_pipe = mock.Mock()
+
+  class CrashOnInitService(CommonService):
+    '''Helper class to test exception handling.
+       This service crashes on initialization.'''
+    _service_name = "Crashservice 1"
+    _logger_name = "workflows.service.crash_on_init"
+
+    def initializing(self):
+      '''Crash.'''
+      assert False, 'This crash needs to be handled'
+
+  service = CrashOnInitService(frontend=fe_pipe)
+  service.start()
+
+  fe_pipe.send.assert_called()
+
+  # Service status should have been set to ERROR
+  assert any(c[0][0] == { 'band': 'status_update', 'statuscode': service.SERVICE_STATUS_ERROR } \
+             for c in fe_pipe.send.call_args_list)
+
+  # Traceback should have been sent to log
+  log_msgs = filter(lambda c: c[0][0] == { 'band': 'log', 'payload': mock.ANY } and c[0][0]['payload'].levelname == 'CRITICAL', \
+                    fe_pipe.send.call_args_list)
+  assert log_msgs, 'No critical log message received'
+  log = log_msgs[0][0][0]['payload']
+  assert 'This crash needs to be handled' in log.exc_text
+  assert 'initializing' in log.exc_text
+  assert 'test_common_service' in log.exc_text

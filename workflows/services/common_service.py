@@ -172,48 +172,54 @@ class CommonService(object):
        set status, etc...
        This function is most likely called by the frontend in a separate
        process.'''
-    self.initialize_logging()
+    try:
+      self.initialize_logging()
 
-    self.__update_service_status(self.SERVICE_STATUS_STARTING)
+      self.__update_service_status(self.SERVICE_STATUS_STARTING)
 
-    self.initializing()
-    self._register('command', self.__process_command)
-    self._register('transport_message', self.__process_transport)
+      self.initializing()
+      self._register('command', self.__process_command)
+      self._register('transport_message', self.__process_transport)
 
-    if self.__pipe_commands is None:
-      # can only listen to commands if command queue is defined
-      self.__shutdown = True
+      if self.__pipe_commands is None:
+        # can only listen to commands if command queue is defined
+        self.__shutdown = True
 
-    while not self.__shutdown: # main loop
-      self.__update_service_status(self.SERVICE_STATUS_IDLE)
+      while not self.__shutdown: # main loop
+        self.__update_service_status(self.SERVICE_STATUS_IDLE)
 
-      if self._idle_time is None:
-        message = self.__pipe_commands.recv()
-      else:
-        if self.__pipe_commands.poll(self._idle_time):
+        if self._idle_time is None:
           message = self.__pipe_commands.recv()
         else:
-          self.__update_service_status(self.SERVICE_STATUS_TIMER)
-          if self._idle_callback is not None:
-            self._idle_callback()
-          continue
+          if self.__pipe_commands.poll(self._idle_time):
+            message = self.__pipe_commands.recv()
+          else:
+            self.__update_service_status(self.SERVICE_STATUS_TIMER)
+            if self._idle_callback is not None:
+              self._idle_callback()
+            continue
 
-      self.__update_service_status(self.SERVICE_STATUS_PROCESSING)
+        self.__update_service_status(self.SERVICE_STATUS_PROCESSING)
 
-      if message and 'band' in message:
-        processor = self.__callback_register.get(message['band'])
-        if processor is None:
-          self.log.warn('received message on unregistered band\n%s', message)
+        if message and 'band' in message:
+          processor = self.__callback_register.get(message['band'])
+          if processor is None:
+            self.log.warn('received message on unregistered band\n%s', message)
+          else:
+            processor(message.get('payload'))
         else:
-          processor(message.get('payload'))
-      else:
-        self.log.warn('received message without band information\n%s', message)
+          self.log.warn('received message without band information\n%s', message)
 
-    self.__update_service_status(self.SERVICE_STATUS_SHUTDOWN)
+      self.__update_service_status(self.SERVICE_STATUS_SHUTDOWN)
 
-    self.in_shutdown()
+      self.in_shutdown()
 
-    self.__update_service_status(self.SERVICE_STATUS_END)
+      self.__update_service_status(self.SERVICE_STATUS_END)
+
+    except:
+      self.log.critical('Unhandled service exception', exc_info=True)
+      self.__update_service_status(self.SERVICE_STATUS_ERROR)
+      return
 
   def __process_command(self, command):
     '''Process an incoming command message from the frontend.'''
