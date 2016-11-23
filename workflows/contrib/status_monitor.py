@@ -5,8 +5,10 @@ from workflows.services.common_service import CommonService
 import workflows.transport
 import threading
 
-class Monitor():
-  '''A sample implementation of a status monitor showing all running services'''
+class Monitor(): # pragma: no cover
+  '''A sample implementation of a status monitor showing all running services.
+     To use this example class, pass in a transport object and call the run()
+     method.'''
 
   shutdown = False
   '''Set to true to end the main loop and shut down the service monitor.'''
