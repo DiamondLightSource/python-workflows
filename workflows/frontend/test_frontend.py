@@ -20,6 +20,25 @@ def test_frontend_connects_to_transport_layer(mock_transport, mock_status, mock_
   mock_trn.assert_called_once_with()
   mock_trn.return_value.connect.assert_called_once_with()
 
+@mock.patch('workflows.frontend.workflows.status.StatusAdvertise')
+@mock.patch('workflows.frontend.workflows.transport')
+def test_frontend_subscribes_to_command_channel(mock_transport, mock_status):
+  '''Frontend should call connect method on transport layer module and subscribe to a unique command queue.'''
+  transport = mock_transport.lookup.return_value.return_value
+  fe = workflows.frontend.Frontend()
+  mock_transport.lookup.assert_called_once_with(None)
+  transport.connect.assert_called_once()
+  transport.subscribe.assert_not_called()
+
+  fe = workflows.frontend.Frontend(transport_command_prefix='sentinel.')
+  transport.subscribe.assert_called_once()
+  assert transport.subscribe.call_args == (('sentinel.' + fe.get_host_id(), mock.ANY), {})
+  callbackfn = transport.subscribe.call_args[0][1]
+
+  assert fe.shutdown == False
+  callbackfn({}, { 'command': 'shutdown' })
+  assert fe.shutdown == True
+
 @mock.patch('workflows.frontend.multiprocessing')
 @mock.patch('workflows.frontend.workflows.status.StatusAdvertise')
 @mock.patch('workflows.frontend.workflows.transport')

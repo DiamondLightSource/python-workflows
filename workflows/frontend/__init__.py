@@ -16,11 +16,18 @@ class Frontend():
      service. On initialization a status advertising thread is started,
      which keeps running in the background.'''
 
-  def __init__(self, transport=None, service=None):
+  def __init__(self, transport=None, service=None,
+      transport_command_prefix=None):
     '''Create a frontend instance. Connect to the transport layer, start any
-       requested service and begin broadcasting status information.
+       requested service, begin broadcasting status information and listen
+       for control commands.
        :param transport: Either the name of a transport class, a transport
                          class, or a transport class object.
+       :param service: A class or name of the class to be instantiated in a
+                       subprocess as service.
+       :param transport_command_prefix: An optional prefix of a transport
+                                        subscription to be listened to for
+                                        commands.
     '''
     self.__lock = threading.RLock()
     self.__hostid = self._generate_unique_host_id()
@@ -30,6 +37,9 @@ class Frontend():
     self._pipe_commands = None # frontend -> service
     self._pipe_service = None  # frontend <- service
     self._service_status = CommonService.SERVICE_STATUS_NONE
+
+    self.restart_service = True
+    self.shutdown = False
 
     # Set up logging
     class logadapter():
@@ -61,6 +71,11 @@ class Frontend():
       self._transport = transport
     assert self._transport.connect(), "Could not connect to transport layer"
     self._service_transportid = self._transport.register_client()
+
+    if transport_command_prefix:
+      self._transport.subscribe(transport_command_prefix + self.__hostid,
+                                self.process_transport_command)
+      self.log.debug('Listening for commands on transport layer')
 
     # Start initial service if one has been requested
     if service is not None:
@@ -112,6 +127,15 @@ class Frontend():
 #   print "To command queue: ", command
     if self._pipe_commands:
       self._pipe_commands.send(command)
+
+  def process_transport_command(self, header, message):
+    '''Parse a command coming in through the transport command subscription'''
+    if message and message.get('command'):
+      self.log.info('Received command \'%s\' via transport layer', message['command'])
+      if message['command'] == 'shutdown':
+        self.shutdown = True
+    else:
+      self.log.warn('Received invalid transport command message')
 
   def parse_band_log(self, message):
     '''Process incoming logging messages from the service.'''
