@@ -1,9 +1,8 @@
 from __future__ import absolute_import, division
+import logging
 import Queue
-import sys
 import threading
 import time
-import traceback
 
 class StatusAdvertise():
   '''Background thread that advertises the current node status, obtained by
@@ -21,6 +20,7 @@ class StatusAdvertise():
     self._background_thread.daemon = True
     self._shutdown = False
     self._notification = Queue.Queue()
+    self.log = logging.getLogger('workflows.status')
 
   def start(self):
     '''Start a background thread to broadcast the current node status at
@@ -29,11 +29,13 @@ class StatusAdvertise():
 
   def stop(self):
     '''Stop the background thread.'''
+    self.log.debug('Notifying status advertising thread to shut down')
     self._shutdown = True
 
   def stop_and_wait(self):
     '''Stop the background thread and wait for any pending broadcasts.'''
     self.stop()
+    self.log.debug('Waiting for status advertising thread to shut down')
     self._background_thread.join()
 
   def trigger(self):
@@ -44,39 +46,41 @@ class StatusAdvertise():
     '''Advertise current frontend and service status to transport layer, and
        broadcast useful information about this node.
        This runs in a separate thread.'''
-    while not self._shutdown:
-      waitperiod = self._interval + time.time()
+    self.log.debug('Status advertising thread started')
+    try:
+      while not self._shutdown:
+        waitperiod = self._interval + time.time()
 
-      try:
-        with self._advertise_lock:
-          status = None
-          if self._status_function is not None:
-            status = self._status_function()
-          if self._transport is not None:
-            if status is None:
-              self._transport.broadcast_status()
-            else:
-              self._transport.broadcast_status(status)
-      except Exception, e:
-        # should pass these to a logging function
-        print "Exception in status thread:"
-        print '-'*60
-        traceback.print_exc(file=sys.stdout)
-        print '-'*60
+        try:
+          with self._advertise_lock:
+            if self._status_function is not None:
+              status = self._status_function()
+            if self._transport is not None:
+              if status is None:
+                self._transport.broadcast_status()
+              else:
+                self._transport.broadcast_status(status)
+        except Exception, e:
+          self.log.error('Exception in status advertising thread', exc_info=True)
 
-      waitperiod = waitperiod - time.time()
-      try:
-        self._notification.get(True, waitperiod)
-      except Queue.Empty:
-        pass # intentional
+        waitperiod = waitperiod - time.time()
+        try:
+          self._notification.get(True, waitperiod)
+        except Queue.Empty:
+          pass # intentional
+      self.log.debug('Stopping status advertising thread')
 
-    # Thread is stopping. Check if one last notification should be sent
-    with self._advertise_lock:
-      status = None
-      if self._status_function is not None:
-        status = self._status_function()
-      if self._transport is not None:
-        if status is None:
-          self._transport.broadcast_status()
-        else:
-          self._transport.broadcast_status(status)
+      # Thread is stopping. Check if one last notification should be sent
+      with self._advertise_lock:
+        status = None
+        if self._status_function is not None:
+          status = self._status_function()
+        if self._transport is not None:
+          if status is None:
+            self._transport.broadcast_status()
+          else:
+            self._transport.broadcast_status(status)
+      self.log.debug('Status advertising stopped')
+    except Exception, e:
+      self.log.critical('Unhandled exception in status advertising thread', exc_info=True)
+      raise

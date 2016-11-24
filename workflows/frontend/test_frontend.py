@@ -6,7 +6,7 @@ import mock
 @mock.patch('workflows.frontend.workflows.status.StatusAdvertise')
 @mock.patch('workflows.frontend.workflows.transport')
 def test_frontend_connects_to_transport_layer(mock_transport, mock_status, mock_mp):
-  '''Frontend should call connect method on transport layer module.'''
+  '''Frontend should call connect method on transport layer module and subscribe to a unique command queue.'''
   workflows.frontend.Frontend()
   mock_transport.lookup.assert_called_once_with(None)
   mock_transport.lookup.return_value.assert_called_once_with()
@@ -24,7 +24,8 @@ def test_frontend_connects_to_transport_layer(mock_transport, mock_status, mock_
 @mock.patch('workflows.frontend.workflows.status.StatusAdvertise')
 @mock.patch('workflows.frontend.workflows.transport')
 def test_start_service_in_frontend(mock_transport, mock_status, mock_mp):
-  '''Check that the service is being run and connected to the frontend properly via the correct pipes.'''
+  '''Check that the service is being run and connected to the frontend properly via the correct pipes,
+     and the status advertiser is being started in the background.'''
   mock_service = mock.Mock()
   mock_mp.Pipe.side_effect = [
       (mock.sentinel.pipe1, mock.sentinel.pipe2),
