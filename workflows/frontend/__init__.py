@@ -94,7 +94,7 @@ class Frontend():
        are processed and forwarded to the corresponding callback methods.'''
     self.log.info("Current service: " + str(self._service))
     n = 3600
-    while n > 0:
+    while n > 0 and not self.shutdown:
       if self._pipe_service and self._pipe_service.poll(1):
         try:
           message = self._pipe_service.recv()
