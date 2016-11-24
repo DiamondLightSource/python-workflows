@@ -61,6 +61,7 @@ class Frontend():
     self.log = logging.LoggerAdapter(
                    logging.getLogger('workflows.frontend'),
                    logadapter())
+    self.log.warn = self.log.warning # LoggerAdapter does not support .warn
 
     # Connect to the network transport layer
     if transport is None or isinstance(transport, basestring):
@@ -92,9 +93,10 @@ class Frontend():
   def run(self):
     '''The main loop of the frontend. Here incoming messages from the service
        are processed and forwarded to the corresponding callback methods.'''
-    self.log.info("Current service: " + str(self._service))
+    self.log.debug("Entered main loop")
     n = 3600
     while n > 0 and not self.shutdown:
+      # When a service is running, check for incoming messages from that service
       if self._pipe_service and self._pipe_service.poll(1):
         try:
           message = self._pipe_service.recv()
@@ -104,14 +106,14 @@ class Frontend():
               handler = getattr(self, 'parse_band_' + message['band'])
             except AttributeError:
               handler = None
-              self.log.warn("Unknown band " + str(message['band']))
+              self.log.warn("Unknown band %s", str(message['band']))
             if handler:
 #              try:
                 handler(message)
 #              except Exception:
 #                print 'Uh oh. What to do.'
           else:
-            self.log.warn("Invalid message received " + str(message))
+            self.log.warn("Invalid message received %s", str(message))
         except Queue.Empty:
           pass
       n = n - 1
@@ -130,7 +132,7 @@ class Frontend():
 
   def process_transport_command(self, header, message):
     '''Parse a command coming in through the transport command subscription'''
-    if message and message.get('command'):
+    if isinstance(message, dict) and message.get('command'):
       self.log.info('Received command \'%s\' via transport layer', message['command'])
       if message['command'] == 'shutdown':
         self.shutdown = True
@@ -214,6 +216,7 @@ class Frontend():
       self._service_name = service_instance.get_name()
       self._service.daemon = True
       self._service.start()
+    self.log.info("Started service: %s", self._service_name)
     return True
 
   def _terminate_service(self):
@@ -221,9 +224,12 @@ class Frontend():
        Disconnect queues, end queue feeder threads.
        Wait for service process to clear, drop all references.'''
     with self.__lock:
-      self._service.terminate()
-      self._pipe_commands.close()
-      self._pipe_service.close()
+      if self._service:
+        self._service.terminate()
+      if self._pipe_commands:
+        self._pipe_commands.close()
+      if self._pipe_service:
+        self._pipe_service.close()
       self._pipe_commands = None
       self._pipe_service = None
       self._service_name = None
@@ -231,7 +237,8 @@ class Frontend():
       if self._service_transportid:
         self._transport.drop_client(self._service_transportid)
       self._service_transportid = None
-      self._service.join() # must wait for process to be actually destroyed
+      if self._service:
+        self._service.join() # must wait for process to be actually destroyed
       self._service = None
 
 # ---- Transport calls -----------------------------------------------------
