@@ -126,9 +126,11 @@ class StompTransport(CommonTransport):
     return self._connected
 
   def disconnect(self):
+    '''Gracefully close connection to stomp server.'''
     with self._lock:
       if self._connected:
-        pass # TODO
+        self._conn.disconnect()
+        self._connected = False
 
   def broadcast_status(self, status, channel=None):
     '''Broadcast transient status information to all listeners'''

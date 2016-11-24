@@ -77,7 +77,19 @@ def test_instantiate_link_and_connect_to_broker(mockstomp):
 
   stomp.disconnect()
 
-  # TODO
+  mockstomp.Connection.assert_called_once()
+  mockconn.start.assert_called_once()
+  mockconn.connect.assert_called_once()
+  mockconn.disconnect.assert_called_once()
+  assert not stomp.is_connected()
+
+  stomp.disconnect()
+
+  mockstomp.Connection.assert_called_once()
+  mockconn.start.assert_called_once()
+  mockconn.connect.assert_called_once()
+  mockconn.disconnect.assert_called_once()
+  assert not stomp.is_connected()
 
 @mock.patch('workflows.transport.stomp_transport.time')
 @mock.patch('workflows.transport.stomp_transport.stomp')

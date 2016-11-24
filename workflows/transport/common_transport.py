@@ -36,6 +36,11 @@ class CommonTransport(object):
                 False-like value otherwise.'''
     return False
 
+  @staticmethod
+  def disconnect():
+    '''Gracefully disconnect the transport class. This function should be
+       overridden.'''
+
   def subscribe(self, channel, callback, **kwargs):
     '''Listen to a queue, notify via callback function.
        :param channel: Queue name to subscribe to
