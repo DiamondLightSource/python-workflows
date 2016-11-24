@@ -34,7 +34,7 @@ class ServiceStarter(object):
        it to the Frontend object.'''
 
   def run(self, cmdline_args=None, program_name='start_service',
-        version=workflows.version()):
+        version=workflows.version(), **kwargs):
     '''Example command line interface to start services.
        :param cmdline_args: List of command line arguments to pass to parser
        :param program_name: Name of the command line tool to display in help
@@ -82,6 +82,7 @@ class ServiceStarter(object):
     frontend = workflows.frontend.Frontend(
       service=options.service,
       transport=transport,
+      **kwargs
     )
 
     # Call on_frontend_preparation hook
