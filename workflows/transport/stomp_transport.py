@@ -153,13 +153,18 @@ class StompTransport(CommonTransport):
        :param channel: Queue name to subscribe to
        :param callback: Function to be called when messages are received
        :param **kwargs: Further parameters for the transport layer. For example
-              exclusive: Attempt to become exclusive subscriber to the queue.
               acknowledgement: If true receipt of each message needs to be
                                acknowledged.
+              exclusive: Attempt to become exclusive subscriber to the queue.
+              selector: Only receive messages filtered by a selector. See
+                   https://activemq.apache.org/activemq-message-properties.html
+                        for potential filter criteria. Uses SQL 92 syntax.
     '''
     headers = {}
     if kwargs.get('retroactive'):
       headers['activemq.retroactive'] = 'true'
+    if kwargs.get('selector'):
+      headers['selector'] = kwargs['selector']
     if kwargs.get('acknowledgement'):
       ack = 'client-individual'
       def callback_bounce(header, message):
