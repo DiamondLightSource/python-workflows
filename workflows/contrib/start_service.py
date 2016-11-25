@@ -41,8 +41,10 @@ class ServiceStarter(object):
        :param version: Version number to print when run with '--version'
     '''
 
-    # Set up parser
+    # Enumerate all known services
+    known_services = workflows.services.get_known_services()
 
+    # Set up parser
     parser = OptionParser(
       usage=program_name + ' [options]' if program_name else None,
       version=version
@@ -50,7 +52,7 @@ class ServiceStarter(object):
     parser.add_option("-?", action="help", help=SUPPRESS_HELP)
     parser.add_option("-s", "--service", dest="service", metavar="SVC",
       default=None, help="Name of the service to start. Known services: " + \
-        ", ".join(workflows.services.get_known_services()))
+        ", ".join(known_services))
     parser.add_option("-t", "--transport", dest="transport", metavar="TRN",
       default="StompTransport",
       help="Transport mechanism. Known mechanisms: " + \
@@ -59,27 +61,30 @@ class ServiceStarter(object):
     workflows.transport.add_command_line_options(parser)
 
     # Call on_parser_preparation hook
-
     parser = self.on_parser_preparation(parser) or parser
 
     # Parse command line options
-
     (options, args) = parser.parse_args(cmdline_args)
 
     # Call on_parsing hook
-
     (options, args) = retval = self.on_parsing(options, args) or (options, args)
 
     # Create Transport object
-
     transport = workflows.transport.lookup(options.transport)()
 
     # Call on_transport_preparation hook
-
     transport = self.on_transport_preparation(transport) or transport
 
-    # Create Frontend object
+    # When service name is specified, check if service exists or can be derived
+    if options.service and options.service not in known_services:
+      matching = [ s for s in known_services if s.startswith(options.service) ]
+      if not matching:
+        matching = [ s for s in known_services
+                     if s.lower().startswith(options.service.lower()) ]
+      if matching and len(matching) == 1:
+        options.service = matching[0]
 
+    # Create Frontend object
     frontend = workflows.frontend.Frontend(
       service=options.service,
       transport=transport,
@@ -87,11 +92,9 @@ class ServiceStarter(object):
     )
 
     # Call on_frontend_preparation hook
-
     frontend = self.on_frontend_preparation(frontend) or frontend
 
     # Start Frontend
-
     frontend.run()
 
 if __name__ == '__main__':  # pragma: no cover
