@@ -170,7 +170,7 @@ def test_log_unknown_band_data():
   assert messages[1].name == 'workflows.service'
   assert 'without band' in messages[1].message
 
-def test_service_initialization_crashes_are_handlerd_correctly():
+def test_service_initialization_crashes_are_handled_correctly():
   '''Log messages should be passed to frontend'''
   fe_pipe = mock.Mock()
 
@@ -191,8 +191,7 @@ def test_service_initialization_crashes_are_handlerd_correctly():
   fe_pipe.send.assert_called()
 
   # Service status should have been set to ERROR
-  assert any(c[0][0] == { 'band': 'status_update', 'statuscode': service.SERVICE_STATUS_ERROR } \
-             for c in fe_pipe.send.call_args_list)
+  fe_pipe.send.assert_any_call({ 'band': 'status_update', 'statuscode': service.SERVICE_STATUS_ERROR })
 
   # Traceback should have been sent to log
   log_msgs = filter(lambda c: c[0][0] == { 'band': 'log', 'payload': mock.ANY } and c[0][0]['payload'].levelname == 'CRITICAL', \
@@ -202,3 +201,22 @@ def test_service_initialization_crashes_are_handlerd_correctly():
   assert 'This crash needs to be handled' in log.exc_text
   assert 'initializing' in log.exc_text
   assert 'test_common_service' in log.exc_text
+
+def test_service_can_change_name_and_shut_itself_down():
+  '''Name changes should be passed to frontend'''
+  fe_pipe = mock.Mock()
+
+  class NameChangingService(CommonService):
+    '''Helper class to test name changing.'''
+    def initializing(self):
+      '''Change name.'''
+      self._set_name(mock.sentinel.newname)
+      self._shutdown()
+  service = NameChangingService(frontend=fe_pipe)
+  service.start()
+
+  print fe_pipe.send.call_args
+  # Check for service name update
+  fe_pipe.send.assert_any_call({ 'band': 'set_name', 'name': mock.sentinel.newname })
+  # Service should have shut down cleanly
+  fe_pipe.send.assert_any_call({ 'band': 'status_update', 'statuscode': service.SERVICE_STATUS_END })

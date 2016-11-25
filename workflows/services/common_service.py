@@ -135,9 +135,17 @@ class CommonService(object):
     })
 
   def get_name(self):
-    '''Return a name for this service.
-       Change the name by overwriting self._service_name.'''
+    '''Get the name for this service.'''
     return self._service_name
+
+  def _set_name(self, name):
+    '''Set a new name for this service, and notify the frontend accordingly.'''
+    self._service_name = name
+    self.__send_to_frontend({ 'band': 'set_name', 'name': self._service_name })
+
+  def _shutdown(self):
+    '''Terminate the service.'''
+    self.__shutdown = True
 
   def initialize_logging(self):
     '''Reset the logging for the service process. All logged messages are
