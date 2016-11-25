@@ -162,6 +162,8 @@ class StompTransport(CommonTransport):
                         for potential filter criteria. Uses SQL 92 syntax.
     '''
     headers = {}
+    if kwargs.get('exclusive'):
+      headers['activemq.exclusive'] = 'true'
     if kwargs.get('retroactive'):
       headers['activemq.retroactive'] = 'true'
     if kwargs.get('selector'):
