@@ -49,12 +49,13 @@ class ServiceStarter(object):
     )
     parser.add_option("-?", action="help", help=SUPPRESS_HELP)
     parser.add_option("-s", "--service", dest="service", metavar="SVC",
-      default=None, help="Name of the service to start. Known services: %s" % \
+      default=None, help="Name of the service to start. Known services: " + \
         ", ".join(workflows.services.get_known_services()))
     parser.add_option("-t", "--transport", dest="transport", metavar="TRN",
       default="StompTransport",
-      help="Transport mechanism. Known mechanisms: %s (default: %%default)" % \
-        ", ".join(workflows.transport.get_known_transports()))
+      help="Transport mechanism. Known mechanisms: " + \
+           ", ".join(workflows.transport.get_known_transports()) + \
+           " (default: %%default)")
     workflows.transport.add_command_line_options(parser)
 
     # Call on_parser_preparation hook

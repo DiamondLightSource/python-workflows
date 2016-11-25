@@ -84,7 +84,7 @@ class StompTransport(CommonTransport):
       action='callback', callback=cls._set_parameter)
     optparser.add_option('--stomp-pass', metavar='PASS',
       default=cls.defaults.get('--stomp-pass'),
-      help="Stomp password, default '%default'",
+      help="Stomp password",
       type='string', nargs=1,
       action='callback', callback=cls._set_parameter)
     optparser.add_option('--stomp-prfx', metavar='PRE',

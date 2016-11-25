@@ -48,7 +48,7 @@ def test_forward_send_call():
 
   qt.send(destination=mock.sentinel.destination,
              message=str(mock.sentinel.message),
-	     headers=mock.sentinel.header)
+             headers=mock.sentinel.header)
 
   mockfunc.assert_called_with({
     'band': 'transport',
@@ -65,7 +65,7 @@ def test_forward_broadcast_call():
 
   qt.broadcast(destination=mock.sentinel.destination,
              message=str(mock.sentinel.message),
-	     headers=mock.sentinel.header)
+             headers=mock.sentinel.header)
 
   mockfunc.assert_called_once_with({
     'band': 'transport',

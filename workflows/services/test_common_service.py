@@ -180,7 +180,8 @@ def test_service_initialization_crashes_are_handlerd_correctly():
     _service_name = "Crashservice 1"
     _logger_name = "workflows.service.crash_on_init"
 
-    def initializing(self):
+    @staticmethod
+    def initializing():
       '''Crash.'''
       assert False, 'This crash needs to be handled'
 
