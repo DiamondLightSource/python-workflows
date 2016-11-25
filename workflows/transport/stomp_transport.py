@@ -117,7 +117,7 @@ class StompTransport(CommonTransport):
         wait=True)
       self._namespace = \
         self.config.get('--stomp-prfx', self.defaults.get('--stomp-prfx'))
-      if self._namespace:
+      if self._namespace and not self._namespace.endswith('.'):
         self._namespace = self._namespace + '.'
       self._connected = True
     return True

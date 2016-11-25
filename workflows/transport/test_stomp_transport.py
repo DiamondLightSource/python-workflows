@@ -20,7 +20,7 @@ def test_add_command_line_help():
 
   StompTransport().add_command_line_options(parser)
 
-  assert parser.add_option.called
+  parser.add_option.assert_called()
   assert parser.add_option.call_count > 4
   for call in parser.add_option.call_args_list:
     assert call[1]['action'] == 'callback'
@@ -52,6 +52,10 @@ def test_check_config_file_behaviour(mockstomp):
   mockstomp.Connection.assert_called_once_with([('localhost', 1234)])
   mockconn.connect.assert_called_once_with(mock.sentinel.user, 'somesecret', wait=True)
   assert stomp.get_namespace() == 'namespace'
+
+  # Loading a non-existing configuration file
+  with pytest.raises(workflows.WorkflowsError):
+    parser.parse_args(['--stomp-conf', ''])
 
 @mock.patch('workflows.transport.stomp_transport.stomp')
 def test_instantiate_link_and_connect_to_broker(mockstomp):
@@ -236,11 +240,11 @@ def test_subscribe_to_queue(mockstomp):
   assert args == ('/queue/' + str(mock.sentinel.channel1), 1)
   assert kwargs == { 'headers': {}, 'ack': 'auto' }
 
-  stomp._subscribe(2, str(mock.sentinel.channel2), mock_cb2, retroactive=True, selector=mock.sentinel.selector)
+  stomp._subscribe(2, str(mock.sentinel.channel2), mock_cb2, retroactive=True, selector=mock.sentinel.selector, exclusive=True)
   assert mockconn.subscribe.call_count == 2
   args, kwargs = mockconn.subscribe.call_args
   assert args == ('/queue/' + str(mock.sentinel.channel2), 2)
-  assert kwargs == { 'headers': {'activemq.retroactive':'true', 'selector': mock.sentinel.selector}, 'ack': 'auto' }
+  assert kwargs == { 'headers': {'activemq.retroactive':'true', 'selector':mock.sentinel.selector, 'activemq.exclusive':'true'}, 'ack': 'auto' }
 
   assert mock_cb1.call_count == 0
   listener.on_message({'subscription': 1}, mock.sentinel.message1)
@@ -346,9 +350,14 @@ def test_nack_message(mockstomp):
 @mock.patch('workflows.transport.stomp_transport.stomp')
 def test_namespace_is_used_correctly(mockstomp):
   '''Test that a configured namespace is correctly used when subscribing and sending messages.'''
-  StompTransport.defaults['--stomp-prfx'] = 'ns'
-  stomp = StompTransport()
   mockconn = mockstomp.Connection.return_value
+  StompTransport.defaults['--stomp-prfx'] = ''
+  stomp = StompTransport()
+  stomp.connect()
+  assert stomp.get_namespace() == ''
+
+  StompTransport.defaults['--stomp-prfx'] = 'ns.'
+  stomp = StompTransport()
   stomp.connect()
   assert stomp.get_namespace() == 'ns'
 
@@ -356,8 +365,16 @@ def test_namespace_is_used_correctly(mockstomp):
   mockconn.send.assert_called_once()
   assert mockconn.send.call_args[0] == ('/queue/ns.some_queue', mock.sentinel.message1)
 
-# stomp._broadcast( 'some_topic', mock.sentinel.message2 )
-# assert mockconn.send.call_args[0] == ('/topic/ns.some_topic', mock.sentinel.message2)
+  StompTransport.defaults['--stomp-prfx'] = 'ns'
+  stomp = StompTransport()
+  stomp.connect()
+  assert stomp.get_namespace() == 'ns'
+
+  stomp._send( 'some_queue', mock.sentinel.message1 )
+  assert mockconn.send.call_args[0] == ('/queue/ns.some_queue', mock.sentinel.message1)
+
+  stomp._broadcast( 'some_topic', mock.sentinel.message2 )
+  assert mockconn.send.call_args[0] == ('/topic/ns.some_topic', mock.sentinel.message2)
 
   stomp._subscribe( 1, 'sub_queue', None )
   mockconn.subscribe.assert_called_once()
