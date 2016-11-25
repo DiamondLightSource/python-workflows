@@ -1,5 +1,6 @@
 from __future__ import absolute_import, division
 import ConfigParser
+import json
 import stomp
 import threading
 import time
@@ -283,6 +284,26 @@ class StompTransport(CommonTransport):
     with self._lock:
       self._conn.nack(message_id, subscription_id, **kwargs)
 
+  @staticmethod
+  def _mangle_for_sending(message):
+    '''Function that any message will pass through before it being forwarded to
+       the actual _send* functions.
+       Stomp only deals with serialized strings, so serialize message as json.
+    '''
+    return json.dumps(message)
+
+  @staticmethod
+  def _mangle_for_receiving(message):
+    '''Function that any message will pass through before it being forwarded to
+       the receiving subscribed callback functions.
+       This transport class only deals with serialized strings, so decode
+       message from json. However anything can come into here, so catch any
+       deserialization errors.
+    '''
+    try:
+      return json.loads(message)
+    except (TypeError, ValueError):
+      return message
 
 ## Stomp listener methods #####################################################
 

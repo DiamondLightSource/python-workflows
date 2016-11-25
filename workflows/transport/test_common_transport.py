@@ -22,8 +22,8 @@ def test_subscribe_unsubscribe_a_channel():
         exclusive=mock.sentinel.exclusive,
         acknowledgement=mock.sentinel.ack)
   callback = ct._subscribe.call_args[0][2]
-  callback(mock.sentinel.header, '"asdf"')
-  mock_callback.assert_called_once_with(mock.sentinel.header, 'asdf')
+  callback(mock.sentinel.header, mock.sentinel.message)
+  mock_callback.assert_called_once_with(mock.sentinel.header, mock.sentinel.message)
 
   ct.unsubscribe(subid)
 
@@ -47,8 +47,8 @@ def test_simple_subscribe_unsubscribe_a_broadcast():
   ct._subscribe_broadcast.assert_called_once_with(subid, mock.sentinel.channel,
         mock.ANY, retroactive=mock.sentinel.retro)
   callback = ct._subscribe_broadcast.call_args[0][2]
-  callback(mock.sentinel.header, '"asdf"')
-  mock_callback.assert_called_once_with(mock.sentinel.header, 'asdf')
+  callback(mock.sentinel.header, mock.sentinel.message)
+  mock_callback.assert_called_once_with(mock.sentinel.header, mock.sentinel.message)
 
   ct.unsubscribe(subid)
 
@@ -57,48 +57,44 @@ def test_simple_subscribe_unsubscribe_a_broadcast():
     ct.subscription_callback(subid)
 
 def test_simple_send_message():
-  """Pass string and object messages to send(), should be serialized and
-     routed to specific _send()"""
+  """Pass messages to send(), should be routed to specific _send()"""
   ct = CommonTransport()
   ct._send = mock.Mock()
 
-  ct.send(mock.sentinel.destination, str(mock.sentinel.message),
+  ct.send(mock.sentinel.destination, mock.sentinel.message,
         headers=mock.sentinel.headers,
         expiration=mock.sentinel.expiration,
         transaction=mock.sentinel.transaction,
         something=mock.sentinel.something)
 
   ct._send.assert_called_once_with(mock.sentinel.destination,
-        '"' + str(mock.sentinel.message) + '"', headers=mock.sentinel.headers,
+        mock.sentinel.message, headers=mock.sentinel.headers,
         expiration=mock.sentinel.expiration,
         transaction=mock.sentinel.transaction,
         something=mock.sentinel.something)
 
-  ct.send(mock.sentinel.destination, { 'entry': [ 0, 'banana' ] })
+  ct.send(mock.sentinel.destination, mock.sentinel.message)
 
-  ct._send.assert_called_with(mock.sentinel.destination,
-        '{"entry": [0, "banana"]}')
+  ct._send.assert_called_with(mock.sentinel.destination, mock.sentinel.message)
 
 def test_simple_broadcast_message():
-  """Pass string and object messages to broadcast(), should be serialized and
-     routed to specific _broadcast()"""
+  """Pass messages to broadcast(), should be routed to specific _broadcast()"""
 
   ct = CommonTransport()
   ct._broadcast = mock.Mock()
 
-  ct.broadcast(mock.sentinel.destination, str(mock.sentinel.message),
+  ct.broadcast(mock.sentinel.destination, mock.sentinel.message,
         headers=mock.sentinel.headers, expiration=mock.sentinel.expiration,
         transaction=mock.sentinel.transaction)
 
   ct._broadcast.assert_called_once_with(mock.sentinel.destination,
-        '"' + str(mock.sentinel.message) + '"', headers=mock.sentinel.headers,
+        mock.sentinel.message, headers=mock.sentinel.headers,
         expiration=mock.sentinel.expiration,
         transaction=mock.sentinel.transaction)
 
-  ct.broadcast(mock.sentinel.destination, { 'entry': [ 0, 'banana' ] })
+  ct.broadcast(mock.sentinel.destination, mock.sentinel.message)
 
-  ct._broadcast.assert_called_with(mock.sentinel.destination,
-        '{"entry": [0, "banana"]}')
+  ct._broadcast.assert_called_with(mock.sentinel.destination, mock.sentinel.message)
 
 def test_register_and_drop_clients():
   "Register clients, should get unique IDs, unregister clients."

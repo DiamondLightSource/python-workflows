@@ -152,6 +152,71 @@ def test_send_broadcast(mockstomp):
   assert kwargs == { 'headers': mock.sentinel.headers }
 
 @mock.patch('workflows.transport.stomp_transport.stomp')
+def test_messages_are_serialized_for_transport(mockstomp):
+  '''Test the message serialization.'''
+  banana = { 'entry': [ 0, 'banana' ] }
+  banana_str = '{"entry": [0, "banana"]}'
+  stomp = StompTransport()
+  stomp.connect()
+  mockconn = mockstomp.Connection.return_value
+
+  stomp.send(str(mock.sentinel.channel1), banana)
+  mockconn.send.assert_called_once()
+  args, kwargs = mockconn.send.call_args
+  assert args == ('/queue/' + str(mock.sentinel.channel1), banana_str)
+
+  stomp.broadcast(str(mock.sentinel.channel2), banana)
+  args, kwargs = mockconn.send.call_args
+  assert args == ('/topic/' + str(mock.sentinel.channel2), banana_str)
+
+  with pytest.raises(Exception):
+    stomp.send(str(mock.sentinel.channel), mock.sentinel.unserializable)
+
+@mock.patch('workflows.transport.stomp_transport.stomp')
+def test_messages_are_deserialized_after_transport(mockstomp):
+  '''Test the message serialization.'''
+  banana = { 'entry': [ 0, 'banana' ] }
+  banana_str = '{"entry": [0, "banana"]}'
+  stomp = StompTransport()
+  stomp.connect()
+  mockconn = mockstomp.Connection.return_value
+  message_handler = mockconn.set_listener.call_args[0][1].on_message
+
+  # Test subscriptions
+  callback = mock.Mock()
+  stomp.subscribe('channel', callback)
+  subscription_id = mockconn.subscribe.call_args[0][1]
+  message_handler({'subscription': subscription_id}, banana_str)
+  callback.assert_called_once_with({'subscription': subscription_id}, banana)
+
+  message_handler({'subscription': subscription_id}, mock.sentinel.undeserializable)
+  callback.assert_called_with({'subscription': subscription_id}, mock.sentinel.undeserializable)
+
+  # Test broadcast subscriptions
+  callback = mock.Mock()
+  stomp.subscribe_broadcast('channel', callback)
+  subscription_id = mockconn.subscribe.call_args[0][1]
+  message_handler({'subscription': subscription_id}, banana_str)
+  callback.assert_called_once_with({'subscription': subscription_id}, banana)
+
+  message_handler({'subscription': subscription_id}, mock.sentinel.undeserializable)
+  callback.assert_called_with({'subscription': subscription_id}, mock.sentinel.undeserializable)
+
+  # Test subscriptions with mangling disabled
+  callback = mock.Mock()
+  stomp.subscribe('channel', callback, disable_mangling=True)
+  subscription_id = mockconn.subscribe.call_args[0][1]
+  message_handler({'subscription': subscription_id}, banana_str)
+  callback.assert_called_once_with({'subscription': subscription_id}, banana_str)
+
+  # Test broadcast subscriptions with mangling disabled
+  callback = mock.Mock()
+  stomp.subscribe_broadcast('channel', callback, disable_mangling=True)
+  subscription_id = mockconn.subscribe.call_args[0][1]
+  message_handler({'subscription': subscription_id}, banana_str)
+  callback.assert_called_once_with({'subscription': subscription_id}, banana_str)
+
+@mock.patch('workflows.transport.stomp_transport.stomp')
 def test_subscribe_to_queue(mockstomp):
   '''Test subscribing to a queue (producer-consumer) and callback functions.'''
   mock_cb1 = mock.Mock()

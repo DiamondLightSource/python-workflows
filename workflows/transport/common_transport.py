@@ -1,5 +1,4 @@
 from __future__ import absolute_import, division
-import json
 import logging
 import workflows
 
@@ -51,6 +50,7 @@ class CommonTransport(object):
               client_id: Value tying a subscription to one client. This allows
                          removing all subscriptions for a client simultaneously
                          when the client goes away.
+              disable_mangling: Receive messages as unprocessed strings.
               exclusive: Attempt to become exclusive subscriber to the queue.
               acknowledgement: If true receipt of each message needs to be
                                acknowledged.
@@ -69,9 +69,12 @@ class CommonTransport(object):
       self.__clients[kwargs['client_id']]['subscriptions'].add \
         (self.__subscription_id)
       del(kwargs['client_id'])
-    def callback_bounce(header, message):
-      callback(header, self._mangle_for_receiving(message))
-    self._subscribe(self.__subscription_id, channel, callback_bounce, **kwargs)
+    if kwargs.get('disable_mangling'):
+      self._subscribe(self.__subscription_id, channel, callback, **kwargs)
+    else:
+      def callback_bounce(header, message):
+        callback(header, self._mangle_for_receiving(message))
+      self._subscribe(self.__subscription_id, channel, callback_bounce, **kwargs)
     return self.__subscription_id
 
   def unsubscribe(self, subscription, **kwargs):
@@ -98,6 +101,7 @@ class CommonTransport(object):
                          removing all subscriptions for a client simultaneously
                          when the client goes away.
        :param **kwargs: Further parameters for the transport layer. For example
+              disable_mangling: Receive messages as unprocessed strings.
               retroactive: Ask broker to send old messages if possible
        :return: A unique subscription ID
     '''
@@ -112,10 +116,14 @@ class CommonTransport(object):
       self.__clients[kwargs['client_id']]['subscriptions'].add \
         (self.__subscription_id)
       del(kwargs['client_id'])
-    def callback_bounce(header, message):
-      callback(header, self._mangle_for_receiving(message))
-    self._subscribe_broadcast(self.__subscription_id, channel,
-        callback_bounce, **kwargs)
+    if kwargs.get('disable_mangling'):
+      self._subscribe_broadcast(self.__subscription_id, channel,
+          callback, **kwargs)
+    else:
+      def callback_bounce(header, message):
+        callback(header, self._mangle_for_receiving(message))
+      self._subscribe_broadcast(self.__subscription_id, channel,
+          callback_bounce, **kwargs)
     return self.__subscription_id
 
   def subscription_callback(self, subscription):
@@ -409,13 +417,21 @@ class CommonTransport(object):
   # -- Internal message mangling functions -----------------------------------
   #
 
+  # Some transport mechanisms will not be able to work with arbitrary objects,
+  # so these functions are used to prepare a message for sending/receiving.
+  # The canonical example is serialization/deserialization, see stomp_transport
+
   @staticmethod
   def _mangle_for_sending(message):
-    return json.dumps(message)
+    '''Function that any message will pass through before it being forwarded to
+       the actual _send* functions.'''
+    return message
 
   @staticmethod
   def _mangle_for_receiving(message):
-    return json.loads(message)
+    '''Function that any message will pass through before it being forwarded to
+       the receiving subscribed callback functions.'''
+    return message
 
   #
   # -- Plugin-related function -----------------------------------------------
