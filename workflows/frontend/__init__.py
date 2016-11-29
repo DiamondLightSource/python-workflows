@@ -42,7 +42,7 @@ class Frontend():
     self.shutdown = False
 
     # Set up logging
-    class logadapter():
+    class LogAdapter():
       '''A helper class that acts like a dictionary, but actually reads its
          values from the get_status() function.'''
       status_fn = self.get_status
@@ -60,7 +60,7 @@ class Frontend():
         return self.status.__getitem__(key)
     self.log = logging.LoggerAdapter(
                    logging.getLogger('workflows.frontend'),
-                   logadapter())
+                   LogAdapter())
     self.log.warn = self.log.warning # LoggerAdapter does not support .warn
 
     # Connect to the network transport layer
