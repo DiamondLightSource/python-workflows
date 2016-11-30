@@ -27,6 +27,10 @@ class CommonService(object):
 
   _logger_name = 'workflows.service'  # The logger can be accessed via self.log
 
+  # Broadcast service status on every status change ---------------------------
+
+  _broadcast_status_on_change = True  # Disables rapid status change broadcasts
+
   # Overrideable functions ----------------------------------------------------
 
   def initializing(self):
@@ -127,13 +131,14 @@ class CommonService(object):
     self._idle_callback = callback
     self._idle_time = idle_time
 
-  def __update_service_status(self, statuscode):
+  def __update_service_status(self, statuscode, trigger=True):
     '''Set the internal status of the service object, and notify frontend.'''
     if self.__service_status != statuscode:
       self.__service_status = statuscode
       self.__send_to_frontend({
         'band': 'status_update',
-        'statuscode': self.__service_status
+        'statuscode': self.__service_status,
+        'trigger_update': trigger
       })
 
   def get_name(self):
@@ -196,7 +201,8 @@ class CommonService(object):
         self.__shutdown = True
 
       while not self.__shutdown: # main loop
-        self.__update_service_status(self.SERVICE_STATUS_IDLE)
+        self.__update_service_status(self.SERVICE_STATUS_IDLE,
+                                     trigger=self._broadcast_status_on_change)
 
         if self._idle_time is None:
           message = self.__pipe_commands.recv()
@@ -204,12 +210,14 @@ class CommonService(object):
           if self.__pipe_commands.poll(self._idle_time):
             message = self.__pipe_commands.recv()
           else:
-            self.__update_service_status(self.SERVICE_STATUS_TIMER)
+            self.__update_service_status(self.SERVICE_STATUS_TIMER,
+                                     trigger=self._broadcast_status_on_change)
             if self._idle_callback is not None:
               self._idle_callback()
             continue
 
-        self.__update_service_status(self.SERVICE_STATUS_PROCESSING)
+        self.__update_service_status(self.SERVICE_STATUS_PROCESSING,
+                                     trigger=self._broadcast_status_on_change)
 
         if message and 'band' in message:
           processor = self.__callback_register.get(message['band'])
