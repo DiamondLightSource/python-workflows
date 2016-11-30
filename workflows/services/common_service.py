@@ -97,6 +97,7 @@ class CommonService(object):
     self._transport.connect()
     self.__shutdown = False
     self.__callback_register = {}
+    self.__service_status = None
     self.__update_service_status(self.SERVICE_STATUS_NEW)
     self._idle_callback = None
     self._idle_time = None
@@ -128,11 +129,12 @@ class CommonService(object):
 
   def __update_service_status(self, statuscode):
     '''Set the internal status of the service object, and notify frontend.'''
-    self.__service_status = statuscode
-    self.__send_to_frontend({
-      'band': 'status_update',
-      'statuscode': self.__service_status
-    })
+    if self.__service_status != statuscode:
+      self.__service_status = statuscode
+      self.__send_to_frontend({
+        'band': 'status_update',
+        'statuscode': self.__service_status
+      })
 
   def get_name(self):
     '''Get the name for this service.'''
