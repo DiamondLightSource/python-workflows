@@ -126,6 +126,52 @@ def test_connect_queue_communication_to_transport_layer(mock_status):
     } )
 
 @mock.patch('workflows.frontend.workflows.status.StatusAdvertise')
+@pytest.mark.timeout(3)
+def test_frontend_can_handle_unhandled_service_initialization_exceptions(mock_status):
+  '''When a service crashes on initialization an exception should be thrown.'''
+  transport = mock.Mock()
+
+  class CrashServiceNicelyOnInit(CommonService):
+    '''A service that crashes python 2.7 with a segmentation fault.'''
+    def initializing(self):
+      '''Raise AssertionError.
+         This should set the error state, kill the service and cause the frontend
+         to leave its main loop.'''
+      assert False # pragma: no cover
+#   self._register_idle(1, self.kill_service)
+
+  fe = workflows.frontend.Frontend(transport=transport, service=CrashServiceNicelyOnInit)
+  transport = transport.return_value
+  transport.connect.assert_called_once()
+
+  with pytest.raises(workflows.WorkflowsError):
+    fe.run()
+
+@mock.patch('workflows.frontend.workflows.status.StatusAdvertise')
+@mock.patch('workflows.frontend.multiprocessing')
+def test_frontend_can_handle_service_initialization_segfaults(mock_mp, mock_status):
+  '''When a service crashes on initialization an exception should be thrown.'''
+  transport = mock.Mock()
+  service = mock.Mock()
+  service_process = mock.Mock()
+  dummy_pipe = mock.Mock()
+  dummy_pipe.poll.return_value = False
+  mock_mp.Pipe.return_value = (dummy_pipe, dummy_pipe)
+  mock_mp.Process.return_value = service_process
+  service_process.is_alive.return_value = False # Dead on arrival
+
+  fe = workflows.frontend.Frontend(transport=transport, service=service)
+  transport = transport.return_value
+  transport.connect.assert_called_once()
+  mock_mp.Process.assert_called_once_with(target=service.return_value.start, args=())
+
+  with pytest.raises(workflows.WorkflowsError):
+    fe.run()
+  service_process.start.assert_called()
+  service_process.is_alive.assert_called()
+  service_process.join.assert_called()
+
+@mock.patch('workflows.frontend.workflows.status.StatusAdvertise')
 @mock.patch('workflows.frontend.multiprocessing')
 def test_frontend_terminates_on_transport_disconnection(mock_mp, mock_status):
   '''When the transport connection is lost permanently, the frontend should stop.'''

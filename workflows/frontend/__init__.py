@@ -39,7 +39,7 @@ class Frontend():
     self._pipe_service = None  # frontend <- service
     self._service_status = CommonService.SERVICE_STATUS_NONE
 
-    self.restart_service = True
+    self.restart_service = False
     self.shutdown = False
 
     # Set up logging
@@ -80,6 +80,7 @@ class Frontend():
       self.log.debug('Listening for commands on transport layer')
 
     # Start initial service if one has been requested
+    self._service_factory = service
     if service is not None:
       self._service_status = CommonService.SERVICE_STATUS_NEW
       self.switch_service(service)
@@ -117,6 +118,39 @@ class Frontend():
             self.log.warn("Invalid message received %s", str(message))
         except Queue.Empty:
           pass
+
+      # Check that the service is alive
+      with self.__lock:
+        if self._service and \
+           not self._service.is_alive() and \
+           not self._pipe_service.poll():
+          if self._service_status == CommonService.SERVICE_STATUS_END:
+            self.log.info("Service terminated")
+          else:
+            if self._service_status in (CommonService.SERVICE_STATUS_NONE,
+                                        CommonService.SERVICE_STATUS_NEW,
+                                        CommonService.SERVICE_STATUS_STARTING):
+              error_message = 'Service may have died unexpectedly in ' \
+                            + 'initialization (last known status: %s)' \
+                                % CommonService.human_readable_state[ \
+                                      self._service_status]
+              self.log.error(error_message)
+              self._terminate_service()
+              raise workflows.WorkflowsError(error_message)
+            else:
+              self.log.warn("Service may have died unexpectedly" \
+                            " (last known status: %s" \
+                            % CommonService.human_readable_state[ \
+                                      self._service_status])
+          self._terminate_service()
+          if not self.restart_service:
+            self.shutdown = True
+
+      with self.__lock:
+        if self._service is None and self.restart_service and self._service_factory:
+          self._service_status = CommonService.SERVICE_STATUS_NEW
+          self.switch_service(self._service_factory)
+
       n = n - 1
 
       # Check if service crash was detected
@@ -133,6 +167,11 @@ class Frontend():
     self._status_advertiser.trigger()
     self._terminate_service()
     self.log.info("Fin. Terminating.")
+
+  def stop(self):
+    self._terminate_service()
+    self._status_advertiser.stop_and_wait()
+    self._transport_disconnect()
 
   def send_command(self, command):
     '''Send command to service via the command queue.'''
@@ -160,6 +199,14 @@ class Frontend():
       self.log.warn("Received broken record on log band\nMessage: %s\nRecord: %s",
                     str(message),
                     str(hasattr(message.get('payload'), '__dict__') and message['payload'].__dict__))
+
+  def parse_band_set_name(self, message):
+    '''Process incoming message indicating service name change.'''
+    if message.get('name'):
+      self._service_name = message['name']
+    else:
+      self.log.warn("Received broken record on set_name band\nMessage: %s",
+                    str(message))
 
   def parse_band_status_update(self, message):
     '''Process incoming status updates from the service.'''
