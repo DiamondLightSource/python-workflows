@@ -4,6 +4,7 @@ import multiprocessing
 import Queue
 import threading
 import time
+import workflows
 import workflows.services
 from workflows.services.common_service import CommonService
 import workflows.status
@@ -118,10 +119,19 @@ class Frontend():
           pass
       n = n - 1
 
+      # Check if service crash was detected
+      if self._service_status == CommonService.SERVICE_STATUS_ERROR:
+        self._terminate_service()
+        raise workflows.WorkflowsError('A service crash was detected')
+
+      # Check that the transport is alive
+      if not self._transport.is_connected():
+        self._terminate_service()
+        raise workflows.WorkflowsError('Lost transport layer connection')
+
     self._service_status = CommonService.SERVICE_STATUS_TEARDOWN
     self._status_advertiser.trigger()
     self._terminate_service()
-    self._status_advertiser.stop_and_wait()
     self.log.info("Fin. Terminating.")
 
   def send_command(self, command):

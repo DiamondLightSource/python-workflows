@@ -301,6 +301,9 @@ def test_messages_are_not_rejected_when_client_goes_away_with_committed_ack():
 @pytest.mark.skip(reason="TODO")
 def test_messages_are_not_rejected_when_client_goes_away_with_committed_nack():
   pass
+@pytest.mark.skip(reason="TODO")
+def test_messages_are_not_rejected_when_client_goes_away_with_subscription_without_acks():
+  pass
 
 def test_unimplemented_communication_methods_should_fail():
   '''Check that low-level communication calls raise WorkflowsError when not

@@ -215,7 +215,6 @@ def test_service_can_change_name_and_shut_itself_down():
   service = NameChangingService(frontend=fe_pipe)
   service.start()
 
-  print fe_pipe.send.call_args
   # Check for service name update
   fe_pipe.send.assert_any_call({ 'band': 'set_name', 'name': mock.sentinel.newname })
   # Service should have shut down cleanly

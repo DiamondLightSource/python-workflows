@@ -1,6 +1,9 @@
 from __future__ import absolute_import, division
-import workflows.frontend
+from workflows.services.common_service import CommonService
 import mock
+import multiprocessing
+import pytest
+import workflows.frontend
 
 @mock.patch('workflows.frontend.multiprocessing')
 @mock.patch('workflows.frontend.workflows.status.StatusAdvertise')
@@ -121,3 +124,28 @@ def test_connect_queue_communication_to_transport_layer(mock_status):
           'message': mock.sentinel.message,
         }
     } )
+
+@mock.patch('workflows.frontend.workflows.status.StatusAdvertise')
+@mock.patch('workflows.frontend.multiprocessing')
+def test_frontend_terminates_on_transport_disconnection(mock_mp, mock_status):
+  '''When the transport connection is lost permanently, the frontend should stop.'''
+  transport = mock.Mock()
+  service = mock.Mock()
+  service_process = mock.Mock()
+  dummy_pipe = mock.Mock()
+  dummy_pipe.poll.side_effect = [ False, Exception('Frontend did not terminate on transport disconnect') ]
+  mock_mp.Pipe.return_value = (dummy_pipe, dummy_pipe)
+  mock_mp.Process.return_value = service_process
+  service_process.is_alive.return_value = True
+
+  fe = workflows.frontend.Frontend(transport=transport, service=service)
+  transport = transport.return_value
+  transport.connect.assert_called_once()
+  transport.is_connected.return_value = False
+  mock_mp.Process.assert_called_once_with(target=service.return_value.start, args=())
+
+  with pytest.raises(workflows.WorkflowsError):
+    fe.run()
+
+  service_process.terminate.assert_called()
+  service_process.join.assert_called()

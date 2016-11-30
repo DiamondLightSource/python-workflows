@@ -213,9 +213,13 @@ class StompTransport(CommonTransport):
       headers = {}
     destination = '/queue/' + self._namespace + destination
     with self._lock:
-      self._conn.send(
+      try:
+        self._conn.send(
           destination, message,
           headers=headers, **kwargs)
+      except stomp.exception.NotConnectedException:
+        self._connected = False
+        raise
 
   def _broadcast(self, destination, message, **kwargs):
     '''Broadcast a message.
@@ -234,9 +238,13 @@ class StompTransport(CommonTransport):
       headers = {}
     destination = '/topic/' + self._namespace + destination
     with self._lock:
-      self._conn.send(
+      try:
+        self._conn.send(
           destination, message,
           headers=headers, **kwargs)
+      except stomp.exception.NotConnectedException:
+        self._connected = False
+        raise
 
   def _transaction_begin(self, transaction_id, **kwargs):
     '''Start a new transaction.

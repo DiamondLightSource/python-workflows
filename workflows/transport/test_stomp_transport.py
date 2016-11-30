@@ -6,6 +6,7 @@ import mock
 import optparse
 import os
 import pytest
+import stomp as stomppy
 
 def test_lookup_and_initialize_stomp_transport_layer():
   '''Find the stomp transport layer via the lookup mechanism and run
@@ -136,6 +137,19 @@ def test_send_message(mockstomp):
   assert kwargs == { 'headers': mock.sentinel.headers }
 
 @mock.patch('workflows.transport.stomp_transport.stomp')
+def test_error_handling_on_send(mockstomp):
+  '''Unrecoverable errors during sending should mark the connection as disconnected.'''
+  stomp = StompTransport()
+  stomp.connect()
+  mockconn = mockstomp.Connection.return_value
+  mockconn.send.side_effect = stomppy.exception.NotConnectedException()
+  mockstomp.exception = stomppy.exception
+
+  with pytest.raises(stomppy.exception.NotConnectedException):
+    stomp._send( str(mock.sentinel.channel), mock.sentinel.message )
+  assert not stomp.is_connected()
+
+@mock.patch('workflows.transport.stomp_transport.stomp')
 def test_send_broadcast(mockstomp):
   '''Test the broadcast sending function.'''
   stomp = StompTransport()
@@ -154,6 +168,19 @@ def test_send_broadcast(mockstomp):
   args, kwargs = mockconn.send.call_args
   assert args == ('/topic/' + str(mock.sentinel.channel), mock.sentinel.message)
   assert kwargs == { 'headers': mock.sentinel.headers }
+
+@mock.patch('workflows.transport.stomp_transport.stomp')
+def test_error_handling_on_broadcast(mockstomp):
+  '''Unrecoverable errors during broadcasting should mark the connection as disconnected.'''
+  stomp = StompTransport()
+  stomp.connect()
+  mockconn = mockstomp.Connection.return_value
+  mockconn.send.side_effect = stomppy.exception.NotConnectedException()
+  mockstomp.exception = stomppy.exception
+
+  with pytest.raises(stomppy.exception.NotConnectedException):
+    stomp._broadcast( str(mock.sentinel.channel), mock.sentinel.message )
+  assert not stomp.is_connected()
 
 @mock.patch('workflows.transport.stomp_transport.stomp')
 def test_messages_are_serialized_for_transport(mockstomp):
