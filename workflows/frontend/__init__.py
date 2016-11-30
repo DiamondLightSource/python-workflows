@@ -212,7 +212,8 @@ class Frontend():
     '''Process incoming status updates from the service.'''
     self.log.debug("Status update: " + str(message))
     self._service_status = message['statuscode']
-    self._status_advertiser.trigger()
+    if message.get('trigger_update', True):
+      self._status_advertiser.trigger()
 
   def get_host_id(self):
     '''Get a cached copy of the host id.'''

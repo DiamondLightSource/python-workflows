@@ -195,3 +195,64 @@ def test_frontend_terminates_on_transport_disconnection(mock_mp, mock_status):
 
   service_process.terminate.assert_called()
   service_process.join.assert_called()
+
+class mock_pipe(object):
+  '''A testing object that behaves like a pipe.'''
+  def __init__(self, contents, on_empty=None):
+    '''Load up contents into pipe. Set up an optional callback function.'''
+    self.contents = contents
+    self.on_empty = on_empty
+
+  def poll(self, time=None):
+    '''Check if pipe is empty.'''
+    if self.contents:
+      return True
+    return False
+
+  def recv(self):
+    '''Return first item off the list or raise exception.
+       Call callback function if defined and pipe is emptied.'''
+    if not self.contents:
+      raise EOFError('Pipe is empty')
+    if len(self.contents) == 1 and self.on_empty:
+      self.on_empty()
+    return self.contents.pop(0)
+
+  def close(self):
+    '''This pipe can't be written to anyway. Ignore call.'''
+
+  def assert_empty(self):
+    '''Pipe must have been read out completely.'''
+    assert not self.contents
+
+@mock.patch('workflows.frontend.workflows.status.StatusAdvertise')
+@mock.patch('workflows.frontend.multiprocessing')
+def test_frontend_parses_status_updates(mock_mp, mock_status):
+  '''The frontend should forward status updates to the advertiser thread when appropriate.'''
+  transport = mock.Mock()
+  service_process = mock.Mock()
+  service_process.is_alive.return_value = True
+  def end_service_process():
+    service_process.is_alive.return_value = False
+  mock_mp.Process.return_value = service_process
+  status_thread = mock_status.return_value
+
+  dummy_pipe = mock_pipe([{'band': 'status_update', 'statuscode': 1},
+                          {'band': 'status_update', 'statuscode': 2},
+                          {'band': 'status_update', 'statuscode': 3, 'trigger_update': False}],
+                         on_empty=end_service_process)
+  mock_mp.Pipe.return_value = (dummy_pipe, dummy_pipe)
+
+  fe = workflows.frontend.Frontend(transport=transport, service=mock.Mock())
+  mock_status.assert_called_once()
+  status_callback = mock_status.call_args[1]['status_callback']
+  # Record status on trigger call
+  trigger_status = []
+  mock_status.return_value.trigger = lambda: trigger_status.append(status_callback())
+
+  fe.run()
+
+  dummy_pipe.assert_empty()
+  # Status 0 is not reported via trigger(), status 3 must not be reported via trigger()
+  # -2 status via trigger() expected due to shutdown.
+  assert list(s['status'] for s in trigger_status) == [1, 2, -2]
