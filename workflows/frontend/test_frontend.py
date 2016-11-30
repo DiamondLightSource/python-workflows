@@ -133,7 +133,8 @@ def test_frontend_can_handle_unhandled_service_initialization_exceptions(mock_st
 
   class CrashServiceNicelyOnInit(CommonService):
     '''A service that crashes python 2.7 with a segmentation fault.'''
-    def initializing(self):
+    @staticmethod
+    def initializing():
       '''Raise AssertionError.
          This should set the error state, kill the service and cause the frontend
          to leave its main loop.'''
@@ -196,7 +197,7 @@ def test_frontend_terminates_on_transport_disconnection(mock_mp, mock_status):
   service_process.terminate.assert_called()
   service_process.join.assert_called()
 
-class mock_pipe(object):
+class MockPipe(object):
   '''A testing object that behaves like a pipe.'''
   def __init__(self, contents, on_empty=None):
     '''Load up contents into pipe. Set up an optional callback function.'''
@@ -218,7 +219,8 @@ class mock_pipe(object):
       self.on_empty()
     return self.contents.pop(0)
 
-  def close(self):
+  @staticmethod
+  def close():
     '''This pipe can't be written to anyway. Ignore call.'''
 
   def assert_empty(self):
@@ -237,10 +239,10 @@ def test_frontend_parses_status_updates(mock_mp, mock_status):
   mock_mp.Process.return_value = service_process
   status_thread = mock_status.return_value
 
-  dummy_pipe = mock_pipe([{'band': 'status_update', 'statuscode': 1},
-                          {'band': 'status_update', 'statuscode': 2},
-                          {'band': 'status_update', 'statuscode': 3, 'trigger_update': False}],
-                         on_empty=end_service_process)
+  dummy_pipe = MockPipe([{'band': 'status_update', 'statuscode': 1},
+                         {'band': 'status_update', 'statuscode': 2},
+                         {'band': 'status_update', 'statuscode': 3, 'trigger_update': False}],
+                        on_empty=end_service_process)
   mock_mp.Pipe.return_value = (dummy_pipe, dummy_pipe)
 
   fe = workflows.frontend.Frontend(transport=transport, service=mock.Mock())
