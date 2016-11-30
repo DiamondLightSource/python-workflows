@@ -53,6 +53,7 @@ class StatusAdvertise():
 
         try:
           with self._advertise_lock:
+            status = None
             if self._status_function is not None:
               status = self._status_function()
             if self._transport is not None:
