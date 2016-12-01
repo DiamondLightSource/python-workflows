@@ -182,13 +182,9 @@ class StompTransport(CommonTransport):
         headers['transformation'] = kwargs['transformation']
     if kwargs.get('acknowledgement'):
       ack = 'client-individual'
-      def callback_bounce(header, message):
-        self.register_message(sub_id, header['message-id'])
-        callback(header, message)
-      self._subscription_callbacks[sub_id] = callback_bounce
     else:
       ack = 'auto'
-      self._subscription_callbacks[sub_id] = callback
+    self._subscription_callbacks[sub_id] = callback
 
     with self._lock:
       self._conn.subscribe(destination, sub_id, headers=headers, ack=ack)
