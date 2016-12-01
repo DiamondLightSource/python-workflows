@@ -164,28 +164,58 @@ class CommonTransport(object):
     message = self._mangle_for_sending(message)
     self._broadcast(destination, message, **kwargs)
 
-  def ack(self, message_id, subscription_id, **kwargs):
+  def ack(self, message, subscription_id=None, **kwargs):
     '''Acknowledge receipt of a message. This only makes sense when the
        'acknowledgement' flag was set for the relevant subscription.
-       :param message_id: ID of the message to be acknowledged.
-       :param subscription_id: ID of the associated subscription.
+       :param message: ID of the message to be acknowledged, OR a dictionary
+                       containing a field 'message-id'.
+       :param subscription_id: ID of the associated subscription. Optional when
+                               a dictionary is passed as first parameter and
+                               that dictionary contains field 'subscription'.
        :param **kwargs: Further parameters for the transport layer. For example
               transaction: Transaction ID if acknowledgement should be part of
                            a transaction
     '''
+    if isinstance(message, dict):
+      message_id = message.get('message-id')
+      if not subscription_id:
+        subscription_id = message.get('subscription')
+    else:
+      message_id = message
+    if not message_id:
+      raise workflows.WorkflowsError('Cannot acknowledge message without ' + \
+                                     'message ID')
+    if not subscription_id:
+      raise workflows.WorkflowsError('Cannot acknowledge message without ' + \
+                                     'subscription ID')
     self.log.debug('Acknowledging message %s on subscription %s',
                    message_id, subscription_id)
     self._ack(message_id, subscription_id, **kwargs)
 
-  def nack(self, message_id, subscription_id, **kwargs):
+  def nack(self, message, subscription_id=None, **kwargs):
     '''Reject receipt of a message. This only makes sense when the
        'acknowledgement' flag was set for the relevant subscription.
-       :param message_id: ID of the message to be rejected.
-       :param subscription_id: ID of the associated subscription.
+       :param message: ID of the message to be rejected, OR a dictionary
+                       containing a field 'message-id'.
+       :param subscription_id: ID of the associated subscription. Optional when
+                               a dictionary is passed as first parameter and
+                               that dictionary contains field 'subscription'.
        :param **kwargs: Further parameters for the transport layer. For example
               transaction: Transaction ID if rejection should be part of a
                            transaction
     '''
+    if isinstance(message, dict):
+      message_id = message.get('message-id')
+      if not subscription_id:
+        subscription_id = message.get('subscription')
+    else:
+      message_id = message
+    if not message_id:
+      raise workflows.WorkflowsError('Cannot reject message without ' + \
+                                     'message ID')
+    if not subscription_id:
+      raise workflows.WorkflowsError('Cannot reject message without ' + \
+                                     'subscription ID')
     self.log.debug('Rejecting message %s on subscription %s',
                    message_id, subscription_id)
     self._nack(message_id, subscription_id, **kwargs)
