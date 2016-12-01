@@ -154,18 +154,23 @@ class StompTransport(CommonTransport):
        :param channel: Queue name to subscribe to
        :param callback: Function to be called when messages are received
        :param **kwargs: Further parameters for the transport layer. For example
-              acknowledgement: If true receipt of each message needs to be
-                               acknowledged.
-              exclusive: Attempt to become exclusive subscriber to the queue.
-              selector: Only receive messages filtered by a selector. See
-                        https://activemq.apache.org/activemq-message-properties.html
-                        for potential filter criteria. Uses SQL 92 syntax.
-              transformation: Transform messages into different format. If set
-                              to True, will use 'jms-object-json' formatting.
+         acknowledgement:  If true receipt of each message needs to be
+                           acknowledged.
+         exclusive:        Attempt to become exclusive subscriber to the queue.
+         ignore_namespace: Do not apply namespace to the destination name
+         selector:         Only receive messages filtered by a selector. See
+                           https://activemq.apache.org/activemq-message-properties.html
+                           for potential filter criteria. Uses SQL 92 syntax.
+         transformation:   Transform messages into different format. If set
+                           to True, will use 'jms-object-json' formatting.
     '''
     headers = {}
     if kwargs.get('exclusive'):
       headers['activemq.exclusive'] = 'true'
+    if kwargs.get('ignore_namespace'):
+      destination = '/queue/' + channel
+    else:
+      destination = '/queue/' + self._namespace + channel
     if kwargs.get('retroactive'):
       headers['activemq.retroactive'] = 'true'
     if kwargs.get('selector'):
@@ -186,7 +191,7 @@ class StompTransport(CommonTransport):
       self._subscription_callbacks[sub_id] = callback
 
     with self._lock:
-      self._conn.subscribe('/queue/' + self._namespace + channel, sub_id, headers=headers, ack=ack)
+      self._conn.subscribe(destination, sub_id, headers=headers, ack=ack)
 
   def _subscribe_broadcast(self, sub_id, channel, callback, **kwargs):
     '''Listen to a broadcast topic, notify via callback function.
@@ -194,11 +199,16 @@ class StompTransport(CommonTransport):
        :param channel: Topic name to subscribe to
        :param callback: Function to be called when messages are received
        :param **kwargs: Further parameters for the transport layer. For example
-              retroactive: Ask broker to send old messages if possible
-              transformation: Transform messages into different format. If set
-                              to True, will use 'jms-object-json' formatting.
+         ignore_namespace: Do not apply namespace to the destination name
+         retroactive:      Ask broker to send old messages if possible
+         transformation:   Transform messages into different format. If set
+                           to True, will use 'jms-object-json' formatting.
     '''
     headers = {}
+    if kwargs.get('ignore_namespace'):
+      destination = '/topic/' + channel
+    else:
+      destination = '/topic/' + self._namespace + channel
     if kwargs.get('retroactive'):
       headers['activemq.retroactive'] = 'true'
     if kwargs.get('transformation'):
@@ -208,16 +218,17 @@ class StompTransport(CommonTransport):
         headers['transformation'] = kwargs['transformation']
     self._subscription_callbacks[sub_id] = callback
     with self._lock:
-      self._conn.subscribe('/topic/' + self._namespace + channel, sub_id, headers=headers)
+      self._conn.subscribe(destination, sub_id, headers=headers)
 
   def _send(self, destination, message, **kwargs):
     '''Send a message to a queue.
        :param destination: Queue name to send to
        :param message: A string to be sent
        :param **kwargs: Further parameters for the transport layer. For example
-              headers: Optional dictionary of header entries
-              expiration: Optional expiration time, relative to sending time
-              transaction: Transaction ID if message should be part of a
+         headers:          Optional dictionary of header entries
+         expiration:       Optional expiration time, relative to sending time
+         ignore_namespace: Do not apply namespace to the destination name
+         transaction:      Transaction ID if message should be part of a
                            transaction
     '''
     headers = kwargs.get('headers', {})
@@ -225,7 +236,10 @@ class StompTransport(CommonTransport):
       del(kwargs['headers'])
     if not headers:
       headers = {}
-    destination = '/queue/' + self._namespace + destination
+    if kwargs.get('ignore_namespace'):
+      destination = '/queue/' + destination
+    else:
+      destination = '/queue/' + self._namespace + destination
     with self._lock:
       try:
         self._conn.send(
@@ -240,9 +254,10 @@ class StompTransport(CommonTransport):
        :param destination: Topic name to send to
        :param message: A string to be broadcast
        :param **kwargs: Further parameters for the transport layer. For example
-              headers: Optional dictionary of header entries
-              expiration: Optional expiration time, relative to sending time
-              transaction: Transaction ID if message should be part of a
+         headers:          Optional dictionary of header entries
+         ignore_namespace: Do not apply namespace to the destination name
+         expiration:       Optional expiration time, relative to sending time
+         transaction:      Transaction ID if message should be part of a
                            transaction
     '''
     headers = kwargs.get('headers', {})
@@ -250,7 +265,10 @@ class StompTransport(CommonTransport):
       del(kwargs['headers'])
     if not headers:
       headers = {}
-    destination = '/topic/' + self._namespace + destination
+    if kwargs.get('ignore_namespace'):
+      destination = '/topic/' + destination
+    else:
+      destination = '/topic/' + self._namespace + destination
     with self._lock:
       try:
         self._conn.send(

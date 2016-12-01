@@ -392,6 +392,9 @@ def test_namespace_is_used_correctly(mockstomp):
   mockconn.send.assert_called_once()
   assert mockconn.send.call_args[0] == ('/queue/ns.some_queue', mock.sentinel.message1)
 
+  stomp._send( 'some_queue', mock.sentinel.message2, ignore_namespace=True )
+  assert mockconn.send.call_args[0] == ('/queue/some_queue', mock.sentinel.message2)
+
   StompTransport.defaults['--stomp-prfx'] = 'ns'
   stomp = StompTransport()
   stomp.connect()
@@ -403,12 +406,21 @@ def test_namespace_is_used_correctly(mockstomp):
   stomp._broadcast( 'some_topic', mock.sentinel.message2 )
   assert mockconn.send.call_args[0] == ('/topic/ns.some_topic', mock.sentinel.message2)
 
+  stomp._broadcast( 'some_topic', mock.sentinel.message3, ignore_namespace=True )
+  assert mockconn.send.call_args[0] == ('/topic/some_topic', mock.sentinel.message3)
+
   stomp._subscribe( 1, 'sub_queue', None )
   mockconn.subscribe.assert_called_once()
   assert mockconn.subscribe.call_args[0] == ('/queue/ns.sub_queue', 1)
 
-  stomp._subscribe_broadcast( 2, 'sub_topic', None )
-  assert mockconn.subscribe.call_args[0] == ('/topic/ns.sub_topic', 2)
+  stomp._subscribe( 2, 'sub_queue', None, ignore_namespace=True )
+  assert mockconn.subscribe.call_args[0] == ('/queue/sub_queue', 2)
+
+  stomp._subscribe_broadcast( 3, 'sub_topic', None )
+  assert mockconn.subscribe.call_args[0] == ('/topic/ns.sub_topic', 3)
+
+  stomp._subscribe_broadcast( 4, 'sub_topic', None, ignore_namespace=True )
+  assert mockconn.subscribe.call_args[0] == ('/topic/sub_topic', 4)
 
   stomp.broadcast_status('some status', channel='extra')
   assert mockconn.send.call_args[0] == ('/topic/ns.transient.status.extra', '"some status"')
