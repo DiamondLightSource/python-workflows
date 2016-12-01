@@ -158,8 +158,10 @@ class StompTransport(CommonTransport):
                                acknowledged.
               exclusive: Attempt to become exclusive subscriber to the queue.
               selector: Only receive messages filtered by a selector. See
-                   https://activemq.apache.org/activemq-message-properties.html
+                        https://activemq.apache.org/activemq-message-properties.html
                         for potential filter criteria. Uses SQL 92 syntax.
+              transformation: Transform messages into different format. If set
+                              to True, will use 'jms-object-json' formatting.
     '''
     headers = {}
     if kwargs.get('exclusive'):
@@ -168,6 +170,11 @@ class StompTransport(CommonTransport):
       headers['activemq.retroactive'] = 'true'
     if kwargs.get('selector'):
       headers['selector'] = kwargs['selector']
+    if kwargs.get('transformation'):
+      if kwargs['transformation'] == True:
+        headers['transformation'] = 'jms-object-json'
+      else:
+        headers['transformation'] = kwargs['transformation']
     if kwargs.get('acknowledgement'):
       ack = 'client-individual'
       def callback_bounce(header, message):
@@ -188,10 +195,17 @@ class StompTransport(CommonTransport):
        :param callback: Function to be called when messages are received
        :param **kwargs: Further parameters for the transport layer. For example
               retroactive: Ask broker to send old messages if possible
+              transformation: Transform messages into different format. If set
+                              to True, will use 'jms-object-json' formatting.
     '''
     headers = {}
     if kwargs.get('retroactive'):
       headers['activemq.retroactive'] = 'true'
+    if kwargs.get('transformation'):
+      if kwargs['transformation'] == True:
+        headers['transformation'] = 'jms-object-json'
+      else:
+        headers['transformation'] = kwargs['transformation']
     self._subscription_callbacks[sub_id] = callback
     with self._lock:
       self._conn.subscribe('/topic/' + self._namespace + channel, sub_id, headers=headers)

@@ -260,18 +260,18 @@ def test_subscribe_to_queue(mockstomp):
   listener = mockconn.set_listener.call_args[0][1]
   assert listener is not None
 
-  stomp._subscribe(1, str(mock.sentinel.channel1), mock_cb1)
+  stomp._subscribe(1, str(mock.sentinel.channel1), mock_cb1, transformation=mock.sentinel.transformation)
 
   mockconn.subscribe.assert_called_once()
   args, kwargs = mockconn.subscribe.call_args
   assert args == ('/queue/' + str(mock.sentinel.channel1), 1)
-  assert kwargs == { 'headers': {}, 'ack': 'auto' }
+  assert kwargs == { 'headers': {'transformation': mock.sentinel.transformation}, 'ack': 'auto' }
 
-  stomp._subscribe(2, str(mock.sentinel.channel2), mock_cb2, retroactive=True, selector=mock.sentinel.selector, exclusive=True)
+  stomp._subscribe(2, str(mock.sentinel.channel2), mock_cb2, retroactive=True, selector=mock.sentinel.selector, exclusive=True, transformation=True)
   assert mockconn.subscribe.call_count == 2
   args, kwargs = mockconn.subscribe.call_args
   assert args == ('/queue/' + str(mock.sentinel.channel2), 2)
-  assert kwargs == { 'headers': {'activemq.retroactive':'true', 'selector':mock.sentinel.selector, 'activemq.exclusive':'true'}, 'ack': 'auto' }
+  assert kwargs == { 'headers': {'activemq.retroactive':'true', 'selector':mock.sentinel.selector, 'activemq.exclusive':'true', 'transformation': 'jms-object-json'}, 'ack': 'auto' }
 
   assert mock_cb1.call_count == 0
   listener.on_message({'subscription': 1}, mock.sentinel.message1)
@@ -300,18 +300,18 @@ def test_subscribe_to_broadcast(mockstomp):
   listener = mockconn.set_listener.call_args[0][1]
   assert listener is not None
 
-  stomp._subscribe_broadcast(1, str(mock.sentinel.channel1), mock_cb1)
+  stomp._subscribe_broadcast(1, str(mock.sentinel.channel1), mock_cb1, transformation=mock.sentinel.transformation)
 
   mockconn.subscribe.assert_called_once()
   args, kwargs = mockconn.subscribe.call_args
   assert args == ('/topic/' + str(mock.sentinel.channel1), 1)
-  assert kwargs == { 'headers': {} }
+  assert kwargs == { 'headers': {'transformation': mock.sentinel.transformation} }
 
-  stomp._subscribe_broadcast(2, str(mock.sentinel.channel2), mock_cb2, retroactive=True)
+  stomp._subscribe_broadcast(2, str(mock.sentinel.channel2), mock_cb2, retroactive=True, transformation=True)
   assert mockconn.subscribe.call_count == 2
   args, kwargs = mockconn.subscribe.call_args
   assert args == ('/topic/' + str(mock.sentinel.channel2), 2)
-  assert kwargs == { 'headers': {'activemq.retroactive':'true'} }
+  assert kwargs == { 'headers': {'activemq.retroactive':'true', 'transformation': 'jms-object-json'} }
 
   assert mock_cb1.call_count == 0
   listener.on_message({'subscription': 1}, mock.sentinel.message1)
