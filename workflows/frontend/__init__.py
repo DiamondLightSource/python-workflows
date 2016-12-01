@@ -423,7 +423,7 @@ class Frontend():
           'message': cb_message,
         }
       } )
-    self._subscription_mapping[subscription_id] = self._transport.subscribe(
+    self._subscription_mapping[subscription_id] = self._transport.subscribe_broadcast(
       channel,
       callback_helper,
       *message['payload'][0][2:],
