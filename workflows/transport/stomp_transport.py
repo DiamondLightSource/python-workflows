@@ -220,6 +220,13 @@ class StompTransport(CommonTransport):
     with self._lock:
       self._conn.subscribe(destination, sub_id, headers=headers)
 
+  def _unsubscribe(self, subscription, **kwargs):
+    '''Stop listening to a queue or a broadcast
+       :param subscription: Subscription ID to cancel
+    '''
+    self._conn.unsubscribe(id=subscription)
+    # Callback reference is kept as further messages may already have been received
+
   def _send(self, destination, message, **kwargs):
     '''Send a message to a queue.
        :param destination: Queue name to send to

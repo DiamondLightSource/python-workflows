@@ -249,7 +249,7 @@ def test_messages_are_deserialized_after_transport(mockstomp):
 
 @mock.patch('workflows.transport.stomp_transport.stomp')
 def test_subscribe_to_queue(mockstomp):
-  '''Test subscribing to a queue (producer-consumer) and callback functions.'''
+  '''Test subscribing to a queue (producer-consumer), callback functions and unsubscribe.'''
   mock_cb1 = mock.Mock()
   mock_cb2 = mock.Mock()
   stomp = StompTransport()
@@ -287,6 +287,11 @@ def test_subscribe_to_queue(mockstomp):
   assert args == ('/queue/' + str(mock.sentinel.channel3), 3)
   assert kwargs == { 'headers': {}, 'ack': 'client-individual' }
 
+  stomp._unsubscribe(1)
+  mockconn.unsubscribe.assert_called_once_with(id=1)
+  stomp._unsubscribe(2)
+  mockconn.unsubscribe.assert_called_with(id=2)
+
 @mock.patch('workflows.transport.stomp_transport.stomp')
 def test_subscribe_to_broadcast(mockstomp):
   '''Test subscribing to a topic (publish-subscribe) and callback functions.'''
@@ -320,6 +325,11 @@ def test_subscribe_to_broadcast(mockstomp):
   assert mock_cb2.call_count == 0
   listener.on_message({'subscription': 2}, mock.sentinel.message2)
   mock_cb2.assert_called_once_with({'subscription': 2}, mock.sentinel.message2)
+
+  stomp._unsubscribe(1)
+  mockconn.unsubscribe.assert_called_once_with(id=1)
+  stomp._unsubscribe(2)
+  mockconn.unsubscribe.assert_called_with(id=2)
 
 @pytest.mark.skip(reason="TODO")
 def test_incoming_messages_are_registered_properly():
