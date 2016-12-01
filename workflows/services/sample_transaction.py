@@ -86,3 +86,4 @@ class SampleTxnProducer(CommonService):
                            self.counter,
                            (time.time() % 1000) * 1000
                          ))
+    self.log.info("Created message %d", self.counter)

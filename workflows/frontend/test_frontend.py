@@ -115,12 +115,12 @@ def test_connect_queue_communication_to_transport_layer(mock_status):
     )
   callback_function = transport.subscribe.call_args[0][1]
 
-  callback_function(mock.sentinel.header, mock.sentinel.message)
+  callback_function({'header': mock.sentinel.header}, mock.sentinel.message)
   commqueue.send.assert_called_once_with( {
       'band': 'transport_message',
       'payload': {
           'subscription_id': mock.sentinel.subid,
-          'header': mock.sentinel.header,
+          'header': {'header': mock.sentinel.header, 'subscription': mock.sentinel.subid},
           'message': mock.sentinel.message,
         }
     } )

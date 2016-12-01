@@ -302,6 +302,7 @@ class Frontend():
 # ---- Transport calls -----------------------------------------------------
 
   _transaction_mapping = {}
+  _subscription_mapping = {}
 
   def parse_band_transport(self, message):
     '''Treat messages sent from service via queue. These were encoded by
@@ -341,13 +342,21 @@ class Frontend():
     '''Counterpart to the transport.ack call from the service.
        Forward the call to the real transport layer.'''
     args, kwargs = message['payload']
-    self._transport.ack(*args, **kwargs)
+    message_id, subscription_id = args[:2]
+    assert subscription_id in self._subscription_mapping
+    self._transport.ack(message_id,
+                        self._subscription_mapping[subscription_id],
+                        *args[2:], **kwargs)
 
   def parse_band_transport_nack(self, message):
     '''Counterpart to the transport.nack call from the service.
        Forward the call to the real transport layer.'''
     args, kwargs = message['payload']
-    self._transport.nack(*args, **kwargs)
+    message_id, subscription_id = args[:2]
+    assert subscription_id in self._subscription_mapping
+    self._transport.nack(message_id,
+                         self._subscription_mapping[subscription_id],
+                         *args[2:], **kwargs)
 
   def parse_band_transport_transaction_begin(self, message):
     '''Counterpart to the transport.transaction_begin call from the service.
@@ -379,34 +388,51 @@ class Frontend():
     '''Counterpart to the transport.subscribe call from the service.
        Forward the call to the real transport layer.'''
     subscription_id, channel = message['payload'][0][:2]
-    self._transport.subscribe(channel,
-      lambda cb_header, cb_message:
+    def callback_helper(cb_header, cb_message):
+      '''Helper function to rewrite the message header and redirect it towards
+         the service.'''
+      cb_header['subscription'] = subscription_id
       self.send_command( {
-          'band': 'transport_message',
-          'payload': {
-            'subscription_id': subscription_id,
-            'header': cb_header,
-            'message': cb_message,
-          },
-        } ),
-       *message['payload'][0][2:],
-       **message['payload'][1]
+        'band': 'transport_message',
+        'payload': {
+          'subscription_id': subscription_id,
+          'header': cb_header,
+          'message': cb_message,
+        }
+      } )
+    self._subscription_mapping[subscription_id] = self._transport.subscribe(
+      channel,
+      callback_helper,
+      *message['payload'][0][2:],
+      **message['payload'][1]
     )
 
   def parse_band_transport_subscribe_broadcast(self, message):
     '''Counterpart to the transport.subscribe_broadcast call from the service.
        Forward the call to the real transport layer.'''
     subscription_id, channel = message['payload'][0][:2]
-    self._transport.subscribe_broadcast(channel,
-      lambda cb_header, cb_message:
+    def callback_helper(cb_header, cb_message):
+      '''Helper function to rewrite the message header and redirect it towards
+         the service.'''
+      cb_header['subscription'] = subscription_id
       self.send_command( {
-          'band': 'transport_message',
-          'payload': {
-            'subscription_id': subscription_id,
-            'header': cb_header,
-            'message': cb_message,
-          },
-        } ),
-       *message['payload'][0][2:],
-       **message['payload'][1]
+        'band': 'transport_message',
+        'payload': {
+          'subscription_id': subscription_id,
+          'header': cb_header,
+          'message': cb_message,
+        }
+      } )
+    self._subscription_mapping[subscription_id] = self._transport.subscribe(
+      channel,
+      callback_helper,
+      *message['payload'][0][2:],
+      **message['payload'][1]
     )
+
+  def parse_band_transport_unsubscribe(self, message):
+    '''Counterpart to the transport.unsubscribe call from the service.
+       Forward the call to the real transport layer.'''
+    subscription_id = message['payload'][0][0]
+    self._transport.unsubscribe(self._subscription_mapping[subscription_id])
+    del(self._subscription_mapping[subscription_id])

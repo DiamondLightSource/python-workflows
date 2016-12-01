@@ -62,7 +62,7 @@ class CommonTransport(object):
       'callback': callback,
       'ack': kwargs.get('acknowledgement'),
     }
-    self.log.debug('Subscribing to %s for %s with ID %d',
+    self.log.debug('Subscribing to %s for client %s with ID %d',
         channel, kwargs.get('client_id'), self.__subscription_id)
     if 'client_id' in kwargs:
       self.__clients[kwargs['client_id']]['subscriptions'].add \
@@ -111,6 +111,8 @@ class CommonTransport(object):
       'callback': callback,
       'ack': False,
     }
+    self.log.debug('Subscribing to broadcasts on %s for client %s with ID %d',
+        channel, kwargs.get('client_id'), self.__subscription_id)
     if 'client_id' in kwargs:
       self.__clients[kwargs['client_id']]['subscriptions'].add \
         (self.__subscription_id)
@@ -171,6 +173,8 @@ class CommonTransport(object):
               transaction: Transaction ID if acknowledgement should be part of
                            a transaction
     '''
+    self.log.debug('Acknowledging message %s on subscription %s',
+                   message_id, subscription_id)
     self._ack(message_id, subscription_id, **kwargs)
 
   def nack(self, message_id, subscription_id, **kwargs):
@@ -182,6 +186,8 @@ class CommonTransport(object):
               transaction: Transaction ID if rejection should be part of a
                            transaction
     '''
+    self.log.debug('Rejecting message %s on subscription %s',
+                   message_id, subscription_id)
     self._nack(message_id, subscription_id, **kwargs)
 
   def transaction_begin(self, **kwargs):
@@ -196,6 +202,8 @@ class CommonTransport(object):
     self.__transactions[self.__transaction_id] = {
       'client': kwargs.get('client_id'),
     }
+    self.log.debug('Starting transaction for client %s with ID %d',
+        kwargs.get('client_id'), self.__subscription_id)
     if 'client_id' in kwargs:
       self.__clients[kwargs['client_id']]['transactions'].add \
         (self.__transaction_id)
@@ -210,6 +218,7 @@ class CommonTransport(object):
     '''
     if transaction_id not in self.__transactions:
       raise workflows.WorkflowsError("Attempting to abort unknown transaction")
+    self.log.debug('Aborting transaction %s', transaction_id)
     if self.__transactions[transaction_id]['client']:
       self.__clients[self.__transactions[transaction_id]['client']] \
         ['transactions'].remove(transaction_id)
@@ -223,6 +232,7 @@ class CommonTransport(object):
     '''
     if transaction_id not in self.__transactions:
       raise workflows.WorkflowsError("Attempting to commit unknown transaction")
+    self.log.debug('Committing transaction %s', transaction_id)
     if self.__transactions[transaction_id]['client']:
       self.__clients[self.__transactions[transaction_id]['client']] \
         ['transactions'].remove(transaction_id)
@@ -318,11 +328,11 @@ class CommonTransport(object):
     raise workflows.WorkflowsError("Transport interface not implemented")
 
   @staticmethod
-  def _ack(message_id, subscription, **kwargs):
+  def _ack(message_id, subscription_id, **kwargs):
     '''Acknowledge receipt of a message. This only makes sense when the
        'acknowledgement' flag was set for the relevant subscription.
-       :param message_id: ID of the message to be acknowledged
-       :param subscription: ID of the relevant subscriptiong
+       :param message_id: ID of the message to be acknowledged.
+       :param subscription_id: ID of the associated subscription.
        :param **kwargs: Further parameters for the transport layer. For example
               transaction: Transaction ID if acknowledgement should be part of
                            a transaction
@@ -330,11 +340,11 @@ class CommonTransport(object):
     raise workflows.WorkflowsError("Transport interface not implemented")
 
   @staticmethod
-  def _nack(message_id, subscription, **kwargs):
+  def _nack(message_id, subscription_id, **kwargs):
     '''Reject receipt of a message. This only makes sense when the
        'acknowledgement' flag was set for the relevant subscription.
-       :param message_id: ID of the message to be rejected
-       :param subscription: ID of the relevant subscriptiong
+       :param message_id: ID of the message to be rejected.
+       :param subscription_id: ID of the associated subscription.
        :param **kwargs: Further parameters for the transport layer. For example
               transaction: Transaction ID if rejection should be part of a
                            transaction
