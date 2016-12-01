@@ -178,15 +178,13 @@ def test_forward_ack_call():
   mockfunc, qt = setup_qt()
 
   subid = qt.subscribe(mock.sentinel.channel, mock.sentinel.callback, acknowledgement=True)
-  qt.register_message(subid, mock.sentinel.messageid)
-  qt.ack(mock.sentinel.messageid,
-            kwarg=mock.sentinel.kwarg)
+  qt.ack(mock.sentinel.messageid, subid, kwarg=mock.sentinel.kwarg)
 
   mockfunc.assert_called_with({
     'band': 'transport',
     'call': 'ack',
     'payload': (
-      ( mock.sentinel.messageid, ),
+      ( mock.sentinel.messageid, subid ),
       { 'kwarg': mock.sentinel.kwarg }
     )
   })
@@ -196,15 +194,13 @@ def test_forward_nack_call():
   mockfunc, qt = setup_qt()
 
   subid = qt.subscribe(mock.sentinel.channel, mock.sentinel.callback, acknowledgement=True)
-  qt.register_message(subid, mock.sentinel.messageid)
-  qt.nack(mock.sentinel.messageid,
-            kwarg=mock.sentinel.kwarg)
+  qt.nack(mock.sentinel.messageid, subid, kwarg=mock.sentinel.kwarg)
 
   mockfunc.assert_called_with({
     'band': 'transport',
     'call': 'nack',
     'payload': (
-      ( mock.sentinel.messageid, ),
+      ( mock.sentinel.messageid, subid ),
       { 'kwarg': mock.sentinel.kwarg }
     )
   })

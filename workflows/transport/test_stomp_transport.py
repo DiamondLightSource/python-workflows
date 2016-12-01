@@ -331,10 +331,6 @@ def test_subscribe_to_broadcast(mockstomp):
   stomp._unsubscribe(2)
   mockconn.unsubscribe.assert_called_with(id=2)
 
-@pytest.mark.skip(reason="TODO")
-def test_incoming_messages_are_registered_properly():
-  pass
-
 @mock.patch('workflows.transport.stomp_transport.stomp')
 def test_transaction_calls(mockstomp):
   '''Test that calls to create, commit, abort transactions are passed to stomp properly.'''

@@ -246,9 +246,6 @@ class CommonService(object):
 
   def __process_transport(self, message):
     '''Process an incoming transport message from the frontend.'''
-    if self._transport.subscription_requires_ack(message['subscription_id']):
-      self._transport.register_message(message['subscription_id'],
-                                       message['header']['message-id'])
     self._transport.subscription_callback(message['subscription_id']) \
       ( message['header'], message['message'] )
 

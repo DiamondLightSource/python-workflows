@@ -13,7 +13,6 @@ class CommonTransport(object):
   __subscription_id = 0
   __transactions = {}
   __transaction_id = 0
-  __messages = {}
 
   log = logging.getLogger('workflows.transport')
 
@@ -163,70 +162,27 @@ class CommonTransport(object):
     message = self._mangle_for_sending(message)
     self._broadcast(destination, message, **kwargs)
 
-  def ack(self, message_id, **kwargs):
+  def ack(self, message_id, subscription_id, **kwargs):
     '''Acknowledge receipt of a message. This only makes sense when the
        'acknowledgement' flag was set for the relevant subscription.
-       :param message_id: ID of the message to be acknowledged
+       :param message_id: ID of the message to be acknowledged.
+       :param subscription_id: ID of the associated subscription.
        :param **kwargs: Further parameters for the transport layer. For example
               transaction: Transaction ID if acknowledgement should be part of
                            a transaction
     '''
-    if message_id not in self.__messages:
-      raise workflows.WorkflowsError \
-            ("Attempting to ACK unknown message")
-    subscription, client = self.__messages[message_id]
-    if client:
-      self.__clients[client]['messages'].remove(message_id)
-    del(self.__messages[message_id])
-    self._ack(message_id, subscription, **kwargs)
+    self._ack(message_id, subscription_id, **kwargs)
 
-  def nack(self, message_id, **kwargs):
+  def nack(self, message_id, subscription_id, **kwargs):
     '''Reject receipt of a message. This only makes sense when the
        'acknowledgement' flag was set for the relevant subscription.
-       :param message_id: ID of the message to be rejected
+       :param message_id: ID of the message to be rejected.
+       :param subscription_id: ID of the associated subscription.
        :param **kwargs: Further parameters for the transport layer. For example
               transaction: Transaction ID if rejection should be part of a
                            transaction
     '''
-    if message_id not in self.__messages:
-      raise workflows.WorkflowsError \
-            ("Attempting to NACK unknown message")
-    subscription, client = self.__messages[message_id]
-    if client:
-      self.__clients[client]['messages'].remove(message_id)
-    del(self.__messages[message_id])
-    self._nack(message_id, subscription, **kwargs)
-
-  def subscription_requires_ack(self, subscription):
-    '''Report if messages belonging to a particular subscription require to be
-       acknowledged manually.
-       :param subscription: ID of the subscription to test
-       :return: Boolean value, true if messages need to be ACKed/NACKed.
-    '''
-    if subscription not in self.__subscriptions:
-      raise workflows.WorkflowsError \
-            ("Unknown subscription")
-    return self.__subscriptions[subscription]['ack']
-
-  def register_message(self, subscription, message_id):
-    '''Mark an incoming message to be ACKed/NACKed. This is only relevant when
-       'acknowledgement' flag was set for the relevant subscription, and will
-       raise a WorkflowsError otherwise. The message_id will be tracked, and
-       if it is not ACKed/NACKed, the transport layer will NACK it once it is
-       clear that the message can no longer be processed (ie. when the
-       associated client goes away).
-       :param subscription: ID of the subscription that the incoming message
-                            belongs to.
-       :param message_id: ID of the message to be rejected
-    '''
-    if not self.subscription_requires_ack(subscription):
-      raise workflows.WorkflowsError \
-            ("Attempting to register message for subscription without"
-             "acknowledgement flag set")
-    client = self.__subscriptions[subscription]['client']
-    self.__messages[message_id] = (subscription, client)
-    if client:
-      self.__clients[client]['messages'].add(message_id)
+    self._nack(message_id, subscription_id, **kwargs)
 
   def transaction_begin(self, **kwargs):
     '''Start a new transaction.
@@ -283,8 +239,7 @@ class CommonTransport(object):
        clients go away.'''
     self.__client_id += 1
     self.__clients[self.__client_id] = { 'subscriptions': set(),
-                                         'transactions': set(),
-                                         'messages': set() }
+                                         'transactions': set() }
     return self.__client_id
 
   def drop_client(self, client_id):
@@ -299,9 +254,6 @@ class CommonTransport(object):
     transactions = list(self.__clients[client_id]['transactions'])
     for transaction in transactions:
       self.transaction_abort(transaction)
-    messages = list(self.__clients[client_id]['messages'])
-    for message_id in messages:
-      self.nack(message_id)
     del(self.__clients[client_id])
 
   #

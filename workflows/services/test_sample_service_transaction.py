@@ -64,9 +64,12 @@ def setup_txnservice(crashpattern):
   p.crashpoint = mock_crash
   mock_crash.side_effect = crashpattern
   mock_transport.transaction_begin.return_value = mock.sentinel.txn
+  mock_transport.subscribe.return_value = mock.sentinel.subid
   setattr(p, '_transport', mock_transport)
   header = { 'message-id': mock.sentinel.message_id }
   message = mock.sentinel.message
+
+  p.initializing()
   p.receive_message(header, message)
 
   return p, mock_transport
@@ -84,7 +87,7 @@ def test_txnservice_uses_transactions_correctly():
   p, mock_transport = setup_txnservice([False, True])
 
   mock_transport.transaction_begin.assert_called_once_with()
-  mock_transport.ack.assert_called_once_with(mock.sentinel.message_id, transaction=mock.sentinel.txn)
+  mock_transport.ack.assert_called_once_with(mock.sentinel.message_id, mock.sentinel.subid, transaction=mock.sentinel.txn)
   mock_transport.send.assert_not_called()
   mock_transport.transaction_commit.assert_not_called()
   mock_transport.transaction_abort.assert_called_once_with(mock.sentinel.txn)
@@ -92,7 +95,7 @@ def test_txnservice_uses_transactions_correctly():
   p, mock_transport = setup_txnservice([False, False, True])
 
   mock_transport.transaction_begin.assert_called_once_with()
-  mock_transport.ack.assert_called_once_with(mock.sentinel.message_id, transaction=mock.sentinel.txn)
+  mock_transport.ack.assert_called_once_with(mock.sentinel.message_id, mock.sentinel.subid, transaction=mock.sentinel.txn)
   mock_transport.send.assert_called_once_with(mock.ANY, mock.sentinel.message, transaction=mock.sentinel.txn)
   mock_transport.transaction_commit.assert_not_called()
   mock_transport.transaction_abort.assert_called_once_with(mock.sentinel.txn)
@@ -100,7 +103,7 @@ def test_txnservice_uses_transactions_correctly():
   p, mock_transport = setup_txnservice([False, False, False])
 
   mock_transport.transaction_begin.assert_called_once_with()
-  mock_transport.ack.assert_called_once_with(mock.sentinel.message_id, transaction=mock.sentinel.txn)
+  mock_transport.ack.assert_called_once_with(mock.sentinel.message_id, mock.sentinel.subid, transaction=mock.sentinel.txn)
   mock_transport.send.assert_called_once_with(mock.ANY, mock.sentinel.message, transaction=mock.sentinel.txn)
   mock_transport.transaction_commit.assert_called_once_with(mock.sentinel.txn)
   mock_transport.transaction_abort.assert_not_called()

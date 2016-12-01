@@ -16,7 +16,7 @@ class SampleTxn(CommonService):
 
   def initializing(self):
     '''Subscribe to a channel. Received messages must be acknowledged.'''
-    self._transport.subscribe('transient.transaction', self.receive_message, acknowledgement=True)
+    self.subid = self._transport.subscribe('transient.transaction', self.receive_message, acknowledgement=True)
 
   @staticmethod
   def crashpoint():
@@ -41,7 +41,7 @@ class SampleTxn(CommonService):
       print "---  Abort  ---"
       return
 
-    self._transport.ack(header['message-id'], transaction=txn)
+    self._transport.ack(header['message-id'], self.subid, transaction=txn)
     print " 2. Ack"
     if self.crashpoint():
       self._transport.transaction_abort(txn)
