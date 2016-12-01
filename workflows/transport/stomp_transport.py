@@ -228,11 +228,12 @@ class StompTransport(CommonTransport):
        :param destination: Queue name to send to
        :param message: A string to be sent
        :param **kwargs: Further parameters for the transport layer. For example
-         headers:          Optional dictionary of header entries
          expiration:       Optional expiration time, relative to sending time
+         headers:          Optional dictionary of header entries
          ignore_namespace: Do not apply namespace to the destination name
          transaction:      Transaction ID if message should be part of a
                            transaction
+         reply-to:         Destination replies should be sent to
     '''
     headers = kwargs.get('headers', {})
     if 'headers' in kwargs:
@@ -257,11 +258,12 @@ class StompTransport(CommonTransport):
        :param destination: Topic name to send to
        :param message: A string to be broadcast
        :param **kwargs: Further parameters for the transport layer. For example
+         expiration:       Optional expiration time, relative to sending time
          headers:          Optional dictionary of header entries
          ignore_namespace: Do not apply namespace to the destination name
-         expiration:       Optional expiration time, relative to sending time
          transaction:      Transaction ID if message should be part of a
                            transaction
+         reply-to:         Destination replies should be sent to
     '''
     headers = kwargs.get('headers', {})
     if 'headers' in kwargs:
