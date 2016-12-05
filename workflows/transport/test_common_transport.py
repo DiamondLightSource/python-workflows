@@ -24,12 +24,29 @@ def test_subscribe_unsubscribe_a_channel():
   callback = ct._subscribe.call_args[0][2]
   callback(mock.sentinel.header, mock.sentinel.message)
   mock_callback.assert_called_once_with(mock.sentinel.header, mock.sentinel.message)
+  # Should not be able to drop callback reference for live subscription
+  with pytest.raises(workflows.WorkflowsError):
+    ct.drop_callback_reference(subid)
 
   ct.unsubscribe(subid)
 
   ct._unsubscribe.assert_called_once_with(subid)
+
+  # Multiple unsubscribes should not work
+  with pytest.raises(workflows.WorkflowsError):
+    ct.unsubscribe(subid)
+  ct._unsubscribe.assert_called_once()
+
+  # Callback should still be connected
+  ct.subscription_callback(subid)
+
+  ct.drop_callback_reference(subid)
   with pytest.raises(workflows.WorkflowsError):
     ct.subscription_callback(subid)
+
+  # Should not be able to double-drop reference
+  with pytest.raises(workflows.WorkflowsError):
+    ct.drop_callback_reference(subid)
 
 def test_simple_subscribe_unsubscribe_a_broadcast():
   """Public subscribe_bc()-call should be routed to specific _subscribe_bc().
@@ -49,12 +66,28 @@ def test_simple_subscribe_unsubscribe_a_broadcast():
   callback = ct._subscribe_broadcast.call_args[0][2]
   callback(mock.sentinel.header, mock.sentinel.message)
   mock_callback.assert_called_once_with(mock.sentinel.header, mock.sentinel.message)
+  # Should not be able to drop callback reference for live subscription
+  with pytest.raises(workflows.WorkflowsError):
+    ct.drop_callback_reference(subid)
 
   ct.unsubscribe(subid)
 
   ct._unsubscribe.assert_called_once_with(subid)
+  # Multiple unsubscribes should not work
+  with pytest.raises(workflows.WorkflowsError):
+    ct.unsubscribe(subid)
+  ct._unsubscribe.assert_called_once()
+
+  # Callback should still be connected
+  ct.subscription_callback(subid)
+
+  ct.drop_callback_reference(subid)
   with pytest.raises(workflows.WorkflowsError):
     ct.subscription_callback(subid)
+
+  # Should not be able to double-drop reference
+  with pytest.raises(workflows.WorkflowsError):
+    ct.drop_callback_reference(subid)
 
 def test_simple_send_message():
   """Pass messages to send(), should be routed to specific _send()"""
@@ -127,7 +160,7 @@ def test_dropping_subscriptions_when_dropping_client():
   subid = ct.subscribe(mock.sentinel.channel, mock.sentinel.callback, client_id=client)
   ct.drop_client(client)
 
-  ct._unsubscribe.assert_called_once_with(subid)
+  ct._unsubscribe.assert_called_with(subid)
   with pytest.raises(workflows.WorkflowsError):
     ct.subscription_callback(subid)
   with pytest.raises(workflows.WorkflowsError):
@@ -135,14 +168,25 @@ def test_dropping_subscriptions_when_dropping_client():
 
   client = ct.register_client()
   subid = ct.subscribe(mock.sentinel.channel, mock.sentinel.callback, client_id=client)
+  subid2 = ct.subscribe(mock.sentinel.channel2, mock.sentinel.callback2, client_id=client)
   assert ct.subscription_callback(subid) == mock.sentinel.callback
-  ct.unsubscribe(subid)
+  assert ct.subscription_callback(subid2) == mock.sentinel.callback2
+  ct.unsubscribe(subid2) # reference to callback is kept here
   ct.drop_client(client)
 
-  assert ct._unsubscribe.call_count == 2
+  assert ct._unsubscribe.call_count == 3
 
+  # Callbacks should be dropped automatically
+  with pytest.raises(workflows.WorkflowsError):
+    ct.subscription_callback(subid)
+  with pytest.raises(workflows.WorkflowsError):
+    ct.subscription_callback(subid2)
+
+  # Subsequent unsubscribes should fail
   with pytest.raises(workflows.WorkflowsError):
     ct.unsubscribe(subid)
+  with pytest.raises(workflows.WorkflowsError):
+    ct.unsubscribe(subid2)
 
 def test_create_and_destroy_transactions():
   "Create, commit and abort transactions."

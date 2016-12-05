@@ -61,6 +61,7 @@ class CommonTransport(object):
       'client': kwargs.get('client_id'),
       'callback': callback,
       'ack': kwargs.get('acknowledgement'),
+      'unsubscribed': False,
     }
     self.log.debug('Subscribing to %s for client %s with ID %d',
         channel, kwargs.get('client_id'), self.__subscription_id)
@@ -76,18 +77,43 @@ class CommonTransport(object):
       self._subscribe(self.__subscription_id, channel, callback_bounce, **kwargs)
     return self.__subscription_id
 
-  def unsubscribe(self, subscription, **kwargs):
+  def unsubscribe(self, subscription, drop_callback_reference=False, **kwargs):
     '''Stop listening to a queue or a broadcast
        :param subscription: Subscription ID to cancel
+       :param drop_callback_reference: Drop the reference to the registered
+                                       callback function immediately. This
+                                       means any buffered messages still in
+                                       flight will not arrive at the intended
+                                       destination and cause exceptions to be
+                                       raised instead.
        :param **kwargs: Further parameters for the transport layer.
     '''
     if subscription not in self.__subscriptions:
       raise workflows.WorkflowsError \
             ("Attempting to unsubscribe unknown subscription")
+    if self.__subscriptions[subscription]['unsubscribed']:
+      raise workflows.WorkflowsError \
+            ("Attempting to unsubscribe already unsubscribed subscription")
+    self._unsubscribe(subscription, **kwargs)
+    self.__subscriptions[subscription]['unsubscribed'] = True
+    if drop_callback_reference:
+      self.drop_callback_reference(subscription)
+
+  def drop_callback_reference(self, subscription):
+    '''Drop reference to the callback function after unsubscribing.
+       Any future messages arriving for that subscription will result in
+       exceptions being raised.
+       :param subscription: Subscription ID to delete callback reference for.
+    '''
+    if subscription not in self.__subscriptions:
+      raise workflows.WorkflowsError \
+            ("Attempting to drop callback reference for unknown subscription")
+    if not self.__subscriptions[subscription]['unsubscribed']:
+      raise workflows.WorkflowsError \
+            ("Attempting to drop callback reference for live subscription")
     if self.__subscriptions[subscription]['client']:
       self.__clients[self.__subscriptions[subscription]['client']] \
         ['subscriptions'].remove(subscription)
-    self._unsubscribe(subscription, **kwargs)
     del(self.__subscriptions[subscription])
 
   def subscribe_broadcast(self, channel, callback, **kwargs):
@@ -110,6 +136,7 @@ class CommonTransport(object):
       'client': kwargs.get('client_id'),
       'callback': callback,
       'ack': False,
+      'unsubscribed': False,
     }
     self.log.debug('Subscribing to broadcasts on %s for client %s with ID %d',
         channel, kwargs.get('client_id'), self.__subscription_id)
@@ -290,7 +317,10 @@ class CommonTransport(object):
       raise workflows.WorkflowsError("Attempting to drop unregistered client")
     channel_subscriptions = list(self.__clients[client_id]['subscriptions'])
     for subscription in channel_subscriptions:
-      self.unsubscribe(subscription)
+      if self.__subscriptions[subscription]['unsubscribed']:
+        self.drop_callback_reference(subscription)
+      else:
+        self.unsubscribe(subscription, drop_callback_reference=True)
     transactions = list(self.__clients[client_id]['transactions'])
     for transaction in transactions:
       self.transaction_abort(transaction)
