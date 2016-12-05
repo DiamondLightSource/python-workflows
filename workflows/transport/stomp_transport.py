@@ -124,6 +124,7 @@ class StompTransport(CommonTransport):
 
   def is_connected(self):
     '''Return connection status'''
+    self._connected = self._connected and self._conn.is_connected()
     return self._connected
 
   def disconnect(self):
