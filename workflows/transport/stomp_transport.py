@@ -233,7 +233,6 @@ class StompTransport(CommonTransport):
          ignore_namespace: Do not apply namespace to the destination name
          transaction:      Transaction ID if message should be part of a
                            transaction
-         reply-to:         Destination replies should be sent to
     '''
     headers = kwargs.get('headers', {})
     if 'headers' in kwargs:
@@ -263,7 +262,6 @@ class StompTransport(CommonTransport):
          ignore_namespace: Do not apply namespace to the destination name
          transaction:      Transaction ID if message should be part of a
                            transaction
-         reply-to:         Destination replies should be sent to
     '''
     headers = kwargs.get('headers', {})
     if 'headers' in kwargs:
