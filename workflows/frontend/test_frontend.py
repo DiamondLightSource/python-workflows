@@ -121,14 +121,13 @@ def test_frontend_can_handle_unhandled_service_initialization_exceptions():
   transport = mock.Mock()
 
   class CrashServiceNicelyOnInit(CommonService):
-    '''A service that crashes python 2.7 with a segmentation fault.'''
+    '''A service that raises an unhandled exception.'''
     @staticmethod
     def initializing():
       '''Raise AssertionError.
          This should set the error state, kill the service and cause the frontend
          to leave its main loop.'''
       assert False # pragma: no cover
-#   self._register_idle(1, self.kill_service)
 
   fe = workflows.frontend.Frontend(transport=transport, service=CrashServiceNicelyOnInit)
   transport = transport.return_value
@@ -136,6 +135,14 @@ def test_frontend_can_handle_unhandled_service_initialization_exceptions():
 
   with pytest.raises(workflows.WorkflowsError):
     fe.run()
+
+  status_list = [ args[0].get('status') for args, kwargs in transport.broadcast_status.call_args_list if args ]
+  assert status_list == [
+      CommonService.SERVICE_STATUS_NEW,
+      CommonService.SERVICE_STATUS_STARTING,
+      CommonService.SERVICE_STATUS_ERROR,
+      CommonService.SERVICE_STATUS_END,
+    ]
 
 @mock.patch('workflows.frontend.multiprocessing')
 def test_frontend_can_handle_service_initialization_segfaults(mock_mp):

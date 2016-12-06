@@ -97,26 +97,25 @@ class Frontend():
     near_past = time.time() - self._status_debounce_interval
     distant_past = time.time() - self._status_interval
     broadcast_status = self._status_last_broadcast < distant_past
-    while len(self._status_history) > (0 if status_code else 1) and \
+    while len(self._status_history) > (1 if status_code is None else 0) and \
           self._status_history[0][0] < near_past:
       self._status_history.pop(0)
-    recent_status_codes = {sh[1] for sh in self._status_history}
-    if status_code:
-      new_status_code = status_code not in recent_status_codes
-      self._status_history.append((time.time(), status_code))
-      if new_status_code:
-        broadcast_status = True
-        self._service_status = status_code
-      else:
-        status_code = max(recent_status_codes)
-        if status_code != self._service_status:
-          broadcast_status = True
-          self._service_status = status_code
-    else:
+    recent_status_codes = { sh[1] for sh in self._status_history }
+    if status_code is None:
       if self._status_history and \
          self._service_status not in recent_status_codes:
         self._service_status = max(sh[1] for sh in self._status_history)
         broadcast_status = True
+    else:
+      self._status_history.append((time.time(), status_code))
+      if status_code in recent_status_codes:
+        status_code = max(recent_status_codes)
+        if status_code != self._service_status:
+          broadcast_status = True
+          self._service_status = status_code
+      else:
+        broadcast_status = True
+        self._service_status = status_code
     if broadcast_status and self._transport and self._transport.is_connected():
       self._transport.broadcast_status(self.get_status())
       self._status_last_broadcast = time.time()
