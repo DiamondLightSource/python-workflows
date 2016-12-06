@@ -57,7 +57,7 @@ def test_start_service_in_frontend(mock_transport, mock_mp):
   fe.switch_service(mock_service)
 
   # check service was started properly
-  mock_service.assert_called_once_with(commands=mock.sentinel.pipe2, frontend=mock.sentinel.pipe3)
+  mock_service.assert_called_once_with(commands=mock.sentinel.pipe1, frontend=mock.sentinel.pipe4)
   mock_mp.Process.assert_called_once_with(target=mock_service.return_value.start, args=())
   mock_mp.Process.return_value.start.assert_called_once()
 

@@ -279,8 +279,8 @@ class Frontend():
         return False
 
       # Set up pipes and connect new service object
-      self._pipe_commands, svc_commands = multiprocessing.Pipe()
-      svc_tofrontend, self._pipe_service = multiprocessing.Pipe()
+      svc_commands, self._pipe_commands = multiprocessing.Pipe(False)
+      self._pipe_service, svc_tofrontend = multiprocessing.Pipe(False)
       service_instance = service_class(
         commands=svc_commands,
         frontend=svc_tofrontend)
