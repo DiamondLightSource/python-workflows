@@ -137,8 +137,7 @@ class CommonService(object):
       self.__service_status = statuscode
       self.__send_to_frontend({
         'band': 'status_update',
-        'statuscode': self.__service_status,
-        'trigger_update': trigger
+        'statuscode': self.__service_status
       })
 
   def get_name(self):

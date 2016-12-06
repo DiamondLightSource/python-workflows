@@ -191,7 +191,7 @@ def test_service_initialization_crashes_are_handled_correctly():
   fe_pipe.send.assert_called()
 
   # Service status should have been set to ERROR
-  fe_pipe.send.assert_any_call({ 'band': 'status_update', 'statuscode': service.SERVICE_STATUS_ERROR, 'trigger_update': mock.ANY})
+  fe_pipe.send.assert_any_call({ 'band': 'status_update', 'statuscode': service.SERVICE_STATUS_ERROR})
 
   # Traceback should have been sent to log
   log_msgs = filter(lambda c: c[0][0] == { 'band': 'log', 'payload': mock.ANY } and c[0][0]['payload'].levelname == 'CRITICAL', \
@@ -218,4 +218,4 @@ def test_service_can_change_name_and_shut_itself_down():
   # Check for service name update
   fe_pipe.send.assert_any_call({ 'band': 'set_name', 'name': mock.sentinel.newname })
   # Service should have shut down cleanly
-  fe_pipe.send.assert_any_call({ 'band': 'status_update', 'statuscode': service.SERVICE_STATUS_END, 'trigger_update': mock.ANY })
+  fe_pipe.send.assert_any_call({ 'band': 'status_update', 'statuscode': service.SERVICE_STATUS_END })

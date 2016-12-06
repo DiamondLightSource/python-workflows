@@ -6,9 +6,8 @@ import pytest
 import workflows.frontend
 
 @mock.patch('workflows.frontend.multiprocessing')
-@mock.patch('workflows.frontend.workflows.status.StatusAdvertise')
 @mock.patch('workflows.frontend.workflows.transport')
-def test_frontend_connects_to_transport_layer(mock_transport, mock_status, mock_mp):
+def test_frontend_connects_to_transport_layer(mock_transport, mock_mp):
   '''Frontend should call connect method on transport layer module and subscribe to a unique command queue.'''
   workflows.frontend.Frontend()
   mock_transport.lookup.assert_called_once_with(None)
@@ -23,9 +22,8 @@ def test_frontend_connects_to_transport_layer(mock_transport, mock_status, mock_
   mock_trn.assert_called_once_with()
   mock_trn.return_value.connect.assert_called_once_with()
 
-@mock.patch('workflows.frontend.workflows.status.StatusAdvertise')
 @mock.patch('workflows.frontend.workflows.transport')
-def test_frontend_subscribes_to_command_channel(mock_transport, mock_status):
+def test_frontend_subscribes_to_command_channel(mock_transport):
   '''Frontend should call connect method on transport layer module and subscribe to a unique command queue.'''
   transport = mock_transport.lookup.return_value.return_value
   fe = workflows.frontend.Frontend()
@@ -43,11 +41,9 @@ def test_frontend_subscribes_to_command_channel(mock_transport, mock_status):
   assert fe.shutdown == True
 
 @mock.patch('workflows.frontend.multiprocessing')
-@mock.patch('workflows.frontend.workflows.status.StatusAdvertise')
 @mock.patch('workflows.frontend.workflows.transport')
-def test_start_service_in_frontend(mock_transport, mock_status, mock_mp):
-  '''Check that the service is being run and connected to the frontend properly via the correct pipes,
-     and the status advertiser is being started in the background.'''
+def test_start_service_in_frontend(mock_transport, mock_mp):
+  '''Check that the service is being run and connected to the frontend via the correct pipes.'''
   mock_service = mock.Mock()
   mock_mp.Pipe.side_effect = [
       (mock.sentinel.pipe1, mock.sentinel.pipe2),
@@ -57,10 +53,6 @@ def test_start_service_in_frontend(mock_transport, mock_status, mock_mp):
   # initialize frontend
   fe = workflows.frontend.Frontend()
 
-  # check status information is being broadcast
-  mock_status.assert_called_once()
-  mock_status.return_value.start.assert_called_once()
-
   # start service
   fe.switch_service(mock_service)
 
@@ -69,16 +61,14 @@ def test_start_service_in_frontend(mock_transport, mock_status, mock_mp):
   mock_mp.Process.assert_called_once_with(target=mock_service.return_value.start, args=())
   mock_mp.Process.return_value.start.assert_called_once()
 
-@mock.patch('workflows.frontend.workflows.status.StatusAdvertise')
 @mock.patch('workflows.frontend.workflows.transport')
-def test_get_frontend_status(mock_transport, mock_status):
+def test_get_frontend_status(mock_transport):
   '''Check that the get_status-method works and contains the correct host-id.'''
   fe = workflows.frontend.Frontend()
   status = fe.get_status()
   assert status['host'] == fe.get_host_id()
 
-@mock.patch('workflows.frontend.workflows.status.StatusAdvertise')
-def test_connect_queue_communication_to_transport_layer(mock_status):
+def test_connect_queue_communication_to_transport_layer():
   '''Check that communication messages coming in from the service layer via the Queue are
      passed correctly to the transport layer and vice versa in the other direction.'''
   transport = mock.Mock()
@@ -125,9 +115,8 @@ def test_connect_queue_communication_to_transport_layer(mock_status):
         }
     } )
 
-@mock.patch('workflows.frontend.workflows.status.StatusAdvertise')
 @pytest.mark.timeout(3)
-def test_frontend_can_handle_unhandled_service_initialization_exceptions(mock_status):
+def test_frontend_can_handle_unhandled_service_initialization_exceptions():
   '''When a service crashes on initialization an exception should be thrown.'''
   transport = mock.Mock()
 
@@ -148,9 +137,8 @@ def test_frontend_can_handle_unhandled_service_initialization_exceptions(mock_st
   with pytest.raises(workflows.WorkflowsError):
     fe.run()
 
-@mock.patch('workflows.frontend.workflows.status.StatusAdvertise')
 @mock.patch('workflows.frontend.multiprocessing')
-def test_frontend_can_handle_service_initialization_segfaults(mock_mp, mock_status):
+def test_frontend_can_handle_service_initialization_segfaults(mock_mp):
   '''When a service crashes on initialization an exception should be thrown.'''
   transport = mock.Mock()
   service = mock.Mock()
@@ -172,9 +160,8 @@ def test_frontend_can_handle_service_initialization_segfaults(mock_mp, mock_stat
   service_process.is_alive.assert_called()
   service_process.join.assert_called()
 
-@mock.patch('workflows.frontend.workflows.status.StatusAdvertise')
 @mock.patch('workflows.frontend.multiprocessing')
-def test_frontend_terminates_on_transport_disconnection(mock_mp, mock_status):
+def test_frontend_terminates_on_transport_disconnection(mock_mp):
   '''When the transport connection is lost permanently, the frontend should stop.'''
   transport = mock.Mock()
   service = mock.Mock()
@@ -227,9 +214,8 @@ class MockPipe(object):
     '''Pipe must have been read out completely.'''
     assert not self.contents
 
-@mock.patch('workflows.frontend.workflows.status.StatusAdvertise')
 @mock.patch('workflows.frontend.multiprocessing')
-def test_frontend_parses_status_updates(mock_mp, mock_status):
+def test_frontend_parses_status_updates(mock_mp):
   '''The frontend should forward status updates to the advertiser thread when appropriate.'''
   transport = mock.Mock()
   service_process = mock.Mock()
@@ -237,24 +223,105 @@ def test_frontend_parses_status_updates(mock_mp, mock_status):
   def end_service_process():
     service_process.is_alive.return_value = False
   mock_mp.Process.return_value = service_process
-  status_thread = mock_status.return_value
 
-  dummy_pipe = MockPipe([{'band': 'status_update', 'statuscode': 1},
-                         {'band': 'status_update', 'statuscode': 2},
-                         {'band': 'status_update', 'statuscode': 3, 'trigger_update': False}],
-                        on_empty=end_service_process)
+  dummy_pipe = MockPipe([
+    {'band': 'status_update', 'statuscode': CommonService.SERVICE_STATUS_NEW},
+    {'band': 'status_update', 'statuscode': CommonService.SERVICE_STATUS_STARTING},
+    {'band': 'status_update', 'statuscode': CommonService.SERVICE_STATUS_PROCESSING},
+    {'band': 'status_update', 'statuscode': CommonService.SERVICE_STATUS_SHUTDOWN},
+    {'band': 'status_update', 'statuscode': CommonService.SERVICE_STATUS_END}],
+                         on_empty=end_service_process)
   mock_mp.Pipe.return_value = (dummy_pipe, dummy_pipe)
 
   fe = workflows.frontend.Frontend(transport=transport, service=mock.Mock())
-  mock_status.assert_called_once()
-  status_callback = mock_status.call_args[1]['status_callback']
-  # Record status on trigger call
-  trigger_status = []
-  mock_status.return_value.trigger = lambda: trigger_status.append(status_callback())
+
+  # intercept status code updates
+  status_list = []
+  original_status_update_fn = fe.update_status
+  def intercept(*args, **kwargs):
+    if 'status_code' in kwargs:
+      status_list.append(kwargs['status_code'])
+    return original_status_update_fn(*args, **kwargs)
+  fe.update_status = intercept
 
   fe.run()
 
   dummy_pipe.assert_empty()
-  # Status 0 is not reported via trigger(), status 3 must not be reported via trigger()
-  # -2 status via trigger() expected due to shutdown.
-  assert list(s['status'] for s in trigger_status) == [1, 2, -2]
+  assert status_list == [CommonService.SERVICE_STATUS_NEW,
+                         CommonService.SERVICE_STATUS_STARTING,
+                         CommonService.SERVICE_STATUS_PROCESSING,
+                         CommonService.SERVICE_STATUS_SHUTDOWN,
+                         CommonService.SERVICE_STATUS_END, # Following updates caused by frontend
+                         CommonService.SERVICE_STATUS_END,
+                         CommonService.SERVICE_STATUS_TEARDOWN]
+
+@mock.patch('workflows.frontend.time')
+@mock.patch('workflows.frontend.multiprocessing')
+def test_frontend_sends_status_updates(mock_mp, mock_time):
+  '''The frontend should send status updates on update_status() calls.
+     Some sensible rate limiting must be applied.'''
+  transport = mock.Mock()
+  mock_time.time.return_value = 10
+
+  fe = workflows.frontend.Frontend(transport=transport)
+
+  transport = transport.return_value
+  transport.broadcast_status.assert_called_once()
+  assert transport.broadcast_status.call_args[0][0]['status'] == \
+      CommonService.SERVICE_STATUS_NONE
+  transport.broadcast_status.reset_mock()
+
+  fe.update_status(status_code=CommonService.SERVICE_STATUS_STARTING)
+
+  transport.broadcast_status.assert_called_once()
+  assert transport.broadcast_status.call_args[0][0]['status'] == \
+      CommonService.SERVICE_STATUS_STARTING
+  transport.broadcast_status.reset_mock()
+
+  # subsequent update call that does not change anything should be ignored
+  fe.update_status()
+  transport.broadcast_status.assert_not_called()
+
+  # time passes. Update call should cause broadcast.
+  mock_time.time.return_value = 20
+  fe.update_status()
+  transport.broadcast_status.assert_called_once()
+  assert transport.broadcast_status.call_args[0][0]['status'] == \
+      CommonService.SERVICE_STATUS_STARTING
+  transport.broadcast_status.reset_mock()
+
+  # not much time passes. Update call should still cause broadcast, because status has not been seen before
+  mock_time.time.return_value = 20.1
+  fe.update_status(status_code=CommonService.SERVICE_STATUS_PROCESSING)
+  transport.broadcast_status.assert_called_once()
+  assert transport.broadcast_status.call_args[0][0]['status'] == \
+      CommonService.SERVICE_STATUS_PROCESSING
+  transport.broadcast_status.reset_mock()
+
+  # not much time passes. Update call should still cause broadcast, because status has not been seen before
+  mock_time.time.return_value = 20.2
+  fe.update_status(status_code=CommonService.SERVICE_STATUS_IDLE)
+  transport.broadcast_status.assert_called_once()
+  assert transport.broadcast_status.call_args[0][0]['status'] == \
+      CommonService.SERVICE_STATUS_IDLE
+  transport.broadcast_status.reset_mock()
+
+  # not much time passes. Update call should still cause broadcast, because status is higher
+  mock_time.time.return_value = 20.3
+  fe.update_status(status_code=CommonService.SERVICE_STATUS_PROCESSING)
+  transport.broadcast_status.assert_called_once()
+  assert transport.broadcast_status.call_args[0][0]['status'] == \
+      CommonService.SERVICE_STATUS_PROCESSING
+  transport.broadcast_status.reset_mock()
+
+  # not much time passes. Update call should NOT cause broadcast, because status has been seen before and is lower
+  mock_time.time.return_value = 20.4
+  fe.update_status(status_code=CommonService.SERVICE_STATUS_IDLE)
+  transport.broadcast_status.assert_not_called()
+
+  # however as time passes the update call should cause a late broadcast
+  mock_time.time.return_value = 22
+  fe.update_status()
+  transport.broadcast_status.assert_called_once()
+  assert transport.broadcast_status.call_args[0][0]['status'] == \
+      CommonService.SERVICE_STATUS_IDLE

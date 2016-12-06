@@ -7,15 +7,14 @@ import time
 import workflows
 import workflows.services
 from workflows.services.common_service import CommonService
-import workflows.status
 import workflows.transport
 
 class Frontend():
   '''The frontend class encapsulates the actual service. It controls the
      service process and keeps the connection to the transport layer. It
      can process control messages directly, or pass messages on to the
-     service. On initialization a status advertising thread is started,
-     which keeps running in the background.'''
+     service.
+  '''
 
   def __init__(self, transport=None, service=None,
       transport_command_prefix=None):
@@ -41,6 +40,12 @@ class Frontend():
 
     self.restart_service = False
     self.shutdown = False
+
+    # Status broadcast related variables
+    self._status_interval = 6
+    self._status_debounce_interval = 1.5
+    self._status_last_broadcast = 0
+    self._status_history = []
 
     # Set up logging
     class LogAdapter():
@@ -82,15 +87,39 @@ class Frontend():
     # Start initial service if one has been requested
     self._service_factory = service
     if service is not None:
-      self._service_status = CommonService.SERVICE_STATUS_NEW
+      self.update_status(CommonService.SERVICE_STATUS_NEW)
       self.switch_service(service)
 
     # Start broadcasting node information
-    self._status_advertiser = workflows.status.StatusAdvertise(
-        interval=6,
-        status_callback=self.get_status,
-        transport=self._transport)
-    self._status_advertiser.start()
+    self.update_status()
+
+  def update_status(self, status_code=None):
+    near_past = time.time() - self._status_debounce_interval
+    distant_past = time.time() - self._status_interval
+    broadcast_status = self._status_last_broadcast < distant_past
+    while len(self._status_history) > (0 if status_code else 1) and \
+          self._status_history[0][0] < near_past:
+      self._status_history.pop(0)
+    recent_status_codes = {sh[1] for sh in self._status_history}
+    if status_code:
+      new_status_code = status_code not in recent_status_codes
+      self._status_history.append((time.time(), status_code))
+      if new_status_code:
+        broadcast_status = True
+        self._service_status = status_code
+      else:
+        status_code = max(recent_status_codes)
+        if status_code != self._service_status:
+          broadcast_status = True
+          self._service_status = status_code
+    else:
+      if self._status_history and \
+         self._service_status not in recent_status_codes:
+        self._service_status = max(sh[1] for sh in self._status_history)
+        broadcast_status = True
+    if broadcast_status and self._transport and self._transport.is_connected():
+      self._transport.broadcast_status(self.get_status())
+      self._status_last_broadcast = time.time()
 
   def run(self):
     '''The main loop of the frontend. Here incoming messages from the service
@@ -98,6 +127,7 @@ class Frontend():
     self.log.debug("Entered main loop")
     n = 3600
     while n > 0 and not self.shutdown:
+      self.update_status()
       # When a service is running, check for incoming messages from that service
       if self._pipe_service and self._pipe_service.poll(1):
         try:
@@ -148,7 +178,7 @@ class Frontend():
 
       with self.__lock:
         if self._service is None and self.restart_service and self._service_factory:
-          self._service_status = CommonService.SERVICE_STATUS_NEW
+          self.update_status(status_code=CommonService.SERVICE_STATUS_NEW)
           self.switch_service(self._service_factory)
 
       n = n - 1
@@ -163,15 +193,9 @@ class Frontend():
         self._terminate_service()
         raise workflows.WorkflowsError('Lost transport layer connection')
 
-    self._service_status = CommonService.SERVICE_STATUS_TEARDOWN
-    self._status_advertiser.trigger()
+    self.update_status(status_code=CommonService.SERVICE_STATUS_TEARDOWN)
     self._terminate_service()
     self.log.info("Fin. Terminating.")
-
-  def stop(self):
-    self._terminate_service()
-    self._status_advertiser.stop_and_wait()
-    self._transport_disconnect()
 
   def send_command(self, command):
     '''Send command to service via the command queue.'''
@@ -211,9 +235,7 @@ class Frontend():
   def parse_band_status_update(self, message):
     '''Process incoming status updates from the service.'''
     self.log.debug("Status update: " + str(message))
-    self._service_status = message['statuscode']
-    if message.get('trigger_update', True):
-      self._status_advertiser.trigger()
+    self.update_status(status_code=message['statuscode'])
 
   def get_host_id(self):
     '''Get a cached copy of the host id.'''
@@ -291,7 +313,8 @@ class Frontend():
       self._pipe_commands = None
       self._pipe_service = None
       self._service_name = None
-      self._service_status = CommonService.SERVICE_STATUS_END
+      if self._service_status != CommonService.SERVICE_STATUS_TEARDOWN:
+        self.update_status(status_code=CommonService.SERVICE_STATUS_END)
       if self._service_transportid:
         self._transport.drop_client(self._service_transportid)
       self._service_transportid = None
