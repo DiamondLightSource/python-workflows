@@ -45,6 +45,14 @@ class MockPipe(object):
     '''Pipe must have been read out completely.'''
     assert not self.contents
 
+def assert_single_call_only(target):
+  def wrapper(*args, **kwargs):
+    if hasattr(wrapper, 'called'):
+      raise Exception('Only a single call to object %s is allowed' % str(target))
+    setattr(wrapper, 'called', True)
+    return target(*args, **kwargs)
+  return wrapper
+
 ###############################################################################
 
 @mock.patch('workflows.frontend.multiprocessing')
@@ -168,7 +176,8 @@ def test_frontend_can_handle_unhandled_service_initialization_exceptions():
   '''When a service crashes on initialization an exception should be thrown.'''
   transport = mock.Mock()
 
-  fe = workflows.frontend.Frontend(transport=transport, service=ServiceCrashingOnInit)
+  fe = workflows.frontend.Frontend(transport=transport,
+                                   service=assert_single_call_only(ServiceCrashingOnInit))
   transport = transport.return_value
   transport.connect.assert_called_once()
 
