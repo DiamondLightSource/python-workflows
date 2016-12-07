@@ -295,6 +295,12 @@ class Frontend():
       self._service_name = service_instance.get_name()
       self._service.daemon = True
       self._service.start()
+
+      # Starting the process copies all file descriptors.
+      # At this point (and no sooner!) the passed pipe objects must be closed
+      # in this process here.
+      svc_commands.close()
+      svc_tofrontend.close()
     self.log.info("Started service: %s", self._service_name)
     return True
 

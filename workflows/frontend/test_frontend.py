@@ -45,9 +45,10 @@ def test_frontend_subscribes_to_command_channel(mock_transport):
 def test_start_service_in_frontend(mock_transport, mock_mp):
   '''Check that the service is being run and connected to the frontend via the correct pipes.'''
   mock_service = mock.Mock()
+  pipes = [ mock.Mock(), mock.Mock(), mock.Mock(), mock.Mock() ]
   mock_mp.Pipe.side_effect = [
-      (mock.sentinel.pipe1, mock.sentinel.pipe2),
-      (mock.sentinel.pipe3, mock.sentinel.pipe4),
+      (pipes[0], pipes[1]),
+      (pipes[2], pipes[3]),
       None ]
 
   # initialize frontend
@@ -57,9 +58,14 @@ def test_start_service_in_frontend(mock_transport, mock_mp):
   fe.switch_service(mock_service)
 
   # check service was started properly
-  mock_service.assert_called_once_with(commands=mock.sentinel.pipe1, frontend=mock.sentinel.pipe4)
+  mock_service.assert_called_once_with(commands=pipes[0], frontend=pipes[3])
   mock_mp.Process.assert_called_once_with(target=mock_service.return_value.start, args=())
   mock_mp.Process.return_value.start.assert_called_once()
+
+  # Fun with python multiprocessing:
+  # Because the pipe file descriptors are copied they must be closed in the process not using them
+  pipes[0].close.assert_called_once_with()
+  pipes[3].close.assert_called_once_with()
 
 @mock.patch('workflows.frontend.workflows.transport')
 def test_get_frontend_status(mock_transport):
