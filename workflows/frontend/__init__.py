@@ -17,7 +17,7 @@ class Frontend():
   '''
 
   def __init__(self, transport=None, service=None,
-      transport_command_prefix=None):
+      transport_command_prefix=None, restart_service=False):
     '''Create a frontend instance. Connect to the transport layer, start any
        requested service, begin broadcasting status information and listen
        for control commands.
@@ -37,8 +37,9 @@ class Frontend():
     self._pipe_commands = None # frontend -> service
     self._pipe_service = None  # frontend <- service
     self._service_status = CommonService.SERVICE_STATUS_NONE
+    self._service_status_announced = CommonService.SERVICE_STATUS_NONE
 
-    self.restart_service = False
+    self.restart_service = restart_service
     self.shutdown = False
 
     # Status broadcast related variables
@@ -89,11 +90,22 @@ class Frontend():
     if service is not None:
       self.update_status(CommonService.SERVICE_STATUS_NEW)
       self.switch_service(service)
-
-    # Start broadcasting node information
-    self.update_status()
+    else:
+      self.update_status()
 
   def update_status(self, status_code=None):
+    '''Update the service status kept inside the frontend (_service_status).
+       The status is also broadcasted, however to keep the network load down
+       updates are rate-limited when the new status code has already been
+       seen within _status_debounce_interval seconds.
+       When the status does not change it is still broadcasted every
+       _status_interval seconds.
+       :param status_code: Either an integer describing the service status
+                           (see workflows.services.common_service), or None
+                           if the status is unchanged.
+    '''
+    if status_code is not None:
+      self._service_status = status_code
     near_past = time.time() - self._status_debounce_interval
     distant_past = time.time() - self._status_interval
     broadcast_status = self._status_last_broadcast < distant_past
@@ -103,19 +115,19 @@ class Frontend():
     recent_status_codes = { sh[1] for sh in self._status_history }
     if status_code is None:
       if self._status_history and \
-         self._service_status not in recent_status_codes:
-        self._service_status = max(sh[1] for sh in self._status_history)
+          self._service_status_announced not in recent_status_codes:
+        self._service_status_announced = max(sh[1] for sh in self._status_history)
         broadcast_status = True
     else:
       self._status_history.append((time.time(), status_code))
       if status_code in recent_status_codes:
         status_code = max(recent_status_codes)
-        if status_code != self._service_status:
+        if status_code != self._service_status_announced:
           broadcast_status = True
-          self._service_status = status_code
+          self._service_status_announced = status_code
       else:
         broadcast_status = True
-        self._service_status = status_code
+        self._service_status_announced = status_code
     if broadcast_status and self._transport and self._transport.is_connected():
       self._transport.broadcast_status(self.get_status())
       self._status_last_broadcast = time.time()
@@ -127,7 +139,7 @@ class Frontend():
     n = 3600
     while n > 0 and not self.shutdown:
       self.update_status()
-      # When a service is running, check for incoming messages from that service
+      # While a service is running, check for incoming messages from that service
       if self._pipe_service and self._pipe_service.poll(1):
         try:
           message = self._pipe_service.recv()
@@ -145,35 +157,32 @@ class Frontend():
 #                print 'Uh oh. What to do.'
           else:
             self.log.warn("Invalid message received %s", str(message))
-        except Queue.Empty:
-          pass
-
-      # Check that the service is alive
-      with self.__lock:
-        if self._service and \
-           not self._service.is_alive() and \
-           not self._pipe_service.poll():
+        except EOFError:
+          # Service has gone away
+          error_message = False
           if self._service_status == CommonService.SERVICE_STATUS_END:
             self.log.info("Service terminated")
-          else:
-            if self._service_status in (CommonService.SERVICE_STATUS_NONE,
+          elif self._service_status == CommonService.SERVICE_STATUS_ERROR:
+            error_message = "Service terminated with error code"
+          elif self._service_status in (CommonService.SERVICE_STATUS_NONE,
                                         CommonService.SERVICE_STATUS_NEW,
                                         CommonService.SERVICE_STATUS_STARTING):
-              error_message = 'Service may have died unexpectedly in ' \
-                            + 'initialization (last known status: %s)' \
-                                % CommonService.human_readable_state[ \
-                                      self._service_status]
-              self.log.error(error_message)
-              self._terminate_service()
-              raise workflows.WorkflowsError(error_message)
-            else:
-              self.log.warn("Service may have died unexpectedly" \
+            error_message = 'Service may have died unexpectedly in ' \
+                          + 'initialization (last known status: %s)' \
+                              % CommonService.human_readable_state.get( \
+                                    self._service_status, self._service_status)
+          else:
+            error_message = "Service may have died unexpectedly" \
                             " (last known status: %s" \
-                            % CommonService.human_readable_state[ \
-                                      self._service_status])
+                            % CommonService.human_readable_state.get( \
+                                    self._service_status, self._service_status)
+          if error_message:
+            self.log.error(error_message)
           self._terminate_service()
           if not self.restart_service:
             self.shutdown = True
+            if error_message:
+              raise workflows.WorkflowsError(error_message)
 
       with self.__lock:
         if self._service is None and self.restart_service and self._service_factory:
@@ -181,11 +190,6 @@ class Frontend():
           self.switch_service(self._service_factory)
 
       n = n - 1
-
-      # Check if service crash was detected
-      if self._service_status == CommonService.SERVICE_STATUS_ERROR:
-        self._terminate_service()
-        raise workflows.WorkflowsError('A service crash was detected')
 
       # Check that the transport is alive
       if not self._transport.is_connected():
@@ -254,8 +258,8 @@ class Frontend():
     '''Returns a dictionary containing all relevant status information to be
        broadcast across the network.'''
     return { 'host': self.__hostid,
-             'status': self._service_status,
-             'statustext': CommonService.human_readable_state.get(self._service_status),
+             'status': self._service_status_announced,
+             'statustext': CommonService.human_readable_state.get(self._service_status_announced),
              'service': self._service_name }
 
   def switch_service(self, new_service):
@@ -318,6 +322,7 @@ class Frontend():
       self._pipe_commands = None
       self._pipe_service = None
       self._service_name = None
+      self._status_history = []
       if self._service_status != CommonService.SERVICE_STATUS_TEARDOWN:
         self.update_status(status_code=CommonService.SERVICE_STATUS_END)
       if self._service_transportid:

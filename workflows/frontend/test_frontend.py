@@ -5,6 +5,48 @@ import multiprocessing
 import pytest
 import workflows.frontend
 
+### Helper classes used in tests ##############################################
+
+class ServiceCrashingOnInit(CommonService):
+  '''A service that raises an unhandled exception.'''
+  @staticmethod
+  def initializing():
+    '''Raise AssertionError.
+       This should set the error state, kill the service and cause the frontend
+       to leave its main loop.'''
+    assert False # pragma: no cover
+
+class MockPipe(object):
+  '''An object that behaves like a pipe.'''
+  def __init__(self, contents, on_empty=None):
+    '''Load up contents into pipe. Set up an optional callback function.'''
+    self.contents = contents
+    self.on_empty = on_empty
+
+  def poll(self, time=None):
+    '''Check if pipe is empty. There is always something there, either
+       some content or an EOFError.'''
+    return True
+
+  def recv(self):
+    '''Return first item off the list or raise exception.
+       Call callback function if defined and pipe is emptied.'''
+    if not self.contents:
+      raise EOFError('Pipe is empty')
+    if len(self.contents) == 1 and self.on_empty:
+      self.on_empty()
+    return self.contents.pop(0)
+
+  @staticmethod
+  def close():
+    '''This pipe can't be written to anyway. Ignore call.'''
+
+  def assert_empty(self):
+    '''Pipe must have been read out completely.'''
+    assert not self.contents
+
+###############################################################################
+
 @mock.patch('workflows.frontend.multiprocessing')
 @mock.patch('workflows.frontend.workflows.transport')
 def test_frontend_connects_to_transport_layer(mock_transport, mock_mp):
@@ -126,16 +168,7 @@ def test_frontend_can_handle_unhandled_service_initialization_exceptions():
   '''When a service crashes on initialization an exception should be thrown.'''
   transport = mock.Mock()
 
-  class CrashServiceNicelyOnInit(CommonService):
-    '''A service that raises an unhandled exception.'''
-    @staticmethod
-    def initializing():
-      '''Raise AssertionError.
-         This should set the error state, kill the service and cause the frontend
-         to leave its main loop.'''
-      assert False # pragma: no cover
-
-  fe = workflows.frontend.Frontend(transport=transport, service=CrashServiceNicelyOnInit)
+  fe = workflows.frontend.Frontend(transport=transport, service=ServiceCrashingOnInit)
   transport = transport.return_value
   transport.connect.assert_called_once()
 
@@ -157,10 +190,9 @@ def test_frontend_can_handle_service_initialization_segfaults(mock_mp):
   service = mock.Mock()
   service_process = mock.Mock()
   dummy_pipe = mock.Mock()
-  dummy_pipe.poll.return_value = False
+  dummy_pipe.recv.side_effect = EOFError() # Dead on arrival
   mock_mp.Pipe.return_value = (dummy_pipe, dummy_pipe)
   mock_mp.Process.return_value = service_process
-  service_process.is_alive.return_value = False # Dead on arrival
 
   fe = workflows.frontend.Frontend(transport=transport, service=service)
   transport = transport.return_value
@@ -170,7 +202,6 @@ def test_frontend_can_handle_service_initialization_segfaults(mock_mp):
   with pytest.raises(workflows.WorkflowsError):
     fe.run()
   service_process.start.assert_called()
-  service_process.is_alive.assert_called()
   service_process.join.assert_called()
 
 @mock.patch('workflows.frontend.multiprocessing')
@@ -197,53 +228,20 @@ def test_frontend_terminates_on_transport_disconnection(mock_mp):
   service_process.terminate.assert_called()
   service_process.join.assert_called()
 
-class MockPipe(object):
-  '''A testing object that behaves like a pipe.'''
-  def __init__(self, contents, on_empty=None):
-    '''Load up contents into pipe. Set up an optional callback function.'''
-    self.contents = contents
-    self.on_empty = on_empty
-
-  def poll(self, time=None):
-    '''Check if pipe is empty.'''
-    if self.contents:
-      return True
-    return False
-
-  def recv(self):
-    '''Return first item off the list or raise exception.
-       Call callback function if defined and pipe is emptied.'''
-    if not self.contents:
-      raise EOFError('Pipe is empty')
-    if len(self.contents) == 1 and self.on_empty:
-      self.on_empty()
-    return self.contents.pop(0)
-
-  @staticmethod
-  def close():
-    '''This pipe can't be written to anyway. Ignore call.'''
-
-  def assert_empty(self):
-    '''Pipe must have been read out completely.'''
-    assert not self.contents
-
 @mock.patch('workflows.frontend.multiprocessing')
 def test_frontend_parses_status_updates(mock_mp):
   '''The frontend should forward status updates to the advertiser thread when appropriate.'''
   transport = mock.Mock()
   service_process = mock.Mock()
-  service_process.is_alive.return_value = True
-  def end_service_process():
-    service_process.is_alive.return_value = False
   mock_mp.Process.return_value = service_process
 
   dummy_pipe = MockPipe([
-    {'band': 'status_update', 'statuscode': CommonService.SERVICE_STATUS_NEW},
-    {'band': 'status_update', 'statuscode': CommonService.SERVICE_STATUS_STARTING},
-    {'band': 'status_update', 'statuscode': CommonService.SERVICE_STATUS_PROCESSING},
-    {'band': 'status_update', 'statuscode': CommonService.SERVICE_STATUS_SHUTDOWN},
-    {'band': 'status_update', 'statuscode': CommonService.SERVICE_STATUS_END}],
-                         on_empty=end_service_process)
+      {'band': 'status_update', 'statuscode': CommonService.SERVICE_STATUS_NEW},
+      {'band': 'status_update', 'statuscode': CommonService.SERVICE_STATUS_STARTING},
+      {'band': 'status_update', 'statuscode': CommonService.SERVICE_STATUS_PROCESSING},
+      {'band': 'status_update', 'statuscode': CommonService.SERVICE_STATUS_SHUTDOWN},
+      {'band': 'status_update', 'statuscode': CommonService.SERVICE_STATUS_END},
+    ])
   mock_mp.Pipe.return_value = (dummy_pipe, dummy_pipe)
 
   fe = workflows.frontend.Frontend(transport=transport, service=mock.Mock())
@@ -338,3 +336,51 @@ def test_frontend_sends_status_updates(mock_mp, mock_time):
   transport.broadcast_status.assert_called_once()
   assert transport.broadcast_status.call_args[0][0]['status'] == \
       CommonService.SERVICE_STATUS_IDLE
+
+@mock.patch('workflows.frontend.multiprocessing')
+def test_frontend_does_not_restart_nonrestartable_service_on_segfault(mock_mp):
+  '''When the frontend is constructed with restart_service=False failing services must not be restarted.'''
+  service_factory = mock.Mock()
+  service_process = mock.Mock()
+  dummy_pipe = mock.Mock()
+  dummy_pipe.recv.side_effect = EOFError() # Dead on arrival
+  mock_mp.Pipe.return_value = (dummy_pipe, dummy_pipe)
+  mock_mp.Process.return_value = service_process
+
+  service_instances = [ mock.Mock() ]
+  service_factory.side_effect = service_instances + [ Exception('More than one service object instantiated') ]
+
+  fe = workflows.frontend.Frontend(transport=mock.Mock(), service=service_factory, restart_service=False)
+  with pytest.raises(workflows.WorkflowsError):
+    fe.run()
+
+  service_factory.assert_called_once()
+  service_process.start.assert_called_once()
+  service_process.join.assert_called_once()
+  mock_mp.Process.assert_called_once_with(target=service_instances[0].start, args=())
+
+@mock.patch('workflows.frontend.multiprocessing')
+def test_frontend_does_not_restart_nonrestartable_service_on_error(mock_mp):
+  '''When the frontend is constructed with restart_service=False failing services must not be restarted.'''
+  transport = mock.Mock()
+  service_instances = [ mock.Mock() ]
+  service_factory = mock.Mock()
+  service_factory.side_effect = service_instances + [ Exception('More than one service object instantiated') ]
+  service_process = mock.Mock()
+  mock_mp.Process.return_value = service_process
+
+  dummy_pipe = MockPipe([
+      {'band': 'status_update', 'statuscode': CommonService.SERVICE_STATUS_NEW},
+      {'band': 'status_update', 'statuscode': CommonService.SERVICE_STATUS_STARTING},
+      {'band': 'status_update', 'statuscode': CommonService.SERVICE_STATUS_PROCESSING},
+      {'band': 'status_update', 'statuscode': CommonService.SERVICE_STATUS_ERROR},
+    ])
+  mock_mp.Pipe.return_value = (dummy_pipe, dummy_pipe)
+
+  fe = workflows.frontend.Frontend(transport=mock.Mock(), service=service_factory, restart_service=False)
+  with pytest.raises(workflows.WorkflowsError):
+    fe.run()
+
+  service_factory.assert_called_once()
+  service_process.start.assert_called_once()
+  service_process.join.assert_called_once()
