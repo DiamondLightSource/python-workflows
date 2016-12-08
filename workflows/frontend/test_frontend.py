@@ -393,3 +393,67 @@ def test_frontend_does_not_restart_nonrestartable_service_on_error(mock_mp):
   service_factory.assert_called_once()
   service_process.start.assert_called_once()
   service_process.join.assert_called_once()
+
+@mock.patch('workflows.frontend.multiprocessing')
+def test_frontend_does_restart_restartable_service_on_segfault(mock_mp):
+  '''When the frontend is constructed with restart_service=True failing services must be restarted.'''
+  service_factory = mock.Mock()
+  service_process = mock.Mock()
+  dummy_pipe = mock.Mock()
+  dummy_pipe.recv.side_effect = EOFError() # Dead on arrival
+  mock_mp.Pipe.return_value = (dummy_pipe, dummy_pipe)
+  mock_mp.Process.return_value = service_process
+
+  sentinel_exception = Exception('break loop')
+
+  service_instances = [ mock.Mock(), mock.Mock() ]
+  service_factory.side_effect = service_instances + [ sentinel_exception ]
+
+  fe = workflows.frontend.Frontend(transport=mock.Mock(), service=service_factory, restart_service=True)
+  try:
+    fe.run()
+    assert False, "Exception should have been raised"
+  except Exception, e:
+    if e != sentinel_exception:
+      raise
+
+  assert service_factory.call_count == 3
+  assert service_process.start.call_count == 2
+  assert service_process.join.call_count == 2
+  mock_mp.Process.assert_has_calls( [ mock.call(args=(), target=service_instances[0].start),
+                                      mock.call(args=(), target=service_instances[1].start) ], any_order=True )
+
+@mock.patch('workflows.frontend.multiprocessing')
+def test_frontend_does_restart_restartable_service_on_error(mock_mp):
+  '''When the frontend is constructed with restart_service=True failing services must be restarted.'''
+  transport = mock.Mock()
+  sentinel_exception = Exception('break loop')
+  service_instances = [ mock.Mock(), mock.Mock() ]
+  service_factory = mock.Mock()
+  service_factory.side_effect = service_instances + [ sentinel_exception ]
+  service_process = mock.Mock()
+  mock_mp.Process.return_value = service_process
+
+  def pipe_creator(*args, **kwargs):
+    '''Pipe creator creates pipes.'''
+    dummy_pipe = MockPipe([
+      {'band': 'status_update', 'statuscode': CommonService.SERVICE_STATUS_NEW},
+      {'band': 'status_update', 'statuscode': CommonService.SERVICE_STATUS_STARTING},
+      {'band': 'status_update', 'statuscode': CommonService.SERVICE_STATUS_PROCESSING},
+      {'band': 'status_update', 'statuscode': CommonService.SERVICE_STATUS_ERROR},
+    ])
+    return (dummy_pipe, dummy_pipe)
+  mock_mp.Pipe.side_effect = pipe_creator
+  fe = workflows.frontend.Frontend(transport=mock.Mock(), service=service_factory, restart_service=True)
+  try:
+    fe.run()
+    assert False, "Exception should have been raised"
+  except Exception, e:
+    if e != sentinel_exception:
+      raise
+
+  assert service_factory.call_count == 3
+  assert service_process.start.call_count == 2
+  assert service_process.join.call_count == 2
+  mock_mp.Process.assert_has_calls( [ mock.call(args=(), target=service_instances[0].start),
+                                      mock.call(args=(), target=service_instances[1].start) ], any_order=True )

@@ -28,10 +28,13 @@ class Frontend():
        :param transport_command_prefix: An optional prefix of a transport
                                         subscription to be listened to for
                                         commands.
+       :param restart_service: If the service process dies unexpectedly the
+                               frontend should start a new instance.
     '''
     self.__lock = threading.RLock()
     self.__hostid = self._generate_unique_host_id()
-    self._service = None
+    self._service = None         # pointer to the service instance
+    self._service_factory = None # pointer to the service class
     self._service_name = None
     self._service_transportid = None
     self._pipe_commands = None # frontend -> service
@@ -89,7 +92,7 @@ class Frontend():
     self._service_factory = service
     if service is not None:
       self.update_status(CommonService.SERVICE_STATUS_NEW)
-      self.switch_service(service)
+      self.switch_service()
     else:
       self.update_status()
 
@@ -187,7 +190,7 @@ class Frontend():
       with self.__lock:
         if self._service is None and self.restart_service and self._service_factory:
           self.update_status(status_code=CommonService.SERVICE_STATUS_NEW)
-          self.switch_service(self._service_factory)
+          self.switch_service()
 
       n = n - 1
 
@@ -262,29 +265,29 @@ class Frontend():
              'statustext': CommonService.human_readable_state.get(self._service_status_announced),
              'service': self._service_name }
 
-  def switch_service(self, new_service):
+  def switch_service(self, new_service=None):
     '''Start a new service in a subprocess.
-       :param new_service: Either a service name or a service class.
+       :param new_service: Either a service name or a service class. If not set,
+                           start up a new instance of the previous class
        :return: True on success, False on failure.
     '''
+    if new_service:
+      self._service_factory = new_service
     with self.__lock:
       # Terminate existing service if necessary
       if self._service is not None:
         self._terminate_service()
 
       # Find service class if necessary
-      if isinstance(new_service, basestring):
-        service_class = workflows.services.lookup(new_service)
-      else:
-        service_class = new_service
-
-      if not service_class:
+      if isinstance(self._service_factory, basestring):
+        self._service_factory = workflows.services.lookup(self._service_factory)
+      if not self._service_factory:
         return False
 
       # Set up pipes and connect new service object
       svc_commands, self._pipe_commands = multiprocessing.Pipe(False)
       self._pipe_service, svc_tofrontend = multiprocessing.Pipe(False)
-      service_instance = service_class(
+      service_instance = self._service_factory(
         commands=svc_commands,
         frontend=svc_tofrontend)
 
