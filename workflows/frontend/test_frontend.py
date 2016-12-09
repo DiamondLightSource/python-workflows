@@ -109,7 +109,7 @@ def test_start_service_in_frontend(mock_transport, mock_mp):
 
   # check service was started properly
   mock_service.assert_called_once_with(commands=pipes[0], frontend=pipes[3])
-  mock_mp.Process.assert_called_once_with(target=mock_service.return_value.start, args=())
+  mock_mp.Process.assert_called_once_with(target=mock_service.return_value.start, args=(), kwargs=mock.ANY)
   mock_mp.Process.return_value.start.assert_called_once()
 
   # Fun with python multiprocessing:
@@ -206,7 +206,7 @@ def test_frontend_can_handle_service_initialization_segfaults(mock_mp):
   fe = workflows.frontend.Frontend(transport=transport, service=service)
   transport = transport.return_value
   transport.connect.assert_called_once()
-  mock_mp.Process.assert_called_once_with(target=service.return_value.start, args=())
+  mock_mp.Process.assert_called_once_with(target=service.return_value.start, args=(), kwargs=mock.ANY)
 
   with pytest.raises(workflows.WorkflowsError):
     fe.run()
@@ -229,7 +229,7 @@ def test_frontend_terminates_on_transport_disconnection(mock_mp):
   transport = transport.return_value
   transport.connect.assert_called_once()
   transport.is_connected.return_value = False
-  mock_mp.Process.assert_called_once_with(target=service.return_value.start, args=())
+  mock_mp.Process.assert_called_once_with(target=service.return_value.start, args=(), kwargs=mock.ANY)
 
   with pytest.raises(workflows.WorkflowsError):
     fe.run()
@@ -366,7 +366,7 @@ def test_frontend_does_not_restart_nonrestartable_service_on_segfault(mock_mp):
   service_factory.assert_called_once()
   service_process.start.assert_called_once()
   service_process.join.assert_called_once()
-  mock_mp.Process.assert_called_once_with(target=service_instances[0].start, args=())
+  mock_mp.Process.assert_called_once_with(target=service_instances[0].start, args=(), kwargs=mock.ANY)
 
 @mock.patch('workflows.frontend.multiprocessing')
 def test_frontend_does_not_restart_nonrestartable_service_on_error(mock_mp):
@@ -420,8 +420,8 @@ def test_frontend_does_restart_restartable_service_on_segfault(mock_mp):
   assert service_factory.call_count == 3
   assert service_process.start.call_count == 2
   assert service_process.join.call_count == 2
-  mock_mp.Process.assert_has_calls( [ mock.call(args=(), target=service_instances[0].start),
-                                      mock.call(args=(), target=service_instances[1].start) ], any_order=True )
+  mock_mp.Process.assert_has_calls( [ mock.call(args=(), kwargs=mock.ANY, target=service_instances[0].start),
+                                      mock.call(args=(), kwargs=mock.ANY, target=service_instances[1].start) ], any_order=True )
 
 @mock.patch('workflows.frontend.multiprocessing')
 def test_frontend_does_restart_restartable_service_on_error(mock_mp):
@@ -455,5 +455,5 @@ def test_frontend_does_restart_restartable_service_on_error(mock_mp):
   assert service_factory.call_count == 3
   assert service_process.start.call_count == 2
   assert service_process.join.call_count == 2
-  mock_mp.Process.assert_has_calls( [ mock.call(args=(), target=service_instances[0].start),
-                                      mock.call(args=(), target=service_instances[1].start) ], any_order=True )
+  mock_mp.Process.assert_has_calls( [ mock.call(args=(), kwargs=mock.ANY, target=service_instances[0].start),
+                                      mock.call(args=(), kwargs=mock.ANY, target=service_instances[1].start) ], any_order=True )

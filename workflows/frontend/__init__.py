@@ -17,19 +17,25 @@ class Frontend():
   '''
 
   def __init__(self, transport=None, service=None,
-      transport_command_prefix=None, restart_service=False):
+      transport_command_prefix=None, restart_service=False,
+      verbose_service=False):
     '''Create a frontend instance. Connect to the transport layer, start any
        requested service, begin broadcasting status information and listen
        for control commands.
-       :param transport: Either the name of a transport class, a transport
-                         class, or a transport class object.
-       :param service: A class or name of the class to be instantiated in a
-                       subprocess as service.
-       :param transport_command_prefix: An optional prefix of a transport
-                                        subscription to be listened to for
-                                        commands.
-       :param restart_service: If the service process dies unexpectedly the
-                               frontend should start a new instance.
+       :param restart_service:
+           If the service process dies unexpectedly the frontend should start
+           a new instance.
+       :param service:
+           A class or name of the class to be instantiated in a subprocess as
+           service.
+       :param transport:
+           Either the name of a transport class, a transport class, or a
+           transport class object.
+       :param transport_command_prefix:
+           An optional prefix of a transport subscription to be listened to for
+           commands.
+       :param verbose_service:
+           If set, run services with increased logging level (DEBUG).
     '''
     self.__lock = threading.RLock()
     self.__hostid = self._generate_unique_host_id()
@@ -52,6 +58,7 @@ class Frontend():
     self._status_history = []
 
     # Set up logging
+    self._verbose_service = verbose_service
     class LogAdapter():
       '''A helper class that acts like a dictionary, but actually reads its
          values from the get_status() function.'''
@@ -298,7 +305,8 @@ class Frontend():
 
       # Start new service in a separate process
       self._service = multiprocessing.Process(
-        target=service_instance.start, args=())
+        target=service_instance.start, args=(),
+        kwargs={'verbose_log': self._verbose_service})
       self._service_name = service_instance.get_name()
       self._service.daemon = True
       self._service.start()

@@ -24,14 +24,20 @@ class ServiceStarter(object):
        '''
 
   @staticmethod
-  def on_frontend_preparation(frontend):
-    '''Plugin hook to manipulate the Frontend object before starting it. If a
-       value is returned here it will replace the Frontend object.'''
-
-  @staticmethod
   def on_transport_preparation(transport):
     '''Plugin hook to intercept/manipulate the Transport object before passing
        it to the Frontend object.'''
+
+  @staticmethod
+  def before_frontend_construction(kwargs):
+    '''Plugin hook to manipulate the Frontend object constructor arguments. If
+       a value is returned here it will replace the keyword arguments
+       dictionary passed to the constructor.'''
+
+  @staticmethod
+  def on_frontend_preparation(frontend):
+    '''Plugin hook to manipulate the Frontend object before starting it. If a
+       value is returned here it will replace the Frontend object.'''
 
   def run(self, cmdline_args=None, program_name='start_service',
         version=workflows.version(), **kwargs):
@@ -84,12 +90,14 @@ class ServiceStarter(object):
       if matching and len(matching) == 1:
         options.service = matching[0]
 
+    kwargs.update({ 'service': options.service,
+                    'transport': transport })
+
+    # Call before_frontend_construction hook
+    kwargs = self.before_frontend_construction(kwargs) or kwargs
+
     # Create Frontend object
-    frontend = workflows.frontend.Frontend(
-      service=options.service,
-      transport=transport,
-      **kwargs
-    )
+    frontend = workflows.frontend.Frontend(**kwargs)
 
     # Call on_frontend_preparation hook
     frontend = self.on_frontend_preparation(frontend) or frontend

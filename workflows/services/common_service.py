@@ -84,6 +84,14 @@ class CommonService(object):
     SERVICE_STATUS_TEARDOWN: 'shutdown',
   }
 
+  # Default logging level for log messages from this service
+
+  log_verbosity = logging.INFO
+
+  # Any keyword arguments set on service invocation
+
+  start_kwargs = { }
+
   # Not so overrideable functions ---------------------------------------------
 
   def __init__(self, *args, **kwargs):
@@ -169,19 +177,25 @@ class CommonService(object):
     root_logger.addHandler(workflows.logging.CallbackHandler(self._log_send))
 
     # Set up the service logger and pass all info (and higher) level messages
+    # (or other level if set differently)
     self.log = logging.getLogger(self._logger_name)
-    self.log.setLevel(logging.INFO)
+    if self.start_kwargs.get('verbose_log'):
+      self.log_verbosity = logging.DEBUG
+    self.log.setLevel(self.log_verbosity)
 
     # Additionally, write all critical messages directly to console
     console = logging.StreamHandler()
     console.setLevel(logging.CRITICAL)
     root_logger.addHandler(console)
 
-  def start(self):
+  def start(self, **kwargs):
     '''Start listening to command queue, process commands in main loop,
        set status, etc...
        This function is most likely called by the frontend in a separate
        process.'''
+
+    # Keep a copy of keyword arguments for use in subclasses
+    self.start_kwargs.update(kwargs)
     try:
       self.initialize_logging()
 
