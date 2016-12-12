@@ -146,7 +146,7 @@ class Frontend():
     '''The main loop of the frontend. Here incoming messages from the service
        are processed and forwarded to the corresponding callback methods.'''
     self.log.debug("Entered main loop")
-    n = 3600
+    n = 36000
     while n > 0 and not self.shutdown:
       self.update_status()
       # While a service is running, check for incoming messages from that service

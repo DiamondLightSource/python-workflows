@@ -103,7 +103,10 @@ class ServiceStarter(object):
     frontend = self.on_frontend_preparation(frontend) or frontend
 
     # Start Frontend
-    frontend.run()
+    try:
+      frontend.run()
+    except KeyboardInterrupt:
+      print("\nShutdown via Ctrl+C")
 
 if __name__ == '__main__':  # pragma: no cover
   ServiceStarter().run()

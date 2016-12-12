@@ -240,6 +240,10 @@ class CommonService(object):
 
       self.__update_service_status(self.SERVICE_STATUS_END)
 
+    except KeyboardInterrupt:
+      self.log.warn('Ctrl+C detected. Shutting down.')
+      return
+
     except:
       self.log.critical('Unhandled service exception', exc_info=True)
       self.__update_service_status(self.SERVICE_STATUS_ERROR)
