@@ -270,7 +270,9 @@ class Frontend():
     return { 'host': self.__hostid,
              'status': self._service_status_announced,
              'statustext': CommonService.human_readable_state.get(self._service_status_announced),
-             'service': self._service_name }
+             'service': self._service_name,
+             'workflows': workflows.version(),
+           }
 
   def switch_service(self, new_service=None):
     '''Start a new service in a subprocess.
