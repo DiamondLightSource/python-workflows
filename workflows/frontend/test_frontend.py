@@ -136,6 +136,7 @@ def test_connect_queue_communication_to_transport_layer():
   transport.assert_called_once()
   transport = transport.return_value
   transport.connect.assert_called_once()
+  client_id = transport.register_client.return_value
 
   fe.parse_band_transport( {
       'call': 'send',
@@ -157,7 +158,8 @@ def test_connect_queue_communication_to_transport_layer():
   transport.subscribe.assert_called_once_with(
     mock.sentinel.channel,
     mock.ANY,
-    mock.sentinel.something, kwarg=mock.sentinel.kwarg
+    mock.sentinel.something, kwarg=mock.sentinel.kwarg,
+    client_id=client_id
     )
   callback_function = transport.subscribe.call_args[0][1]
 

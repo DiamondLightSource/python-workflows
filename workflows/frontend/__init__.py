@@ -410,7 +410,7 @@ class Frontend():
     args, kwargs = message['payload']
     service_txn_id = args[0]
     self._transaction_mapping[service_txn_id] = \
-      self._transport.transaction_begin(clientid=self._service_transportid)
+      self._transport.transaction_begin(client_id=self._service_transportid)
 
   def parse_band_transport_transaction_commit(self, message):
     '''Counterpart to the transport.transaction_begin call from the service.
@@ -450,6 +450,7 @@ class Frontend():
       channel,
       callback_helper,
       *message['payload'][0][2:],
+      client_id=self._service_transportid,
       **message['payload'][1]
     )
 
@@ -473,6 +474,7 @@ class Frontend():
       channel,
       callback_helper,
       *message['payload'][0][2:],
+      client_id=self._service_transportid,
       **message['payload'][1]
     )
 
