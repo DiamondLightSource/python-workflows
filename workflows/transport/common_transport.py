@@ -307,12 +307,14 @@ class CommonTransport(object):
     self.__client_id += 1
     self.__clients[self.__client_id] = { 'subscriptions': set(),
                                          'transactions': set() }
+    self.log.debug('Registered new client ID %d', self.__client_id)
     return self.__client_id
 
   def drop_client(self, client_id):
     '''Remove a client ID and all connected subscriptions, transactions and
        unacknowledged messages.
        :param client_id: Client to be dropped.'''
+    self.log.debug('Unregistering client ID %d', client_id)
     if client_id not in self.__clients:
       raise workflows.WorkflowsError("Attempting to drop unregistered client")
     channel_subscriptions = list(self.__clients[client_id]['subscriptions'])
