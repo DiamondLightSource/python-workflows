@@ -397,6 +397,8 @@ def test_frontend_does_not_restart_nonrestartable_service_on_error(mock_mp):
 @mock.patch('workflows.frontend.multiprocessing')
 def test_frontend_does_restart_restartable_service_on_segfault(mock_mp):
   '''When the frontend is constructed with restart_service=True failing services must be restarted.'''
+  transport = mock.Mock()
+  transport.return_value.register_client.side_effect = [ 1, 2, 3, None ]
   service_factory = mock.Mock()
   service_process = mock.Mock()
   dummy_pipe = mock.Mock()
@@ -409,7 +411,7 @@ def test_frontend_does_restart_restartable_service_on_segfault(mock_mp):
   service_instances = [ mock.Mock(), mock.Mock() ]
   service_factory.side_effect = service_instances + [ sentinel_exception ]
 
-  fe = workflows.frontend.Frontend(transport=mock.Mock(), service=service_factory, restart_service=True)
+  fe = workflows.frontend.Frontend(transport=transport, service=service_factory, restart_service=True)
   try:
     fe.run()
     assert False, "Exception should have been raised"
@@ -422,6 +424,9 @@ def test_frontend_does_restart_restartable_service_on_segfault(mock_mp):
   assert service_process.join.call_count == 2
   mock_mp.Process.assert_has_calls( [ mock.call(args=(), kwargs=mock.ANY, target=service_instances[0].start),
                                       mock.call(args=(), kwargs=mock.ANY, target=service_instances[1].start) ], any_order=True )
+  transport = transport.return_value
+  assert transport.register_client.call_count == 3
+  transport.drop_client.assert_has_calls( [ mock.call(1), mock.call(2), mock.call(3) ] )
 
 @mock.patch('workflows.frontend.multiprocessing')
 def test_frontend_does_restart_restartable_service_on_error(mock_mp):
