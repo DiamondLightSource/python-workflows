@@ -43,6 +43,8 @@ class Frontend():
     self._service_factory = None # pointer to the service class
     self._service_name = None
     self._service_transportid = None
+    self._service_starttime = None
+    self._service_rapidstarts = None
     self._pipe_commands = None # frontend -> service
     self._pipe_service = None  # frontend <- service
     self._service_status = CommonService.SERVICE_STATUS_NONE
@@ -189,7 +191,9 @@ class Frontend():
           if error_message:
             self.log.error(error_message)
           self._terminate_service()
-          if not self.restart_service:
+          if self.restart_service:
+            self.exponential_backoff()
+          else:
             self.shutdown = True
             if error_message:
               raise workflows.WorkflowsError(error_message)
@@ -274,6 +278,24 @@ class Frontend():
              'workflows': workflows.version(),
            }
 
+  def exponential_backoff(self):
+    last_service_switch = self._service_starttime
+    if not last_service_switch:
+      return
+    time_since_last_switch = time.time() - last_service_switch
+
+    if not self._service_rapidstarts:
+      self._service_rapidstarts = 0
+    minimum_wait = 0.1 * (2 ** self._service_rapidstarts)
+    minimum_wait = min(5, minimum_wait)
+
+    if time_since_last_switch > 10:
+      self._service_rapidstarts = 0
+      return
+    self._service_rapidstarts += 1
+    self.log.debug("Slowing down service starts (%.1f seconds)", minimum_wait)
+    time.sleep(minimum_wait)
+
   def switch_service(self, new_service=None):
     '''Start a new service in a subprocess.
        :param new_service: Either a service name or a service class. If not set,
@@ -312,6 +334,7 @@ class Frontend():
       self._service_name = service_instance.get_name()
       self._service.daemon = True
       self._service.start()
+      self._service_starttime = time.time()
 
       # Starting the process copies all file descriptors.
       # At this point (and no sooner!) the passed pipe objects must be closed
