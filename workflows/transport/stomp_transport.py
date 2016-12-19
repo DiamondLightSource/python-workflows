@@ -232,6 +232,8 @@ class StompTransport(CommonTransport):
          expiration:       Optional expiration time, relative to sending time
          headers:          Optional dictionary of header entries
          ignore_namespace: Do not apply namespace to the destination name
+         persistent:       Whether to mark messages as persistent, to be kept
+                           between broker restarts. Default is 'true'.
          transaction:      Transaction ID if message should be part of a
                            transaction
     '''
@@ -240,6 +242,8 @@ class StompTransport(CommonTransport):
       del(kwargs['headers'])
     if not headers:
       headers = {}
+    if 'persistent' not in headers:
+      headers['persistent'] = 'true'
     if kwargs.get('ignore_namespace'):
       destination = '/queue/' + destination
     else:

@@ -128,13 +128,15 @@ def test_send_message(mockstomp):
   mockconn.send.assert_called_once()
   args, kwargs = mockconn.send.call_args
   assert args == ('/queue/' + str(mock.sentinel.channel), mock.sentinel.message)
-  assert kwargs.get('headers') in (None, {})
+  assert kwargs.get('headers') == { 'persistent': 'true' }
 
-  stomp._send( str(mock.sentinel.channel), mock.sentinel.message, headers=mock.sentinel.headers )
+  stomp._send( str(mock.sentinel.channel), mock.sentinel.message,
+               headers={ 'hdr': mock.sentinel.header } )
   assert mockconn.send.call_count == 2
   args, kwargs = mockconn.send.call_args
   assert args == ('/queue/' + str(mock.sentinel.channel), mock.sentinel.message)
-  assert kwargs == { 'headers': mock.sentinel.headers }
+  assert kwargs == { 'headers': { 'hdr': mock.sentinel.header,
+                                  'persistent': 'true' } }
 
 @mock.patch('workflows.transport.stomp_transport.stomp')
 def test_error_handling_on_send(mockstomp):
@@ -342,7 +344,7 @@ def test_transaction_calls(mockstomp):
   mockconn.begin.assert_called_once_with(transaction=mock.sentinel.txid)
 
   stomp._send('destination', mock.sentinel.message, transaction=mock.sentinel.txid)
-  mockconn.send.assert_called_once_with('/queue/destination', mock.sentinel.message, headers={}, transaction=mock.sentinel.txid)
+  mockconn.send.assert_called_once_with('/queue/destination', mock.sentinel.message, headers={'persistent': 'true'}, transaction=mock.sentinel.txid)
 
   stomp._transaction_abort(mock.sentinel.txid)
   mockconn.abort.assert_called_once_with(mock.sentinel.txid)
