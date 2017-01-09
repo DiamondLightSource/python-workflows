@@ -59,6 +59,28 @@ def test_check_config_file_behaviour(mockstomp):
     parser.parse_args(['--stomp-conf', ''])
 
 @mock.patch('workflows.transport.stomp_transport.stomp')
+def test_anonymous_connection(mockstomp):
+  '''Check that a specified configuration file is read, that command line
+     parameters have precedence and are passed on to the stomp layer.'''
+  mockconn = mock.Mock()
+  mockstomp.Connection.return_value = mockconn
+  parser = optparse.OptionParser()
+  stomp = StompTransport()
+  stomp.add_command_line_options(parser)
+
+  parser.parse_args([ '--stomp-user=', '--stomp-pass=' ])
+
+  # Command line parameters are shared for all instances
+  stomp = StompTransport()
+  stomp.connect()
+
+  # Reset configuration for subsequent tests by reloading StompTransport
+  reload(workflows.transport.stomp_transport)
+  globals()['StompTransport'] = workflows.transport.stomp_transport.StompTransport
+
+  mockconn.connect.assert_called_once_with(wait=True)
+
+@mock.patch('workflows.transport.stomp_transport.stomp')
 def test_instantiate_link_and_connect_to_broker(mockstomp):
   '''Test the Stomp connection routine.'''
   stomp = StompTransport()

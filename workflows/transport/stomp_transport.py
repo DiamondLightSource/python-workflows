@@ -111,10 +111,14 @@ class StompTransport(CommonTransport):
         self._conn.start()
       except stomp.exception.ConnectFailedException:
         return False
-      self._conn.connect(
-        self.config.get('--stomp-user', self.defaults.get('--stomp-user')),
-        self.config.get('--stomp-pass', self.defaults.get('--stomp-pass')),
-        wait=True)
+      username = self.config.get('--stomp-user',
+                                 self.defaults.get('--stomp-user'))
+      password = self.config.get('--stomp-pass',
+                                 self.defaults.get('--stomp-pass'))
+      if username or password:
+        self._conn.connect(username, password, wait=True)
+      else: # anonymous access
+        self._conn.connect(wait=True)
       self._namespace = \
         self.config.get('--stomp-prfx', self.defaults.get('--stomp-prfx'))
       if self._namespace and not self._namespace.endswith('.'):
