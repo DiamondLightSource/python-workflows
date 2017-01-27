@@ -10,10 +10,10 @@ package_version = '0.34'
 
 setup(name='workflows',
       description='Supervised data processing in distributed environments',
-      url='https://github.com/xia2/workflows',
+      url='https://github.com/DiamondLightSource/python-workflows',
       author='Markus Gerstel',
       author_email='anthchirp@users.noreply.github.com',
-      download_url="https://github.com/xia2/workflows/releases",
+      download_url="https://github.com/DiamondLightSource/python-workflows/releases",
       version=package_version,
       install_requires=['stomp.py'],
       packages=find_packages(),
