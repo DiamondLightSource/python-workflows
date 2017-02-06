@@ -125,8 +125,9 @@ def test_get_frontend_status(mock_transport):
   assert status['host'] == fe.get_host_id()
 
 def test_connect_queue_communication_to_transport_layer():
-  '''Check that communication messages coming in from the service layer via the Queue are
-     passed correctly to the transport layer and vice versa in the other direction.'''
+  '''Check that communication messages coming in from the service layer are
+     passed correctly to the transport layer and vice versa in the other
+     direction.'''
   transport = mock.Mock()
   commqueue = mock.Mock()
 

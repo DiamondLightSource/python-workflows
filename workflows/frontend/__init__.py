@@ -1,7 +1,6 @@
 from __future__ import absolute_import, division
 import logging
 import multiprocessing
-import Queue
 import threading
 import time
 import workflows
