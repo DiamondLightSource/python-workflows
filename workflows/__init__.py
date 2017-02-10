@@ -6,6 +6,10 @@ def load_plugins(paths):
      :param paths: A path or list of paths containing files to import.
   '''
   import imp, pkgutil
+  try: # Python3 compatibility
+    basestring = basestring
+  except NameError:
+    basestring = (str, bytes)
   if isinstance(paths, basestring):
     paths = list(paths)
   for _, name, _ in pkgutil.iter_modules(paths):

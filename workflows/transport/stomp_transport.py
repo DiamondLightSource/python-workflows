@@ -1,5 +1,8 @@
 from __future__ import absolute_import, division
-import ConfigParser
+try:
+  import ConfigParser
+except ImportError: # Python3 compatibility
+  import configparser as ConfigParser
 import json
 import stomp
 import threading

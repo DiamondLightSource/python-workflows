@@ -27,38 +27,38 @@ class SampleTxn(CommonService):
   def receive_message(self, header, message):
     '''Receive a message'''
 
-    print "=== Receive ==="
-    print header
-    print message
+    print("=== Receive ===")
+    print(header)
+    print(message)
 
-    print "MsgID:", header['message-id']
+    print("MsgID: {0}".format(header['message-id']))
     assert header['message-id']
 
     txn = self._transport.transaction_begin()
-    print " 1. Txn:", txn
+    print(" 1. Txn: {0}".format(str(txn)))
     if self.crashpoint():
       self._transport.transaction_abort(txn)
-      print "---  Abort  ---"
+      print("---  Abort  ---")
       return
 
     self._transport.ack(header['message-id'], self.subid, transaction=txn)
-    print " 2. Ack"
+    print(" 2. Ack")
     if self.crashpoint():
       self._transport.transaction_abort(txn)
-      print "---  Abort  ---"
+      print("---  Abort  ---")
       return
 
     self._transport.send('transient.destination', message, transaction=txn)
-    print " 3. Send"
+    print(" 3. Send")
 
     if self.crashpoint():
       self._transport.transaction_abort(txn)
-      print "---  Abort  ---"
+      print("---  Abort  ---")
       return
 
     self._transport.transaction_commit(txn)
-    print " 4. Commit"
-    print "===  Done   ==="
+    print(" 4. Commit")
+    print("===  Done   ===")
 
 
 class SampleTxnProducer(CommonService):

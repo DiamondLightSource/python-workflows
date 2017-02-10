@@ -1,6 +1,5 @@
 from __future__ import absolute_import, division
 import logging
-import Queue
 import workflows
 import workflows.logging
 from workflows.transport.queue_transport import QueueTransport
@@ -8,13 +7,13 @@ from workflows.transport.queue_transport import QueueTransport
 class CommonService(object):
   '''
   Base class for workflow services. A service is a piece of software that runs
-  in an isolated environment, communicating only via queues with the outside
-  world. Units of work are injected via a queue. Results, status and log
-  messages, etc. are written out via a queue. Any task can be encapsulated
+  in an isolated environment, communicating only via pipes with the outside
+  world. Units of work are injected via a pipe. Results, status and log
+  messages, etc. are written out via a pipe. Any task can be encapsulated
   as a service, for example a service that counts spots on an image passed
   as a filename, and returns the number of counts.
 
-  To instantiate a service two Queue-like objects should be passed to the
+  To instantiate a service two Pipe-like objects should be passed to the
   constructors, one to communicate from the service to the frontend, one to
   communicate from the frontend to the service.
   '''

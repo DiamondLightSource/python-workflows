@@ -165,7 +165,7 @@ class Frontend():
 #              try:
                 handler(message)
 #              except Exception:
-#                print 'Uh oh. What to do.'
+#                print('Uh oh. What to do.')
           else:
             self.log.warn("Invalid message received %s", str(message))
         except EOFError:
@@ -215,7 +215,7 @@ class Frontend():
 
   def send_command(self, command):
     '''Send command to service via the command queue.'''
-#   print "To command queue: ", command
+#   print("To command queue: " + str(command))
     if self._pipe_commands:
       self._pipe_commands.send(command)
 
@@ -383,13 +383,13 @@ class Frontend():
       handler = getattr(self, 'parse_band_transport_' + message['call'])
     except AttributeError:
       # TODO: This should go to a log
-      print 'Unknown transport handler for message', message
+      print('Unknown transport handler for message ' + str(message))
       return
     if 'transaction' in message['payload'][1]:
-#     print "Mapping transaction %s to %s for %s" % (
+#     print("Mapping transaction %s to %s for %s" % (
 #         str( message['payload'][1]['transaction'] ),
 #         str( self._transaction_mapping[message['payload'][1]['transaction']] ),
-#         message['call'])
+#         message['call']))
       message['payload'][1]['transaction'] = \
         self._transaction_mapping[message['payload'][1]['transaction']]
     handler(message)

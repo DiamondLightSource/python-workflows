@@ -418,7 +418,7 @@ def test_frontend_does_restart_restartable_service_on_segfault(mock_mp):
   try:
     fe.run()
     assert False, "Exception should have been raised"
-  except Exception, e:
+  except Exception as e:
     if e != sentinel_exception:
       raise
 
@@ -456,7 +456,7 @@ def test_frontend_does_restart_restartable_service_on_error(mock_mp):
   try:
     fe.run()
     assert False, "Exception should have been raised"
-  except Exception, e:
+  except Exception as e:
     if e != sentinel_exception:
       raise
 
