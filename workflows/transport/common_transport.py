@@ -2,7 +2,7 @@ from __future__ import absolute_import, division
 import logging
 import workflows
 
-class CommonTransport(object):
+class CommonTransport(workflows.add_plugin_register_to_class(object)):
   '''A common transport class, containing e.g. the logic to connect clients
      to message subscriptions and transactions, so that these can be cleanly
      terminated when the client goes away.'''
@@ -456,17 +456,3 @@ class CommonTransport(object):
     '''Function that any message will pass through before it being forwarded to
        the receiving subscribed callback functions.'''
     return message
-
-  #
-  # -- Plugin-related function -----------------------------------------------
-  #
-
-  class __metaclass__(type):
-    '''Define metaclass function to keep a list of all subclasses. This enables
-       looking up transport mechanisms by name.'''
-    def __init__(cls, name, base, attrs):
-      '''Add new subclass of CommonTransport to list of all known subclasses.'''
-      if not hasattr(cls, 'transport_register'):
-        cls.transport_register = {}
-      else:
-        cls.transport_register[name] = cls

@@ -5,6 +5,11 @@ from workflows.services.common_service import CommonService
 import workflows.transport
 import threading
 
+try: # Python3 compatibility
+  basestring = basestring
+except NameError:
+  basestring = (str, bytes)
+
 class Monitor(): # pragma: no cover
   '''A sample implementation of a status monitor showing all running services.
      To use this example class, pass in a transport object and call the run()
@@ -121,7 +126,7 @@ class Monitor(): # pragma: no cover
         with self._lock:
           overview = self._node_status.copy()
         cardnumber = 0
-        for host, status in overview.iteritems():
+        for host, status in overview.items():
           age = (now - int(status['last_seen'] / 1000))
           with self._lock:
             if age > 90:

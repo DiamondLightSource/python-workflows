@@ -1,10 +1,8 @@
 from __future__ import absolute_import, division
 
-import workflows.services
 from workflows.services.common_service import Commands, CommonService
 import mock
 from multiprocessing import Pipe
-import pytest
 
 def test_instantiate_basic_service():
   '''Create a basic service object'''
@@ -194,8 +192,8 @@ def test_service_initialization_crashes_are_handled_correctly():
   fe_pipe.send.assert_any_call({ 'band': 'status_update', 'statuscode': service.SERVICE_STATUS_ERROR})
 
   # Traceback should have been sent to log
-  log_msgs = filter(lambda c: c[0][0] == { 'band': 'log', 'payload': mock.ANY } and c[0][0]['payload'].levelname == 'CRITICAL', \
-                    fe_pipe.send.call_args_list)
+  log_msgs = list(filter(lambda c: c[0][0] == { 'band': 'log', 'payload': mock.ANY } and c[0][0]['payload'].levelname == 'CRITICAL', \
+                    fe_pipe.send.call_args_list))
   assert log_msgs, 'No critical log message received'
   log = log_msgs[0][0][0]['payload']
   assert 'This crash needs to be handled' in log.exc_text

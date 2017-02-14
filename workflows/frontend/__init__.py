@@ -8,6 +8,11 @@ import workflows.services
 from workflows.services.common_service import CommonService
 import workflows.transport
 
+try: # Python3 compatibility
+  basestring = basestring
+except NameError:
+  basestring = (str, bytes)
+
 class Frontend():
   '''The frontend class encapsulates the actual service. It controls the
      service process and keeps the connection to the transport layer. It
@@ -69,8 +74,8 @@ class Frontend():
       def __iter__(self):
         '''Update cached status values, renaming the keys for logging.
            Return a dictionary key iterator.'''
-        self.status = { 'workflows_' + k: v
-                        for k, v in self.status_fn().iteritems() }
+        self.status = { 'workflows_' + k: v \
+                        for k, v in self.status_fn().items() }
         return self.status.__iter__()
 
       def __getitem__(self, key):
@@ -232,7 +237,7 @@ class Frontend():
     '''Process incoming logging messages from the service.'''
     if 'payload' in message and hasattr(message['payload'], 'name'):
       record = message['payload']
-      for k, v in self.get_status().iteritems():
+      for k, v in self.get_status().items():
         setattr(record, 'workflows_' + k, v)
       logging.getLogger(record.name).handle(record)
     else:

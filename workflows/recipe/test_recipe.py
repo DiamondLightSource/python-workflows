@@ -82,33 +82,33 @@ def test_validate_tests_for_invalid_nodes():
   A.recipe['xnode'] = None
   with pytest.raises(workflows.WorkflowsError) as excinfo:
     A.validate()
-  assert 'xnode' in excinfo.value.message
+  assert 'xnode' in str(excinfo.value)
 
   A, _ = generate_recipes()
   del(A.recipe['start'])
   with pytest.raises(workflows.WorkflowsError) as excinfo:
     A.validate()
-  assert 'start' in excinfo.value.message
+  assert 'start' in str(excinfo.value)
 
   A.recipe['start'] = []
   with pytest.raises(workflows.WorkflowsError) as excinfo:
     A.validate()
-  assert 'start' in excinfo.value.message
+  assert 'start' in str(excinfo.value)
 
   A.recipe['start'] = [ ('something',) ]
   with pytest.raises(workflows.WorkflowsError) as excinfo:
     A.validate()
-  assert 'start' in excinfo.value.message
+  assert 'start' in str(excinfo.value)
 
   A.recipe['start'] = [ (1, 'something'), 'banana' ]
   with pytest.raises(workflows.WorkflowsError) as excinfo:
     A.validate()
-  assert 'start' in excinfo.value.message
+  assert 'start' in str(excinfo.value)
 
   A.recipe['start'] = [ (1, 'something'), ('start', 'banana') ]
   with pytest.raises(workflows.WorkflowsError) as excinfo:
     A.validate()
-  assert 'start' in excinfo.value.message
+  assert 'start' in str(excinfo.value)
 
   A, _ = generate_recipes()
   del(A.recipe['error'])
@@ -126,7 +126,7 @@ def test_validate_tests_for_invalid_nodes():
   A.recipe['error'] = "something"
   with pytest.raises(workflows.WorkflowsError) as excinfo:
     A.validate()
-  assert 'error' in excinfo.value.message
+  assert 'error' in str(excinfo.value)
 
 def test_validate_tests_for_invalid_links():
   '''Check that the nodes in recipes have valid output/error links to other nodes.'''
@@ -148,12 +148,12 @@ def test_validate_tests_for_invalid_links():
   A.recipe['error'] = [ "start", 2 ]
   with pytest.raises(workflows.WorkflowsError) as excinfo:
     A.validate()
-  assert 'error' in excinfo.value.message
+  assert 'error' in str(excinfo.value)
 
   A.recipe['error'] = "error"
   with pytest.raises(workflows.WorkflowsError) as excinfo:
     A.validate()
-  assert 'error' in excinfo.value.message
+  assert 'error' in str(excinfo.value)
 
   A.recipe['error'] = 99
   with pytest.raises(workflows.WorkflowsError):
@@ -190,7 +190,7 @@ def test_validate_tests_for_invalid_links():
   A.recipe[99] = {}
   with pytest.raises(workflows.WorkflowsError) as excinfo:
     A.validate()
-  assert '99' in excinfo.value.message
+  assert '99' in str(excinfo.value)
 
 def test_validate_tests_for_cycles():
   '''Check that validation detects cycles in recipes.  Recipes must be acyclical.'''
@@ -198,19 +198,19 @@ def test_validate_tests_for_cycles():
   A.recipe[2]['output'] = 1
   with pytest.raises(workflows.WorkflowsError) as excinfo:
     A.validate()
-  assert 'cycle' in excinfo.value.message
+  assert 'cycle' in str(excinfo.value)
 
   A, _ = generate_recipes()
   A.recipe[2]['output'] = 2
   with pytest.raises(workflows.WorkflowsError) as excinfo:
     A.validate()
-  assert 'cycle' in excinfo.value.message
+  assert 'cycle' in str(excinfo.value)
 
   A, _ = generate_recipes()
   A.recipe[2]['output'] = [1, 2]
   with pytest.raises(workflows.WorkflowsError) as excinfo:
     A.validate()
-  assert 'cycle' in excinfo.value.message
+  assert 'cycle' in str(excinfo.value)
 
 def test_replacing_parameters_in_recipe():
   '''Recipe may contain placeholders that should be replaced with actual values by running apply_parameters.'''
@@ -260,4 +260,4 @@ def test_merging_recipes():
   assert C.recipe[C.recipe['error'][0]]['service'] == 'B service'
 
   # There is a 'C service'
-  assert any(map(lambda x: (isinstance(x, dict) and x.get('service') == 'C service'), C.recipe.itervalues()))
+  assert any(map(lambda x: (isinstance(x, dict) and x.get('service') == 'C service'), C.recipe.values()))

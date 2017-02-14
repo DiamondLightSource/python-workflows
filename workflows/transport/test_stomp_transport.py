@@ -1,6 +1,7 @@
 from __future__ import absolute_import, division
 import workflows.transport
 from workflows.transport.stomp_transport import StompTransport
+from imp import reload
 import json
 import mock
 import optparse

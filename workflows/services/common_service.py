@@ -4,7 +4,7 @@ import workflows
 import workflows.logging
 from workflows.transport.queue_transport import QueueTransport
 
-class CommonService(object):
+class CommonService(workflows.add_plugin_register_to_class(object)):
   '''
   Base class for workflow services. A service is a piece of software that runs
   in an isolated environment, communicating only via pipes with the outside
@@ -257,20 +257,6 @@ class CommonService(object):
     '''Process an incoming transport message from the frontend.'''
     self._transport.subscription_callback(message['subscription_id']) \
       ( message['header'], message['message'] )
-
-  #
-  # -- Plugin-related function -----------------------------------------------
-  #
-
-  class __metaclass__(type):
-    '''Define metaclass function to keep a list of all subclasses. This enables
-       looking up service mechanisms by name.'''
-    def __init__(cls, name, base, attrs):
-      '''Add new subclass of CommonService to list of all known subclasses.'''
-      if not hasattr(cls, 'service_register'):
-        cls.service_register = {}
-      else:
-        cls.service_register[name] = cls
 
 class Commands():
   '''A list of command strings used for communicating with the frontend.'''

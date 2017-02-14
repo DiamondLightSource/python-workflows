@@ -1,6 +1,12 @@
+from __future__ import absolute_import, division
 import json
 import string
 import workflows
+
+try: # Python3 compatibility
+  basestring = basestring
+except NameError:
+  basestring = (str, bytes)
 
 class Recipe(object):
   '''Object containing a processing recipe that can be passed to services.
@@ -22,7 +28,7 @@ class Recipe(object):
   def deserialize(string):
     '''Clean up a recipe that has been stored as serialized json string.'''
     recipe = json.loads(string)
-    for k in list(recipe.iterkeys()):
+    for k in list(recipe):
       if k not in ('start', 'error') and int(k):
         recipe[int(k)] = recipe[k]
         del(recipe[k])
@@ -79,9 +85,9 @@ class Recipe(object):
         raise workflows.WorkflowsError('Invalid recipe: "error" node points to itself')
 
     # All other nodes must be numeric
-    nodes = filter(lambda x: not isinstance(x, int)
+    nodes = list(filter(lambda x: not isinstance(x, int)
                              and x not in ('start', 'error'),
-                   self.recipe)
+                        self.recipe))
     if nodes:
       raise workflows.WorkflowsError('Invalid recipe: Node "%s" is not numeric' % nodes[0])
 
@@ -160,7 +166,7 @@ class Recipe(object):
         return string.Formatter().vformat(item, (), params)
       if isinstance(item, dict):
         return { _recursive_apply(key): _recursive_apply(value) for
-                 key, value in item.iteritems() }
+                 key, value in item.items() }
       if isinstance(item, tuple):
         return tuple(_recursive_apply(list(item)))
       if isinstance(item, list):
@@ -207,7 +213,7 @@ class Recipe(object):
 
     # Set up a translation table for indices and copy all entries
     translation = {}
-    for key, value in other.recipe.iteritems():
+    for key, value in other.recipe.items():
       if isinstance(key, int):
         if key not in translation:
           translation[key] = next_index
@@ -221,10 +227,10 @@ class Recipe(object):
       elif isinstance(x, tuple):
         return tuple(map(translate, x))
       elif isinstance(x, dict):
-        return { k: translate(v) for k, v in x.iteritems() }
+        return { k: translate(v) for k, v in x.items() }
       else:
         return translation[x]
-    for idx in translation.itervalues():
+    for idx in translation.values():
       if 'output' in new_recipe[idx]:
         new_recipe[idx]['output'] = translate(new_recipe[idx]['output'])
       if 'error' in new_recipe[idx]:
@@ -250,7 +256,7 @@ class Recipe(object):
 
 #   # Minimize DAG
 #   queuehash, topichash = {}, {}
-#   for k, v in new_recipe.iteritems():
+#   for k, v in new_recipe.items():
 #     if isinstance(v, dict):
 #       if 'queue' in v:
 #         queuehash[v['queue']] = queuehash.get(v['queue'], [])

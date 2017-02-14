@@ -7,12 +7,12 @@ def lookup(service):
      :param service: Name of the service
      :return: A service class
   '''
-  return CommonService.service_register.get(service)
+  return CommonService.plugin_register.get(service)
 
 def get_known_services():
   '''Return a dictionary of all known services.
      :return: A dictionary containing entries { service name : service class }
   '''
-  return CommonService.service_register
+  return CommonService.plugin_register
 
 workflows.load_plugins(__path__)

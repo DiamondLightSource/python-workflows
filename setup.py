@@ -1,4 +1,6 @@
+from __future__ import absolute_import, division
 from setuptools import setup, find_packages
+import sys
 
 package_version = '0.34'
 
@@ -7,6 +9,9 @@ package_version = '0.34'
 #  - export NUMBER="0.34"
 #  - git add -u; git commit -m "v${NUMBER} release"; git tag -a v${NUMBER} -m v${NUMBER}; git push; git push origin v${NUMBER}
 #  - python setup.py register sdist upload
+
+if sys.version_info < (2,7):
+  sys.exit('Sorry, Python < 2.7 is not supported')
 
 setup(name='workflows',
       description='Supervised data processing in distributed environments',

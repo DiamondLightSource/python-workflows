@@ -1,6 +1,5 @@
 from __future__ import absolute_import, division
 from workflows.services.common_service import CommonService
-import json
 import time
 import random
 
