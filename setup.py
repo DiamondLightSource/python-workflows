@@ -2,11 +2,11 @@ from __future__ import absolute_import, division
 from setuptools import setup, find_packages
 import sys
 
-package_version = '0.34'
+package_version = '0.35'
 
 # to release:
 #  - increment number
-#  - export NUMBER="0.34"
+#  - export NUMBER="0.35"
 #  - git add -u; git commit -m "v${NUMBER} release"; git tag -a v${NUMBER} -m v${NUMBER}; git push; git push origin v${NUMBER}
 #  - python setup.py register sdist upload
 
@@ -24,4 +24,18 @@ setup(name='workflows',
       packages=find_packages(),
       license='BSD',
       tests_require=['mock'],
-      zip_safe=False)
+      zip_safe=False,
+      classifiers = [
+        'Development Status :: 3 - Alpha',
+        'License :: OSI Approved :: BSD License',
+        'Programming Language :: Python :: 2',
+        'Programming Language :: Python :: 2.7',
+        'Programming Language :: Python :: 3',
+        'Programming Language :: Python :: 3.3',
+        'Programming Language :: Python :: 3.4',
+        'Programming Language :: Python :: 3.5',
+        'Programming Language :: Python :: 3.6',
+        'Operating System :: OS Independent',
+        'Topic :: Software Development :: Libraries :: Python Modules'
+        ]
+     )
