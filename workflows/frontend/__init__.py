@@ -152,8 +152,7 @@ class Frontend():
     '''The main loop of the frontend. Here incoming messages from the service
        are processed and forwarded to the corresponding callback methods.'''
     self.log.debug("Entered main loop")
-    n = 36000
-    while n > 0 and not self.shutdown:
+    while not self.shutdown:
       self.update_status()
       # While a service is running, check for incoming messages from that service
       if self._pipe_service and self._pipe_service.poll(1):
@@ -207,16 +206,14 @@ class Frontend():
           self.update_status(status_code=CommonService.SERVICE_STATUS_NEW)
           self.switch_service()
 
-      n = n - 1
-
       # Check that the transport is alive
       if not self._transport.is_connected():
         self._terminate_service()
         raise workflows.WorkflowsError('Lost transport layer connection')
-
+    self.log.info("Left main loop")
     self.update_status(status_code=CommonService.SERVICE_STATUS_TEARDOWN)
     self._terminate_service()
-    self.log.info("Fin. Terminating.")
+    self.log.info("Terminating.")
 
   def send_command(self, command):
     '''Send command to service via the command queue.'''
