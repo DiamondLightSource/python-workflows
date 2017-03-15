@@ -112,7 +112,7 @@ class StompTransport(CommonTransport):
       self._conn.set_listener('', self._stomp_listener)
       try:
         self._conn.start()
-      except stomp.exception.ConnectFailedException, e:
+      except stomp.exception.ConnectFailedException:
         raise DisconnectedError('Could not initiate connection to stomp host')
       username = self.config.get('--stomp-user',
                                  self.defaults.get('--stomp-user'))
@@ -123,7 +123,7 @@ class StompTransport(CommonTransport):
           self._conn.connect(username, password, wait=True)
         else: # anonymous access
           self._conn.connect(wait=True)
-      except stomp.exception.ConnectFailedException, e:
+      except stomp.exception.ConnectFailedException:
         raise AuthenticationError('Could not connect to stomp host: Authentication error')
       self._namespace = \
         self.config.get('--stomp-prfx', self.defaults.get('--stomp-prfx'))
