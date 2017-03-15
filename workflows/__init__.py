@@ -27,6 +27,12 @@ def version():
 class WorkflowsError(Exception):
   '''Common class for exceptions deliberately raised by workflows package.'''
 
+class DisconnectedError(WorkflowsError):
+  '''Indicates the connection could not be established or has been lost.'''
+
+class AuthenticationError(WorkflowsError):
+  '''Indicates the connection could not be established due to incorrect credentials.'''
+
 def add_plugin_register_to_class(*bases):
   # This function is based off the six library
   # https://github.com/benjaminp/six

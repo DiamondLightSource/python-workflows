@@ -7,7 +7,7 @@ import json
 import stomp
 import threading
 import time
-from workflows import WorkflowsError
+from workflows import WorkflowsError, DisconnectedError, AuthenticationError
 from workflows.transport.common_transport import CommonTransport
 
 class StompTransport(CommonTransport):
@@ -112,16 +112,19 @@ class StompTransport(CommonTransport):
       self._conn.set_listener('', self._stomp_listener)
       try:
         self._conn.start()
-      except stomp.exception.ConnectFailedException:
-        return False
+      except stomp.exception.ConnectFailedException, e:
+        raise DisconnectedError('Could not initiate connection to stomp host')
       username = self.config.get('--stomp-user',
                                  self.defaults.get('--stomp-user'))
       password = self.config.get('--stomp-pass',
                                  self.defaults.get('--stomp-pass'))
-      if username or password:
-        self._conn.connect(username, password, wait=True)
-      else: # anonymous access
-        self._conn.connect(wait=True)
+      try:
+        if username or password:
+          self._conn.connect(username, password, wait=True)
+        else: # anonymous access
+          self._conn.connect(wait=True)
+      except stomp.exception.ConnectFailedException, e:
+        raise AuthenticationError('Could not connect to stomp host: Authentication error')
       self._namespace = \
         self.config.get('--stomp-prfx', self.defaults.get('--stomp-prfx'))
       if self._namespace and not self._namespace.endswith('.'):
@@ -262,7 +265,7 @@ class StompTransport(CommonTransport):
           headers=headers, **kwargs)
       except stomp.exception.NotConnectedException:
         self._connected = False
-        raise
+        raise DisconnectedError('No connection to stomp host')
 
   def _broadcast(self, destination, message, **kwargs):
     '''Broadcast a message.

@@ -1,4 +1,5 @@
 from __future__ import absolute_import, division
+import workflows
 import workflows.transport
 from workflows.transport.stomp_transport import StompTransport
 from imp import reload
@@ -119,6 +120,27 @@ def test_instantiate_link_and_connect_to_broker(mockstomp):
   mockconn.disconnect.assert_called_once()
   assert not stomp.is_connected()
 
+@mock.patch('workflows.transport.stomp_transport.stomp')
+def test_error_handling_when_connecting_to_broker(mockstomp):
+  '''Test the Stomp connection routine.'''
+  stomp = StompTransport()
+  mockconn = mockstomp.Connection.return_value
+  mockconn.start.side_effect = stomppy.exception.ConnectFailedException()
+  mockstomp.exception = stomppy.exception
+
+  with pytest.raises(workflows.DisconnectedError):
+    stomp.connect()
+
+  assert not stomp.is_connected()
+
+  mockconn.start.side_effect = None
+  mockconn.connect.side_effect = stomppy.exception.ConnectFailedException()
+
+  with pytest.raises(workflows.AuthenticationError):
+    stomp.connect()
+
+  assert not stomp.is_connected()
+
 @mock.patch('workflows.transport.stomp_transport.time')
 @mock.patch('workflows.transport.stomp_transport.stomp')
 def test_broadcast_status(mockstomp, mocktime):
@@ -170,7 +192,7 @@ def test_error_handling_on_send(mockstomp):
   mockconn.send.side_effect = stomppy.exception.NotConnectedException()
   mockstomp.exception = stomppy.exception
 
-  with pytest.raises(stomppy.exception.NotConnectedException):
+  with pytest.raises(workflows.DisconnectedError):
     stomp._send( str(mock.sentinel.channel), mock.sentinel.message )
   assert not stomp.is_connected()
 
