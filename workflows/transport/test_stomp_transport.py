@@ -314,11 +314,11 @@ def test_subscribe_to_queue(mockstomp):
   assert args == ('/queue/' + str(mock.sentinel.channel1), 1)
   assert kwargs == { 'headers': {'transformation': mock.sentinel.transformation}, 'ack': 'auto' }
 
-  stomp._subscribe(2, str(mock.sentinel.channel2), mock_cb2, retroactive=True, selector=mock.sentinel.selector, exclusive=True, transformation=True)
+  stomp._subscribe(2, str(mock.sentinel.channel2), mock_cb2, retroactive=True, selector=mock.sentinel.selector, exclusive=True, transformation=True, priority=42)
   assert mockconn.subscribe.call_count == 2
   args, kwargs = mockconn.subscribe.call_args
   assert args == ('/queue/' + str(mock.sentinel.channel2), 2)
-  assert kwargs == { 'headers': {'activemq.retroactive':'true', 'selector':mock.sentinel.selector, 'activemq.exclusive':'true', 'transformation': 'jms-object-json'}, 'ack': 'auto' }
+  assert kwargs == { 'headers': {'activemq.retroactive':'true', 'selector':mock.sentinel.selector, 'activemq.exclusive':'true', 'transformation': 'jms-object-json', 'activemq.priority':42}, 'ack': 'auto' }
 
   assert mock_cb1.call_count == 0
   listener.on_message({'subscription': 1}, mock.sentinel.message1)

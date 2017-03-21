@@ -169,6 +169,8 @@ class StompTransport(CommonTransport):
                            acknowledged.
          exclusive:        Attempt to become exclusive subscriber to the queue.
          ignore_namespace: Do not apply namespace to the destination name
+         priority:         Consumer priority, messages are sent to higher
+                           priority consumers whenever possible.
          selector:         Only receive messages filtered by a selector. See
                            https://activemq.apache.org/activemq-message-properties.html
                            for potential filter criteria. Uses SQL 92 syntax.
@@ -182,6 +184,8 @@ class StompTransport(CommonTransport):
       destination = '/queue/' + channel
     else:
       destination = '/queue/' + self._namespace + channel
+    if kwargs.get('priority'):
+      headers['activemq.priority'] = kwargs['priority']
     if kwargs.get('retroactive'):
       headers['activemq.retroactive'] = 'true'
     if kwargs.get('selector'):
