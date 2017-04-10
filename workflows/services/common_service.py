@@ -1,6 +1,5 @@
 from __future__ import absolute_import, division
 import logging
-import threading
 import workflows
 import workflows.logging
 from workflows.transport.queue_transport import QueueTransport
@@ -138,14 +137,6 @@ class CommonService(workflows.add_plugin_register_to_class(object)):
     self._idle_callback = callback
     self._idle_time = idle_time
 
-  def _define_timer(self, interval, callback):
-    '''Create a repeating timer, that calls a callback function every
-       n seconds. This returns a timer object which offers a .cancel()
-       method to disable the timer.'''
-
-    threading.Timer(interval, callback)
-    pass
-
   def __update_service_status(self, statuscode):
     '''Set the internal status of the service object, and notify frontend.'''
     if self.__service_status != statuscode:
@@ -273,8 +264,3 @@ class CommonService(workflows.add_plugin_register_to_class(object)):
 class Commands():
   '''A list of command strings used for communicating with the frontend.'''
   SHUTDOWN = 'shutdown'
-
-class RepeatingTimer():
-  pass
-# threading.Timer(interval, callback)
-

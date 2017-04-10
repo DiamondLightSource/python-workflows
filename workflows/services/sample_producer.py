@@ -31,4 +31,4 @@ class SampleProducer(CommonService):
                          "Message #%d\n++++++++Produced@ %f" % (
                            self.counter,
                            (time.time() % 1000) * 1000
-                         )) # , AMQ_SCHEDULED_DELAY=60000)
+                         ))
