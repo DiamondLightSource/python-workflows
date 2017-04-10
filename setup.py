@@ -2,11 +2,11 @@ from __future__ import absolute_import, division
 from setuptools import setup, find_packages
 import sys
 
-package_version = '0.37'
+package_version = '0.38'
 
 # to release:
 #  - increment number
-#  - export NUMBER="0.37"
+#  - export NUMBER="0.38"
 #  - git add -u; git commit -m "v${NUMBER} release"; git tag -a v${NUMBER} -m v${NUMBER}; git push; git push origin v${NUMBER}
 #  - python setup.py register sdist upload
 
