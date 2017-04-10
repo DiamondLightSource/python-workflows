@@ -217,3 +217,25 @@ def test_service_can_change_name_and_shut_itself_down():
   fe_pipe.send.assert_any_call({ 'band': 'set_name', 'name': mock.sentinel.newname })
   # Service should have shut down cleanly
   fe_pipe.send.assert_any_call({ 'band': 'status_update', 'statuscode': service.SERVICE_STATUS_END })
+
+def test_can_pass_environment_to_service():
+  '''Test that environment dictionaries can be passed to the service on construction and are available during runtime.'''
+  fe_pipe = mock.Mock()
+
+  class EnvironmentPassingService(CommonService):
+    '''Helper class to test environment passing.'''
+    _service_name = "Environmentservice"
+    _logger_name = "workflows.service.environment"
+
+    def get_environment(self):
+      '''Make the service environment available to the caller.'''
+      return self._environment
+
+  # Initialization without enviroment should still result in an available dictionary
+  service = EnvironmentPassingService(frontend=fe_pipe)
+  assert service.get_environment().get("non-existing-key-for-environment-passing-test") is None
+
+  # Check that passed environment is available
+  sample_environment = { 'environment': mock.sentinel.environment }
+  service = EnvironmentPassingService(frontend=fe_pipe, environment=sample_environment)
+  assert service.get_environment().get('environment') == mock.sentinel.environment

@@ -96,9 +96,12 @@ class CommonService(workflows.add_plugin_register_to_class(object)):
   def __init__(self, *args, **kwargs):
     '''Service constructor. Parameters include optional references to two
        pipes: frontend= for messages from the service to the frontend,
-       and commands= for messages from the frontend to the service.'''
+       and commands= for messages from the frontend to the service.
+       A dictionary can optionally be passed with environment=, which is then
+       available to the service during runtime.'''
     self.__pipe_frontend = kwargs.get('frontend')
     self.__pipe_commands = kwargs.get('commands')
+    self._environment = kwargs.get('environment', {})
     self._transport = workflows.transport.queue_transport.QueueTransport()
     self._transport.set_send_function(self.__send_to_frontend)
     self._transport.connect()
