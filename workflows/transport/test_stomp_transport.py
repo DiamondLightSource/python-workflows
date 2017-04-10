@@ -9,6 +9,7 @@ import optparse
 import os
 import pytest
 import stomp as stomppy
+import tempfile
 
 def test_lookup_and_initialize_stomp_transport_layer():
   '''Find the stomp transport layer via the lookup mechanism and run
@@ -32,29 +33,46 @@ def test_add_command_line_help():
 def test_check_config_file_behaviour(mockstomp):
   '''Check that a specified configuration file is read, that command line
      parameters have precedence and are passed on to the stomp layer.'''
-  cfgfile = os.path.join(os.path.dirname(os.path.realpath(__file__)), \
-                         'test_stomp.cfg')
   mockconn = mock.Mock()
   mockstomp.Connection.return_value = mockconn
   parser = optparse.OptionParser()
   stomp = StompTransport()
   stomp.add_command_line_options(parser)
 
-  parser.parse_args([
-    '--stomp-conf', cfgfile,
-    '--stomp-user', mock.sentinel.user])
+  # Temporarily create an example stomp configuration file
+  cfgfile = tempfile.NamedTemporaryFile(delete=False)
+  try:
+    cfgfile.write('''
+# An example stomp configuration file
+# Only lines in the [stomp] block will be interpreted
 
-  # Command line parameters are shared for all instances
-  stomp = StompTransport()
-  stomp.connect()
+[stomp]
+#host = 127.0.0.1
+port = 1234
+username = someuser
+password = somesecret
+prefix = namespace
+''')
+    cfgfile.close()
 
-  # Reset configuration for subsequent tests by reloading StompTransport
-  reload(workflows.transport.stomp_transport)
-  globals()['StompTransport'] = workflows.transport.stomp_transport.StompTransport
+    parser.parse_args([
+      '--stomp-conf', cfgfile.name,
+      '--stomp-user', mock.sentinel.user])
 
-  mockstomp.Connection.assert_called_once_with([('localhost', 1234)])
-  mockconn.connect.assert_called_once_with(mock.sentinel.user, 'somesecret', wait=True)
-  assert stomp.get_namespace() == 'namespace'
+    # Command line parameters are shared for all instances
+    stomp = StompTransport()
+    stomp.connect()
+
+    # Reset configuration for subsequent tests by reloading StompTransport
+    reload(workflows.transport.stomp_transport)
+    globals()['StompTransport'] = workflows.transport.stomp_transport.StompTransport
+
+    mockstomp.Connection.assert_called_once_with([('localhost', 1234)])
+    mockconn.connect.assert_called_once_with(mock.sentinel.user, 'somesecret', wait=True)
+    assert stomp.get_namespace() == 'namespace'
+
+  finally:
+    os.remove(cfgfile.name)
 
   # Loading a non-existing configuration file
   with pytest.raises(workflows.WorkflowsError):
