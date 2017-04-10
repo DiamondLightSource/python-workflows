@@ -52,7 +52,7 @@ port = 1234
 username = someuser
 password = somesecret
 prefix = namespace
-''')
+'''.encode('utf-8'))
     cfgfile.close()
 
     parser.parse_args([
