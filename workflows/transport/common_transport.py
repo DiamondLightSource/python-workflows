@@ -170,6 +170,7 @@ class CommonTransport(workflows.add_plugin_register_to_class(object)):
        :param destination: Queue name to send to
        :param message: Either a string or a serializable object to be sent
        :param **kwargs: Further parameters for the transport layer. For example
+              delay: Delay transport of message by this many seconds
               headers: Optional dictionary of header entries
               expiration: Optional expiration time, relative to sending time
               transaction: Transaction ID if message should be part of a
@@ -183,6 +184,7 @@ class CommonTransport(workflows.add_plugin_register_to_class(object)):
        :param destination: Topic name to send to
        :param message: Either a string or a serializable object to be sent
        :param **kwargs: Further parameters for the transport layer. For example
+              delay: Delay transport of message by this many seconds
               headers: Optional dictionary of header entries
               expiration: Optional expiration time, relative to sending time
               transaction: Transaction ID if message should be part of a

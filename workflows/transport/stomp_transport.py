@@ -243,6 +243,7 @@ class StompTransport(CommonTransport):
        :param destination: Queue name to send to
        :param message: A string to be sent
        :param **kwargs: Further parameters for the transport layer. For example
+         delay:            Delay transport of message by this many seconds
          expiration:       Optional expiration time, relative to sending time
          headers:          Optional dictionary of header entries
          ignore_namespace: Do not apply namespace to the destination name
@@ -258,6 +259,9 @@ class StompTransport(CommonTransport):
       headers = {}
     if 'persistent' not in headers:
       headers['persistent'] = 'true'
+    if kwargs.get('delay'):
+      headers['AMQ_SCHEDULED_DELAY'] = 1000 * kwargs['delay']
+      del(kwargs['delay'])
     if kwargs.get('ignore_namespace'):
       destination = '/queue/' + destination
     else:
@@ -276,6 +280,7 @@ class StompTransport(CommonTransport):
        :param destination: Topic name to send to
        :param message: A string to be broadcast
        :param **kwargs: Further parameters for the transport layer. For example
+         delay:            Delay transport of message by this many seconds
          expiration:       Optional expiration time, relative to sending time
          headers:          Optional dictionary of header entries
          ignore_namespace: Do not apply namespace to the destination name
@@ -287,6 +292,9 @@ class StompTransport(CommonTransport):
       del(kwargs['headers'])
     if not headers:
       headers = {}
+    if kwargs.get('delay'):
+      headers['AMQ_SCHEDULED_DELAY'] = 1000 * kwargs['delay']
+      del(kwargs['delay'])
     if kwargs.get('ignore_namespace'):
       destination = '/topic/' + destination
     else:

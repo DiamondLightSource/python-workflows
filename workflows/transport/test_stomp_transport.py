@@ -194,12 +194,13 @@ def test_send_message(mockstomp):
   assert kwargs.get('headers') == { 'persistent': 'true' }
 
   stomp._send( str(mock.sentinel.channel), mock.sentinel.message,
-               headers={ 'hdr': mock.sentinel.header } )
+               headers={ 'hdr': mock.sentinel.header }, delay=123 )
   assert mockconn.send.call_count == 2
   args, kwargs = mockconn.send.call_args
   assert args == ('/queue/' + str(mock.sentinel.channel), mock.sentinel.message)
   assert kwargs == { 'headers': { 'hdr': mock.sentinel.header,
-                                  'persistent': 'true' } }
+                                  'persistent': 'true',
+                                  'AMQ_SCHEDULED_DELAY': 123000 } }
 
 @mock.patch('workflows.transport.stomp_transport.stomp')
 def test_error_handling_on_send(mockstomp):
@@ -233,6 +234,12 @@ def test_send_broadcast(mockstomp):
   args, kwargs = mockconn.send.call_args
   assert args == ('/topic/' + str(mock.sentinel.channel), mock.sentinel.message)
   assert kwargs == { 'headers': mock.sentinel.headers }
+
+  stomp._broadcast( str(mock.sentinel.channel), mock.sentinel.message, delay=123 )
+  assert mockconn.send.call_count == 3
+  args, kwargs = mockconn.send.call_args
+  assert args == ('/topic/' + str(mock.sentinel.channel), mock.sentinel.message)
+  assert kwargs['headers'].get('AMQ_SCHEDULED_DELAY') == 123000
 
 @mock.patch('workflows.transport.stomp_transport.stomp')
 def test_error_handling_on_broadcast(mockstomp):
