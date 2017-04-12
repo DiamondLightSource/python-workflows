@@ -24,7 +24,7 @@ setup(name='workflows',
       packages=find_packages(),
       license='BSD',
       tests_require=['mock'],
-      zip_safe=True,
+      zip_safe=False,
       classifiers = [
         'Development Status :: 3 - Alpha',
         'License :: OSI Approved :: BSD License',
