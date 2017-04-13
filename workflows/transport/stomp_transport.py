@@ -260,6 +260,8 @@ class StompTransport(CommonTransport):
     if 'persistent' not in headers:
       headers['persistent'] = 'true'
     if kwargs.get('delay'):
+      # The 'delay' mechanism is only supported when
+      # schedulerSupport is enabled on the broker.
       headers['AMQ_SCHEDULED_DELAY'] = 1000 * kwargs['delay']
       del(kwargs['delay'])
     if kwargs.get('ignore_namespace'):
