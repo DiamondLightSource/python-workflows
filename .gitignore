@@ -12,3 +12,6 @@
 
 # Testing output
 /.cache
+
+# Sonarqube
+/.scannerwork
