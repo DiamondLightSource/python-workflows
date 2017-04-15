@@ -443,7 +443,7 @@ class Frontend():
     service_txn_id = args[0]
     assert service_txn_id in self._transaction_mapping
     self._transport.transaction_commit(self._transaction_mapping[service_txn_id])
-    del(self._transaction_mapping[service_txn_id])
+    del self._transaction_mapping[service_txn_id]
 
   def parse_band_transport_transaction_abort(self, message):
     '''Counterpart to the transport.transaction_abort call from the service.
@@ -452,7 +452,7 @@ class Frontend():
     service_txn_id = args[0]
     assert service_txn_id in self._transaction_mapping
     self._transport.transaction_abort(self._transaction_mapping[service_txn_id])
-    del(self._transaction_mapping[service_txn_id])
+    del self._transaction_mapping[service_txn_id]
 
   def parse_band_transport_subscribe(self, message):
     '''Counterpart to the transport.subscribe call from the service.
@@ -507,4 +507,4 @@ class Frontend():
        Forward the call to the real transport layer.'''
     subscription_id = message['payload'][0][0]
     self._transport.unsubscribe(self._subscription_mapping[subscription_id])
-    del(self._subscription_mapping[subscription_id])
+    del self._subscription_mapping[subscription_id]

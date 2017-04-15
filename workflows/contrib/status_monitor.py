@@ -108,7 +108,7 @@ class Monitor(): # pragma: no cover
       obliterate = curses.newwin(6, 35, 7 + 6 * (number // max_cards_horiz), 35 * (number % max_cards_horiz))
       obliterate.erase()
       obliterate.noutrefresh()
-      del(self.cards[number])
+      del self.cards[number]
 
   def _run(self, stdscr):
     '''Start the actual service monitor'''
@@ -127,10 +127,10 @@ class Monitor(): # pragma: no cover
           overview = self._node_status.copy()
         cardnumber = 0
         for host, status in overview.items():
-          age = (now - int(status['last_seen'] / 1000))
+          age = now - int(status['last_seen'] / 1000)
           with self._lock:
             if age > 90:
-              del(self._node_status[host])
+              del self._node_status[host]
             else:
               card = self._get_card(cardnumber)
               card.erase()

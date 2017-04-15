@@ -57,7 +57,7 @@ def test_equality_and_inequality_operator():
   assert A == B
   assert A == B.serialize()
 
-  del(B.recipe[1])
+  del B.recipe[1]
   assert A != B
   assert A != B.serialize()
 
@@ -85,7 +85,7 @@ def test_validate_tests_for_invalid_nodes():
   assert 'xnode' in str(excinfo.value)
 
   A, _ = generate_recipes()
-  del(A.recipe['start'])
+  del A.recipe['start']
   with pytest.raises(workflows.WorkflowsError) as excinfo:
     A.validate()
   assert 'start' in str(excinfo.value)
@@ -111,7 +111,7 @@ def test_validate_tests_for_invalid_nodes():
   assert 'start' in str(excinfo.value)
 
   A, _ = generate_recipes()
-  del(A.recipe['error'])
+  del A.recipe['error']
   A.validate()
 
   A.recipe['error'] = []

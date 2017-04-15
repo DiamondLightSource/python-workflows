@@ -238,7 +238,7 @@ class StompTransport(CommonTransport):
     self._conn.unsubscribe(id=subscription)
     # Callback reference is kept as further messages may already have been received
 
-  def _send(self, destination, message, **kwargs):
+  def _send(self, destination, message, headers=None, delay=None, **kwargs):
     '''Send a message to a queue.
        :param destination: Queue name to send to
        :param message: A string to be sent
@@ -252,18 +252,14 @@ class StompTransport(CommonTransport):
          transaction:      Transaction ID if message should be part of a
                            transaction
     '''
-    headers = kwargs.get('headers', {})
-    if 'headers' in kwargs:
-      del(kwargs['headers'])
     if not headers:
       headers = {}
     if 'persistent' not in headers:
       headers['persistent'] = 'true'
-    if kwargs.get('delay'):
+    if delay:
       # The 'delay' mechanism is only supported when
       # schedulerSupport is enabled on the broker.
-      headers['AMQ_SCHEDULED_DELAY'] = 1000 * kwargs['delay']
-      del(kwargs['delay'])
+      headers['AMQ_SCHEDULED_DELAY'] = 1000 * delay
     if kwargs.get('ignore_namespace'):
       destination = '/queue/' + destination
     else:
@@ -277,7 +273,7 @@ class StompTransport(CommonTransport):
         self._connected = False
         raise DisconnectedError('No connection to stomp host')
 
-  def _broadcast(self, destination, message, **kwargs):
+  def _broadcast(self, destination, message, headers=None, delay=None, **kwargs):
     '''Broadcast a message.
        :param destination: Topic name to send to
        :param message: A string to be broadcast
@@ -289,14 +285,10 @@ class StompTransport(CommonTransport):
          transaction:      Transaction ID if message should be part of a
                            transaction
     '''
-    headers = kwargs.get('headers', {})
-    if 'headers' in kwargs:
-      del(kwargs['headers'])
     if not headers:
       headers = {}
-    if kwargs.get('delay'):
-      headers['AMQ_SCHEDULED_DELAY'] = 1000 * kwargs['delay']
-      del(kwargs['delay'])
+    if delay:
+      headers['AMQ_SCHEDULED_DELAY'] = 1000 * delay
     if kwargs.get('ignore_namespace'):
       destination = '/topic/' + destination
     else:

@@ -68,7 +68,7 @@ class CommonTransport(workflows.add_plugin_register_to_class(object)):
     if 'client_id' in kwargs:
       self.__clients[kwargs['client_id']]['subscriptions'].add \
         (self.__subscription_id)
-      del(kwargs['client_id'])
+      del kwargs['client_id']
     if kwargs.get('disable_mangling'):
       self._subscribe(self.__subscription_id, channel, callback, **kwargs)
     else:
@@ -114,7 +114,7 @@ class CommonTransport(workflows.add_plugin_register_to_class(object)):
     if self.__subscriptions[subscription]['client']:
       self.__clients[self.__subscriptions[subscription]['client']] \
         ['subscriptions'].remove(subscription)
-    del(self.__subscriptions[subscription])
+    del self.__subscriptions[subscription]
 
   def subscribe_broadcast(self, channel, callback, **kwargs):
     '''Listen to a broadcast topic, notify via callback function.
@@ -143,7 +143,7 @@ class CommonTransport(workflows.add_plugin_register_to_class(object)):
     if 'client_id' in kwargs:
       self.__clients[kwargs['client_id']]['subscriptions'].add \
         (self.__subscription_id)
-      del(kwargs['client_id'])
+      del kwargs['client_id']
     if kwargs.get('disable_mangling'):
       self._subscribe_broadcast(self.__subscription_id, channel,
           callback, **kwargs)
@@ -266,7 +266,7 @@ class CommonTransport(workflows.add_plugin_register_to_class(object)):
     if 'client_id' in kwargs:
       self.__clients[kwargs['client_id']]['transactions'].add \
         (self.__transaction_id)
-      del(kwargs['client_id'])
+      del kwargs['client_id']
     self._transaction_begin(self.__transaction_id, **kwargs)
     return self.__transaction_id
 
@@ -281,7 +281,7 @@ class CommonTransport(workflows.add_plugin_register_to_class(object)):
     if self.__transactions[transaction_id]['client']:
       self.__clients[self.__transactions[transaction_id]['client']] \
         ['transactions'].remove(transaction_id)
-    del(self.__transactions[transaction_id])
+    del self.__transactions[transaction_id]
     self._transaction_abort(transaction_id, **kwargs)
 
   def transaction_commit(self, transaction_id, **kwargs):
@@ -295,7 +295,7 @@ class CommonTransport(workflows.add_plugin_register_to_class(object)):
     if self.__transactions[transaction_id]['client']:
       self.__clients[self.__transactions[transaction_id]['client']] \
         ['transactions'].remove(transaction_id)
-    del(self.__transactions[transaction_id])
+    del self.__transactions[transaction_id]
     self._transaction_commit(transaction_id, **kwargs)
 
   #
@@ -328,7 +328,7 @@ class CommonTransport(workflows.add_plugin_register_to_class(object)):
     transactions = list(self.__clients[client_id]['transactions'])
     for transaction in transactions:
       self.transaction_abort(transaction)
-    del(self.__clients[client_id])
+    del self.__clients[client_id]
 
   #
   # -- Low level communication calls to be implemented by subclass -----------
