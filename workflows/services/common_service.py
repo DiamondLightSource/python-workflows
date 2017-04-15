@@ -214,16 +214,14 @@ class CommonService(workflows.add_plugin_register_to_class(object)):
       while not self.__shutdown: # main loop
         self.__update_service_status(self.SERVICE_STATUS_IDLE)
 
-        if self._idle_time is None:
+        if self._idle_time is None \
+            or self.__pipe_commands.poll(self._idle_time):
           message = self.__pipe_commands.recv()
         else:
-          if self.__pipe_commands.poll(self._idle_time):
-            message = self.__pipe_commands.recv()
-          else:
-            self.__update_service_status(self.SERVICE_STATUS_TIMER)
-            if self._idle_callback is not None:
-              self._idle_callback()
-            continue
+          self.__update_service_status(self.SERVICE_STATUS_TIMER)
+          if self._idle_callback is not None:
+            self._idle_callback()
+          continue
 
         self.__update_service_status(self.SERVICE_STATUS_PROCESSING)
 
