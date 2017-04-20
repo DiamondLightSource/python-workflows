@@ -2,9 +2,9 @@ from __future__ import absolute_import, division
 import mock
 import pytest
 import workflows
-import workflows.recipe.wrap
+import workflows.recipe
 
-def check_message_handling_via_unwrapper(callback, recipient, transport):
+def check_message_handling_via_unwrapper(callback, recipient, transport, rw_mock):
   '''Test callback function of a recipe wrapper.'''
 
   # This message does not contain an encoded recipe. It should be passed through directly.
@@ -18,10 +18,11 @@ def check_message_handling_via_unwrapper(callback, recipient, transport):
   # through with a helper object for simple recipe-conformant replies.
   header = { 'workflows-recipe': True }
   message = {
-     'recipe': {},
-     'recipe-pointer': 1,
+     'recipe': mock.sentinel.recipe,
+     'recipe-pointer': mock.sentinel.recipe_pointer,
      'recipe-path': [],
-     'global': { 'ID': mock.sentinel.GUID,
+     'environment': {
+                 'ID': mock.sentinel.GUID,
                  'source': mock.sentinel.source,
                  'timestamp': mock.sentinel.timestamp,
                },
@@ -29,15 +30,16 @@ def check_message_handling_via_unwrapper(callback, recipient, transport):
      }
   recipient.reset_mock()
   callback(header, message)
-  recipient.assert_called_once_with(mock.ANY, header, message['payload'])
-  recipe_wrapper = recipient.call_args[0][0]
-  assert recipe_wrapper
 
-def test_wrapping_a_subscription():
+  recipient.assert_called_once_with(rw_mock.return_value, header, message['payload'])
+  rw_mock.assert_called_once_with(message)
+
+@mock.patch('workflows.recipe.RecipeWrapper', autospec=True)
+def test_wrapping_a_subscription(rw_mock):
   '''Test queue subscription with recipe wrapper.'''
   transport, recipient = mock.Mock(), mock.Mock()
 
-  workflows.recipe.wrap.subscribe(transport, mock.sentinel.channel, recipient,
+  workflows.recipe.wrap_subscribe(transport, mock.sentinel.channel, recipient,
       mock.sentinel.irrelevant_extra_arg, keyword=mock.sentinel.keyword_arg)
 
   # Channel and any extra arguments must be passed on to transport layer.
@@ -48,13 +50,14 @@ def test_wrapping_a_subscription():
   assert callback != recipient
 
   # Part II: Message handling via unwrapper
-  check_message_handling_via_unwrapper(callback, recipient, transport)
+  check_message_handling_via_unwrapper(callback, recipient, transport, rw_mock)
 
-def test_wrapping_a_broadcast_subscription():
+@mock.patch('workflows.recipe.RecipeWrapper', autospec=True)
+def test_wrapping_a_broadcast_subscription(rw_mock):
   '''Test topic subscription with recipe wrapper.'''
   transport, recipient = mock.Mock(), mock.Mock()
 
-  workflows.recipe.wrap.subscribe_broadcast(transport, mock.sentinel.channel, recipient,
+  workflows.recipe.wrap_subscribe_broadcast(transport, mock.sentinel.channel, recipient,
       mock.sentinel.irrelevant_extra_arg, keyword=mock.sentinel.keyword_arg)
 
   # Channel and any extra arguments must be passed on to transport layer.
@@ -65,4 +68,4 @@ def test_wrapping_a_broadcast_subscription():
   assert callback != recipient
 
   # Part II: Message handling via unwrapper
-  check_message_handling_via_unwrapper(callback, recipient, transport)
+  check_message_handling_via_unwrapper(callback, recipient, transport, rw_mock)
