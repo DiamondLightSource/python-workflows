@@ -22,7 +22,7 @@ class Frontend():
 
   def __init__(self, transport=None, service=None,
       transport_command_prefix=None, restart_service=False,
-      verbose_service=False):
+      verbose_service=False, environment=None):
     '''Create a frontend instance. Connect to the transport layer, start any
        requested service, begin broadcasting status information and listen
        for control commands.
@@ -40,6 +40,8 @@ class Frontend():
            commands.
        :param verbose_service:
            If set, run services with increased logging level (DEBUG).
+       :param environment:
+           An optional dictionary that is passed to started services.
     '''
     self.__lock = threading.RLock()
     self.__hostid = self._generate_unique_host_id()
@@ -100,6 +102,9 @@ class Frontend():
       self._transport.subscribe(transport_command_prefix + self.__hostid,
                                 self.process_transport_command)
       self.log.debug('Listening for commands on transport layer')
+
+    # Save environment for service starts
+    self._service_environment = environment
 
     # Start initial service if one has been requested
     self._service_factory = service
@@ -321,7 +326,8 @@ class Frontend():
       self._pipe_service, svc_tofrontend = multiprocessing.Pipe(False)
       service_instance = self._service_factory(
         commands=svc_commands,
-        frontend=svc_tofrontend)
+        frontend=svc_tofrontend,
+        environment=self._service_environment)
 
       # Clean out transport layer for new service
       if self._service_transportid:

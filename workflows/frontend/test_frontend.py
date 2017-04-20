@@ -102,13 +102,13 @@ def test_start_service_in_frontend(mock_transport, mock_mp):
       None ]
 
   # initialize frontend
-  fe = workflows.frontend.Frontend()
+  fe = workflows.frontend.Frontend(environment=mock.sentinel.environment)
 
   # start service
   fe.switch_service(mock_service)
 
   # check service was started properly
-  mock_service.assert_called_once_with(commands=pipes[0], frontend=pipes[3])
+  mock_service.assert_called_once_with(commands=pipes[0], frontend=pipes[3], environment=mock.sentinel.environment)
   mock_mp.Process.assert_called_once_with(target=mock_service.return_value.start, args=(), kwargs=mock.ANY)
   mock_mp.Process.return_value.start.assert_called_once()
 
