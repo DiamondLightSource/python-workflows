@@ -18,6 +18,14 @@ def _wrap_subscription(transport_layer, subscription_call, channel, callback,
   '''
 
   def unwrap_recipe(header, message):
+    '''This is a helper function unpacking incoming messages when they are
+       in a recipe format. Other messages are passed through unmodified.
+       :param header:  A dictionary of message headers. If the header contains
+                       an entry 'workflows-recipe' then the message is parsed
+                       and the embedded recipe information is passed on in a
+                       RecipeWrapper object to the target function.
+       :param message: Incoming deserialized message object.
+    '''
     if header.get('workflows-recipe', False) and 'payload' in message:
       return callback(RecipeWrapper(message), header, message['payload'])
     return callback(None, header, message)
