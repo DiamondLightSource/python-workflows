@@ -8,18 +8,28 @@ class RecipeWrapper(object):
      life easier for recipe users.
   '''
 
-  def __init__(self, message, transport=None, log=None):
+  def __init__(self, message=None, transport=None, log=None, recipe=None):
     '''Create a RecipeWrapper object from a wrapped message.
        References to the transport layer are required to send directly to
        connected downstream processes. Optionally a logger is wrappend and
        extended to include global recipe information in log messages for
        tracking.
     '''
-    self.recipe = workflows.recipe.Recipe(message['recipe'])
-    self.recipe_pointer = message['recipe-pointer'] # TODO: failsafe way?
-    self.recipe_step = self.recipe[self.recipe_pointer]
-    self.recipe_path = message.get('recipe-path', [])
-    self.environment = message.get('environment', {})
+    if message:
+      self.recipe = workflows.recipe.Recipe(message['recipe'])
+      self.recipe_pointer = message['recipe-pointer']
+      self.recipe_step = self.recipe[self.recipe_pointer]
+      self.recipe_path = message.get('recipe-path', [])
+      self.environment = message.get('environment', {})
+    elif recipe:
+      self.recipe = workflows.recipe.Recipe(recipe)
+      self.recipe_pointer= None
+      self.recipe_step = None
+      self.recipe_path = []
+      self.environment = {}
+    else:
+      raise ValueError('A message or recipe is required to create ' \
+                       'a RecipeWrapper object.')
     self.transport = transport
     self.log = log
 
@@ -41,6 +51,8 @@ class RecipeWrapper(object):
     header['workflows-recipe'] = True
 
     def generate_full_recipe_message(destination):
+      '''Factory function to generate independent message objects for
+         downstream recipients with different destinations.'''
       return {
           'environment': self.environment,
           'payload': message,
