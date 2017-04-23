@@ -46,35 +46,65 @@ class RecipeWrapper(object):
       raise ValueError('The current recipe step does not have an output ' \
                        'channel named %s.' % channel)
 
-    if not header:
-      header = {}
-    header['workflows-recipe'] = True
-
-    def generate_full_recipe_message(destination):
-      '''Factory function to generate independent message objects for
-         downstream recipients with different destinations.'''
-      return {
-          'environment': self.environment,
-          'payload': message,
-          'recipe': self.recipe.recipe,
-          'recipe-path': self.recipe_path + [ self.recipe_pointer ],
-          'recipe-pointer': destination,
-             }
 
     destinations = self.recipe_step[channel]
     if not isinstance(destinations, list):
       destinations = [ destinations ]
     for destination in destinations:
-      dest_kwargs = kwargs.copy()
-      if 'transport-delay' in self.recipe[destination] and 'delay' not in kwargs:
-        dest_kwargs['delay'] = self.recipe[destination]['transport-delay']
-      if self.recipe[destination].get('queue'):
-        self.transport.send(
-            self.recipe[destination]['queue'],
-            generate_full_recipe_message(destination),
-            header=header, **dest_kwargs)
-      if self.recipe[destination].get('topic'):
-        self.transport.broadcast(
-            self.recipe[destination]['topic'],
-            generate_full_recipe_message(destination),
-            header=header, **dest_kwargs)
+      self._send_to_destination(destination, header, message, kwargs)
+
+  def start(self, header=None, **kwargs):
+    '''Trigger the start of a recipe, sending the defined payloads to the
+       recipients set in the recipe. Any parameters to this function are
+       passed to the transport send/broadcast methods.
+       If the wrapped recipe has already been started then a ValueError will
+       be raised.
+    '''
+    if not self.transport:
+      raise NotImplementedError('This RecipeWrapper object does not contain ' \
+                                'a reference to a transport object.')
+
+    if self.recipe_step:
+      raise ValueError('This recipe has already been started.')
+
+    for destination, payload in self.recipe['start']:
+      self._send_to_destination(destination, header, payload, kwargs)
+
+  def _generate_full_recipe_message(self, destination, message):
+    '''Factory function to generate independent message objects for
+       downstream recipients with different destinations.'''
+    if self.recipe_pointer:
+      recipe_path = self.recipe_path + [ self.recipe_pointer ]
+    else:
+      recipe_path = self.recipe_path
+
+    return {
+        'environment': self.environment,
+        'payload': message,
+        'recipe': self.recipe.recipe,
+        'recipe-path': recipe_path,
+        'recipe-pointer': destination,
+    }
+
+  def _send_to_destination(self, destination, header, payload, transport_kwargs):
+    '''Helper function to send a message to a specific recipe destination.'''
+    if header:
+      header = header.copy()
+      header['workflows-recipe'] = True
+    else:
+      header = { 'workflows-recipe': True }
+
+    dest_kwargs = transport_kwargs.copy()
+    if 'transport-delay' in self.recipe[destination] and \
+       'delay' not in transport_kwargs:
+      dest_kwargs['delay'] = self.recipe[destination]['transport-delay']
+    if self.recipe[destination].get('queue'):
+      self.transport.send(
+          self.recipe[destination]['queue'],
+          self._generate_full_recipe_message(destination, payload),
+          header=header, **dest_kwargs)
+    if self.recipe[destination].get('topic'):
+      self.transport.broadcast(
+          self.recipe[destination]['topic'],
+          self._generate_full_recipe_message(destination, payload),
+          header=header, **dest_kwargs)

@@ -27,7 +27,7 @@ def generate_recipe_message():
             'transport-delay': 300,
           },
        'start': [
-          (1, {}),
+          (1, {'parameter': mock.sentinel.initial_parameter}),
        ],
        'error': [ 2 ],
      },
@@ -73,7 +73,12 @@ def test_recipe_wrapper_empty_constructor_fails():
   with pytest.raises(ValueError):
     RecipeWrapper()
 
-def test_recipe_embedded_message_sending():
+def test_downstream_message_sending_via_recipewrapper():
+  '''The idea of the RecipeWrapper is that it makes it easy to send messages from
+     one service to another, including instructions on how to handle intermediate
+     results at each step. This tests the send_to function which embeds a message
+     payload inside a data structure containing all the extra processing info.
+  '''
   m = generate_recipe_message()
   t = mock.create_autospec(workflows.transport.common_transport.CommonTransport)
   def downstream_message(dest, payload):
@@ -126,4 +131,44 @@ def test_recipe_embedded_message_sending():
       transaction=mock.sentinel.txn,
       delay=300,
   ))
+  assert t.mock_calls == expected
+
+def test_checkpointing_via_recipewrapper():
+  pass
+
+def test_start_command_via_recipewrapper():
+  '''Test triggering the start of a recipe.'''
+  m = generate_recipe_message()
+  r = m['recipe']
+  t = mock.create_autospec(workflows.transport.common_transport.CommonTransport)
+  def downstream_message(dest, payload):
+    '''Helper function to generate expected message contents for downstream
+       recipients.'''
+    ds_message = generate_recipe_message()
+    ds_message['recipe-pointer'] = dest
+    ds_message['recipe-path'] = [ ]
+    ds_message['payload'] = payload
+    ds_message['environment'] = mock.sentinel.environment
+    return ds_message
+
+  # Test on already started recipe
+  rw = RecipeWrapper(message=m, transport=t)
+  with pytest.raises(ValueError):
+    rw.start(transaction=mock.sentinel.txn)
+  t.reset_mock()
+
+  rw = RecipeWrapper(recipe=r, transport=t)
+  rw.environment = mock.sentinel.environment
+  assert rw.transport == t
+  assert t.method_calls == []
+  t.reset_mock() # magic call may have been recorded
+
+  rw.start(transaction=mock.sentinel.txn)
+
+  expected = [ mock.call.send(
+      r[1]['queue'],
+      downstream_message(1, r['start'][0][1]),
+      header={'workflows-recipe': True},
+      transaction=mock.sentinel.txn,
+  ) ]
   assert t.mock_calls == expected
