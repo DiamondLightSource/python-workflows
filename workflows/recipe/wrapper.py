@@ -23,7 +23,7 @@ class RecipeWrapper(object):
       self.environment = message.get('environment', {})
     elif recipe:
       self.recipe = workflows.recipe.Recipe(recipe)
-      self.recipe_pointer= None
+      self.recipe_pointer = None
       self.recipe_step = None
       self.recipe_path = []
       self.environment = {}
@@ -35,12 +35,12 @@ class RecipeWrapper(object):
 
   def send_to(self, channel, message, header=None, **kwargs):
     if not self.transport:
-      raise NotImplementedError('This RecipeWrapper object does not contain ' \
-                                'a reference to a transport object.')
+      raise ValueError('This RecipeWrapper object does not contain ' \
+                       'a reference to a transport object.')
 
     if not self.recipe_step:
-      raise NotImplementedError('This RecipeWrapper object does not contain ' \
-                                'a recipe with a selected step.')
+      raise ValueError('This RecipeWrapper object does not contain ' \
+                       'a recipe with a selected step.')
 
     if channel not in self.recipe_step:
       raise ValueError('The current recipe step does not have an output ' \
@@ -61,8 +61,8 @@ class RecipeWrapper(object):
        be raised.
     '''
     if not self.transport:
-      raise NotImplementedError('This RecipeWrapper object does not contain ' \
-                                'a reference to a transport object.')
+      raise ValueError('This RecipeWrapper object does not contain ' \
+                       'a reference to a transport object.')
 
     if self.recipe_step:
       raise ValueError('This recipe has already been started.')
@@ -70,10 +70,25 @@ class RecipeWrapper(object):
     for destination, payload in self.recipe['start']:
       self._send_to_destination(destination, header, payload, kwargs)
 
-  def _generate_full_recipe_message(self, destination, message):
+  def checkpoint(self, message, header=None, **kwargs):
+    '''Send a message to the current recipe destination. This can be used to
+       keep a state for longer processing tasks.
+    '''
+    if not self.transport:
+      raise ValueError('This RecipeWrapper object does not contain ' \
+                       'a reference to a transport object.')
+
+    if not self.recipe_step:
+      raise ValueError('This RecipeWrapper object does not contain ' \
+                       'a recipe with a selected step.')
+
+    self._send_to_destination(self.recipe_pointer, header, message, kwargs, \
+                              add_path_step=False)
+
+  def _generate_full_recipe_message(self, destination, message, add_path_step):
     '''Factory function to generate independent message objects for
        downstream recipients with different destinations.'''
-    if self.recipe_pointer:
+    if add_path_step and self.recipe_pointer:
       recipe_path = self.recipe_path + [ self.recipe_pointer ]
     else:
       recipe_path = self.recipe_path
@@ -86,7 +101,8 @@ class RecipeWrapper(object):
         'recipe-pointer': destination,
     }
 
-  def _send_to_destination(self, destination, header, payload, transport_kwargs):
+  def _send_to_destination(self, destination, header, payload, \
+                           transport_kwargs, add_path_step=True):
     '''Helper function to send a message to a specific recipe destination.'''
     if header:
       header = header.copy()
@@ -101,10 +117,10 @@ class RecipeWrapper(object):
     if self.recipe[destination].get('queue'):
       self.transport.send(
           self.recipe[destination]['queue'],
-          self._generate_full_recipe_message(destination, payload),
+          self._generate_full_recipe_message(destination, payload, add_path_step),
           header=header, **dest_kwargs)
     if self.recipe[destination].get('topic'):
       self.transport.broadcast(
           self.recipe[destination]['topic'],
-          self._generate_full_recipe_message(destination, payload),
+          self._generate_full_recipe_message(destination, payload, add_path_step),
           header=header, **dest_kwargs)

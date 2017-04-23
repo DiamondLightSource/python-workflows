@@ -134,7 +134,34 @@ def test_downstream_message_sending_via_recipewrapper():
   assert t.mock_calls == expected
 
 def test_checkpointing_via_recipewrapper():
-  pass
+  '''Test resending modified message to the current destination (checkpointing).'''
+  m = generate_recipe_message()
+  t = mock.create_autospec(workflows.transport.common_transport.CommonTransport)
+  def downstream_message(dest, payload):
+    '''Helper function to generate expected message contents for downstream
+       recipients.'''
+    ds_message = generate_recipe_message()
+    ds_message['recipe-pointer'] = dest
+    ds_message['recipe-path'] = [ ]
+    ds_message['payload'] = payload
+    return ds_message
+
+  # Can't checkpoint on a recipe without a pointer
+  rw = RecipeWrapper(recipe=m['recipe'], transport=mock.Mock())
+  with pytest.raises(ValueError):
+    rw.checkpoint(mock.sentinel.checkpoint, transaction=mock.sentinel.txn)
+
+  rw = RecipeWrapper(message=m, transport=t)
+  rw.checkpoint(mock.sentinel.checkpoint, transaction=mock.sentinel.txn)
+
+  expected = [ mock.call.send(
+      m['recipe'][1]['queue'],
+      downstream_message(1, mock.sentinel.checkpoint),
+      header={'workflows-recipe': True},
+      transaction=mock.sentinel.txn,
+  ) ]
+  assert t.mock_calls == expected
+  t.reset_mock()
 
 def test_start_command_via_recipewrapper():
   '''Test triggering the start of a recipe.'''
