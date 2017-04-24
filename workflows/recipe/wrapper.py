@@ -34,6 +34,9 @@ class RecipeWrapper(object):
     self.log = log
 
   def send_to(self, channel, message, header=None, **kwargs):
+    '''Send messages to another service that is connected to the currently
+       running service via the recipe.
+    '''
     if not self.transport:
       raise ValueError('This RecipeWrapper object does not contain ' \
                        'a reference to a transport object.')
@@ -45,7 +48,6 @@ class RecipeWrapper(object):
     if channel not in self.recipe_step:
       raise ValueError('The current recipe step does not have an output ' \
                        'channel named %s.' % channel)
-
 
     destinations = self.recipe_step[channel]
     if not isinstance(destinations, list):

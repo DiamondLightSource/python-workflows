@@ -71,10 +71,10 @@ def add_plugin_register_to_class(*bases):
       else:
         cls.plugin_register[name] = cls
 
-  class metametaclass(PluginRegister):
+  class Metametaclass(PluginRegister):
     '''Dummy metaclass.'''
     def __new__(cls, name, this_bases, d):
       '''Return the actual metaclass.'''
       return PluginRegister(name, bases, d)
 
-  return type.__new__(metametaclass, 'temporary_class', (), {})
+  return type.__new__(Metametaclass, 'temporary_class', (), {})
