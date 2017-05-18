@@ -11,12 +11,14 @@ def generate_recipe_message():
      'recipe': {
        1: { 'service': 'A service',
             'queue': 'service.one',
-            'output': [ 2 ],
-            'multi-output': [ 2, 3, 4 ],
+            'output': { 'somewhere': [ 2 ],
+                        'multi-output': [ 2, 3, 4 ],
+                      },
             'error': 2,
           },
        2: { 'service': 'service 2',
             'queue': 'queue.two',
+            'output': 3,
           },
        3: { 'service': 'service 3',
             'topic': 'topic.three',
@@ -54,6 +56,31 @@ def test_recipe_wrapper_instantiated_from_message():
   assert rw.recipe_path == m['recipe-path']
   assert rw.environment == m['environment']
 
+def test_recipe_wrapper_instantiated_from_message_with_string_conversion():
+  '''A RecipeWrapper built from a message must be able to parse numeric strings.'''
+  m = generate_recipe_message()
+  original_pointer = m['recipe-pointer']
+  m['recipe-pointer'] = str(original_pointer)
+
+  rw = RecipeWrapper(message=m)
+
+  assert rw.recipe_pointer == original_pointer
+  assert rw.recipe_step == m['recipe'][original_pointer]
+
+def test_recipe_wrapper_instantiated_from_message_with_unicode_conversion():
+  '''A RecipeWrapper built from a message must be able to parse numeric strings.'''
+  m = generate_recipe_message()
+  original_pointer = m['recipe-pointer']
+  try:
+    m['recipe-pointer'] = unicode(original_pointer)
+  except NameError:
+    pytest.skip('Test skipped on Python 3')
+
+  rw = RecipeWrapper(message=m)
+
+  assert rw.recipe_pointer == original_pointer
+  assert rw.recipe_step == m['recipe'][original_pointer]
+
 def test_recipe_wrapper_instantiated_from_recipe():
   '''A RecipeWrapper built from a recipe will contain the recipe, but no
      pointers.'''
@@ -73,7 +100,7 @@ def test_recipe_wrapper_empty_constructor_fails():
   with pytest.raises(ValueError):
     RecipeWrapper()
 
-def test_downstream_message_sending_via_recipewrapper():
+def test_downstream_message_sending_via_recipewrapper_with_named_outputs():
   '''The idea of the RecipeWrapper is that it makes it easy to send messages from
      one service to another, including instructions on how to handle intermediate
      results at each step. This tests the send_to function which embeds a message
@@ -95,42 +122,101 @@ def test_downstream_message_sending_via_recipewrapper():
   assert t.method_calls == []
   t.reset_mock() # magic call may have been recorded
 
-  with pytest.raises(ValueError):
-    rw.send_to('unknown', mock.sentinel.message_text)
+  # Messages sent to undefined outputs are discarded
+  rw.send_to('unknown', mock.sentinel.message_text)
+  assert t.mock_calls == []
 
-  rw.send_to('output', mock.sentinel.message_text)
-
+  # Messages sent to defined outputs are sent
+  rw.send_to('somewhere', mock.sentinel.message_text)
   expected = [ mock.call.send(
       m['recipe'][2]['queue'],
       downstream_message(2, mock.sentinel.message_text),
-      header={'workflows-recipe': True},
+      headers={'workflows-recipe': True},
   ) ]
   assert t.mock_calls == expected
   t.reset_mock()
 
+  # Messages sent to outputs with multiple connections are sent to all of them
   rw.send_to('multi-output', mock.sentinel.another_message_text, transaction=mock.sentinel.txn)
-
   expected = []
   expected.append(mock.call.send(
       m['recipe'][2]['queue'],
       downstream_message(2, mock.sentinel.another_message_text),
-      header={'workflows-recipe': True},
+      headers={'workflows-recipe': True},
       transaction=mock.sentinel.txn,
   ))
   expected.append(mock.call.broadcast(
       m['recipe'][3]['topic'],
       downstream_message(3, mock.sentinel.another_message_text),
-      header={'workflows-recipe': True},
+      headers={'workflows-recipe': True},
       transaction=mock.sentinel.txn,
       delay=300,
   ))
   expected.append(mock.call.send(
       m['recipe'][4]['queue'],
       downstream_message(4, mock.sentinel.another_message_text),
-      header={'workflows-recipe': True},
+      headers={'workflows-recipe': True},
       transaction=mock.sentinel.txn,
       delay=300,
   ))
+  assert t.mock_calls == expected
+  t.reset_mock()
+
+  # Messages sent to unnamed output are discarded
+  rw.send(mock.sentinel.unnamed_output)
+  assert t.mock_calls == []
+
+  # Messages sent to unnamed output are sent when a default output channel is set
+  rw.set_default_channel('somewhere')
+  rw.send(mock.sentinel.unnamed_output_with_default_name)
+  expected = [ mock.call.send(
+      m['recipe'][2]['queue'],
+      downstream_message(2, mock.sentinel.unnamed_output_with_default_name),
+      headers={'workflows-recipe': True},
+  ) ]
+  assert t.mock_calls == expected
+
+def test_downstream_message_sending_via_recipewrapper_with_unnamed_output():
+  '''Test sending messages via the RecipeWrapper when the current step
+     does not have named outputs, or any output at all.
+  '''
+  def downstream_message(dest, payload, path=()):
+    '''Helper function to generate expected message contents for downstream
+       recipients.'''
+    ds_message = generate_recipe_message()
+    ds_message['recipe-pointer'] = dest
+    ds_message['recipe-path'] = [ 1 ] + list(path)
+    ds_message['payload'] = payload
+    return ds_message
+  m = downstream_message(2, mock.sentinel.payload)
+  t = mock.create_autospec(workflows.transport.common_transport.CommonTransport)
+  rw = RecipeWrapper(message=m, transport=t)
+  t.reset_mock()
+
+  # When only an unnamed output is specified all named outputs are discarded.
+  rw.send_to('output', mock.sentinel.test_unnamed_output)
+  assert t.mock_calls == []
+
+  # The send() method can deal with unnamed outputs.
+  rw.send(mock.sentinel.test_default_output)
+  expected = [ mock.call.broadcast(
+      m['recipe'][3]['topic'],
+      downstream_message(3, mock.sentinel.test_default_output, path=(2,)),
+      headers={'workflows-recipe': True},
+      delay=300,
+  ) ]
+  assert t.mock_calls == expected
+  t.reset_mock()
+
+  # The send_to() method can also deal with unnamed outputs once a default output has been defined.
+  rw.set_default_channel('output')
+  rw.send_to('output', mock.sentinel.test_default_named_output)
+  expected = [ mock.call.broadcast(
+      m['recipe'][3]['topic'],
+      downstream_message(3, mock.sentinel.test_default_named_output, path=(2,)),
+      headers={'workflows-recipe': True},
+      delay=300,
+  ) ]
   assert t.mock_calls == expected
 
 def test_checkpointing_via_recipewrapper():
@@ -157,11 +243,10 @@ def test_checkpointing_via_recipewrapper():
   expected = [ mock.call.send(
       m['recipe'][1]['queue'],
       downstream_message(1, mock.sentinel.checkpoint),
-      header={'workflows-recipe': True},
+      headers={'workflows-recipe': True},
       transaction=mock.sentinel.txn,
   ) ]
   assert t.mock_calls == expected
-  t.reset_mock()
 
 def test_start_command_via_recipewrapper():
   '''Test triggering the start of a recipe.'''
@@ -195,7 +280,7 @@ def test_start_command_via_recipewrapper():
   expected = [ mock.call.send(
       r[1]['queue'],
       downstream_message(1, r['start'][0][1]),
-      header={'workflows-recipe': True},
+      headers={'workflows-recipe': True},
       transaction=mock.sentinel.txn,
   ) ]
   assert t.mock_calls == expected

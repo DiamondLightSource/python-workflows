@@ -6,7 +6,7 @@ import workflows.recipe
 
 def generate_recipes():
   '''Generate two recipe objects for testing.'''
-  class A(workflows.recipe.Recipe):
+  class RecipeA(workflows.recipe.Recipe):
     '''Testing recipe class by overriding the 'recipe' property.'''
     recipe = {
         1: { 'service': 'A service',
@@ -35,9 +35,8 @@ def generate_recipes():
            (1, {}),
         ]
       }
-  b = workflows.recipe.Recipe(recipe_b)
 
-  return A(), b
+  return RecipeA(), workflows.recipe.Recipe(recipe_b)
 
 def test_can_generate_recipe_objects():
   '''Test generation of recipes.'''

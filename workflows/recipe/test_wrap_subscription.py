@@ -32,7 +32,7 @@ def check_message_handling_via_unwrapper(callback, recipient, transport, rw_mock
   callback(header, message)
 
   recipient.assert_called_once_with(rw_mock.return_value, header, message['payload'])
-  rw_mock.assert_called_once_with(message)
+  rw_mock.assert_called_once_with(message=message, transport=transport)
 
 @mock.patch('workflows.recipe.RecipeWrapper', autospec=True)
 def test_wrapping_a_subscription(rw_mock):

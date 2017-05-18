@@ -11,13 +11,13 @@ class RecipeWrapper(object):
   def __init__(self, message=None, transport=None, log=None, recipe=None):
     '''Create a RecipeWrapper object from a wrapped message.
        References to the transport layer are required to send directly to
-       connected downstream processes. Optionally a logger is wrappend and
+       connected downstream processes. Optionally a logger is wrapped and
        extended to include global recipe information in log messages for
        tracking.
     '''
     if message:
       self.recipe = workflows.recipe.Recipe(message['recipe'])
-      self.recipe_pointer = message['recipe-pointer']
+      self.recipe_pointer = int(message['recipe-pointer'])
       self.recipe_step = self.recipe[self.recipe_pointer]
       self.recipe_path = message.get('recipe-path', [])
       self.environment = message.get('environment', {})
@@ -30,12 +30,15 @@ class RecipeWrapper(object):
     else:
       raise ValueError('A message or recipe is required to create ' \
                        'a RecipeWrapper object.')
-    self.transport = transport
+    self.default_channel = None
     self.log = log
+    self.transport = transport
 
-  def send_to(self, channel, message, header=None, **kwargs):
+  def send(self, *args, **kwargs):
     '''Send messages to another service that is connected to the currently
-       running service via the recipe.
+       running service via the recipe. The 'send' method will either use a
+       default channel name, set via the set_default_channel method, or an
+       unnamed output definition.
     '''
     if not self.transport:
       raise ValueError('This RecipeWrapper object does not contain ' \
@@ -45,15 +48,56 @@ class RecipeWrapper(object):
       raise ValueError('This RecipeWrapper object does not contain ' \
                        'a recipe with a selected step.')
 
-    if channel not in self.recipe_step:
-      raise ValueError('The current recipe step does not have an output ' \
-                       'channel named %s.' % channel)
+    if 'output' not in self.recipe_step:
+      # The current recipe step does not have output channels.
+      return
 
-    destinations = self.recipe_step[channel]
-    if not isinstance(destinations, list):
-      destinations = [ destinations ]
-    for destination in destinations:
-      self._send_to_destination(destination, header, message, kwargs)
+    if isinstance(self.recipe_step['output'], dict):
+      # The current recipe step does have named output channels.
+      if self.default_channel:
+        # Use named output channel
+        self.send_to(self.default_channel, *args, **kwargs)
+
+    else:
+      # The current recipe step does have unnamed output channels.
+      self._send_to_destinations(self.recipe_step['output'],
+                                 *args, **kwargs)
+
+  def send_to(self, channel, *args, **kwargs):
+    '''Send messages to another service that is connected to the currently
+       running service via the recipe. Discard messages if the recipe does
+       not have anything connected to the specified output channel.
+    '''
+    if not self.transport:
+      raise ValueError('This RecipeWrapper object does not contain ' \
+                       'a reference to a transport object.')
+
+    if not self.recipe_step:
+      raise ValueError('This RecipeWrapper object does not contain ' \
+                       'a recipe with a selected step.')
+
+    if 'output' not in self.recipe_step:
+      # The current recipe step does not have output channels.
+      return
+
+    if not isinstance(self.recipe_step['output'], dict):
+      # The current recipe step does not have named output channels.
+      if self.default_channel == channel:
+        # Use unnamed output channels
+        self.send(*args, **kwargs)
+      return
+
+    if channel not in self.recipe_step['output']:
+      # The current recipe step does not have an output channel with this name.
+      return
+
+    self._send_to_destinations(self.recipe_step['output'][channel],
+                               *args, **kwargs)
+
+  def set_default_channel(self, channel):
+    '''Define one named output channel to be equivalent to unnamed output
+       channels. For this channel send() and send_to() will be identical.'''
+    self.default_channel = channel
 
   def start(self, header=None, **kwargs):
     '''Trigger the start of a recipe, sending the defined payloads to the
@@ -73,6 +117,7 @@ class RecipeWrapper(object):
       self._send_to_destination(destination, header, payload, kwargs)
 
   def checkpoint(self, message, header=None, **kwargs):
+    #TODO add delay=0 to kwargs
     '''Send a message to the current recipe destination. This can be used to
        keep a state for longer processing tasks.
     '''
@@ -103,6 +148,15 @@ class RecipeWrapper(object):
         'recipe-pointer': destination,
     }
 
+  def _send_to_destinations(self, destinations, message, header=None, **kwargs):
+    '''Send messages to a list of numbered destinations. This is an internal
+       helper method used by the public 'send' methods.
+    '''
+    if not isinstance(destinations, list):
+      destinations = ( destinations, )
+    for destination in destinations:
+      self._send_to_destination(destination, header, message, kwargs)
+
   def _send_to_destination(self, destination, header, payload, \
                            transport_kwargs, add_path_step=True):
     '''Helper function to send a message to a specific recipe destination.'''
@@ -120,9 +174,9 @@ class RecipeWrapper(object):
       self.transport.send(
           self.recipe[destination]['queue'],
           self._generate_full_recipe_message(destination, payload, add_path_step),
-          header=header, **dest_kwargs)
+          headers=header, **dest_kwargs)
     if self.recipe[destination].get('topic'):
       self.transport.broadcast(
           self.recipe[destination]['topic'],
           self._generate_full_recipe_message(destination, payload, add_path_step),
-          header=header, **dest_kwargs)
+          headers=header, **dest_kwargs)

@@ -26,9 +26,10 @@ def _wrap_subscription(transport_layer, subscription_call, channel, callback,
                        RecipeWrapper object to the target function.
        :param message: Incoming deserialized message object.
     '''
-    if header.get('workflows-recipe', False) and 'payload' in message:
-      return callback(RecipeWrapper(message=message),
-                      header, message['payload'])
+    if header.get('workflows-recipe', False):
+      return callback(RecipeWrapper(message=message,
+                                    transport=transport_layer),
+                      header, message.get('payload'))
     return callback(None, header, message)
 
   subscription_call(channel, unwrap_recipe, *args, **kwargs)
