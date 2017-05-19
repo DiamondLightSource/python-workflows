@@ -22,16 +22,26 @@ class Recipe(object):
     if isinstance(recipe, basestring):
       self.recipe = self.deserialize(recipe)
     elif recipe:
-      self.recipe = recipe
+      self.recipe = self._sanitize(recipe)
+
+  def deserialize(self, string):
+    '''Convert a recipe that has been stored as serialized json string to a
+       data structure.'''
+    return self._sanitize(json.loads(string))
 
   @staticmethod
-  def deserialize(string):
-    '''Clean up a recipe that has been stored as serialized json string.'''
-    recipe = json.loads(string)
+  def _sanitize(recipe):
+    '''Clean up a recipe that may have been stored as serialized json string.
+       Convert any numerical pointers that are stored as strings to integers.'''
+    recipe = recipe.copy()
     for k in list(recipe):
-      if k not in ('start', 'error') and int(k):
+      if k not in ('start', 'error') and int(k) and k != int(k):
         recipe[int(k)] = recipe[k]
         del(recipe[k])
+    for k in list(recipe):
+      if 'output' in recipe[k] and not isinstance(recipe[k]['output'], (list, dict)):
+        recipe[k]['output'] = [ recipe[k]['output'] ]
+      # dicts should be normalized, too
     if 'start' in recipe:
       recipe['start'] = [ tuple(x) for x in recipe['start'] ]
     return recipe
@@ -44,11 +54,17 @@ class Recipe(object):
     '''Allow direct dictionary access to recipe elements.'''
     return self.recipe.__getitem__(item)
 
+  def __contains__(self, item):
+    '''Testing for presence of recipe elements.'''
+    return item in self.recipe
+
   def __eq__(self, other):
     '''Overload equality operator (!=) to allow comparing recipe objects
        with one another and with their string representations.'''
     if isinstance(other, Recipe):
       return self.recipe == other.recipe
+    if isinstance(other, dict):
+      return self.recipe == self._sanitize(other)
     return self.recipe == self.deserialize(other)
 
   def __ne__(self, other):

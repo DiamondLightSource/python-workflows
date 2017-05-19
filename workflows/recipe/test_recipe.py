@@ -48,17 +48,47 @@ def test_can_generate_recipe_objects():
   assert len(B.recipe) == 3
 
 def test_equality_and_inequality_operator():
-  '''Check that recipe objects can be compared with recipe objects and
-     string representations of recipe objects.'''
+  '''Check that recipe objects can be compared with recipe objects,
+     string and dictionary representations of recipe objects.'''
   A, _ = generate_recipes()
   B, _ = generate_recipes()
 
   assert A == B
   assert A == B.serialize()
+  assert A == B.recipe
 
+  # This is a semi-mangled recipe, containing a string pointer instead of an integer pointer
+  # This can't happen with a recipe object, but can happen with dictionary representation.
+  B.recipe["1"] = B.recipe[1]
   del B.recipe[1]
+  assert A == B.recipe
+
+  # This is another semi-mangled recipe, containing a single integer pointer instead of a list as a default output.
+  # Again this can happen with dictionary representation, and the recipes are still equivalent.
+  B.recipe["1"]['output'] = 2
+  assert A == B.recipe
+
+  # This is a different (invalid) recipe.
+  del B.recipe["1"]
   assert A != B
   assert A != B.serialize()
+  assert A != B.recipe
+
+def test_in_operator():
+  '''Check that the 'in' operator is properly supported by the recipe object.'''
+  A, B = generate_recipes()
+
+  assert 1 in A
+  assert 2 in A
+  assert 3 not in A
+  assert 'start' in A
+  assert 'error' in A
+
+  assert 1 in B
+  assert 2 in B
+  assert 3 not in B
+  assert 'start' in B
+  assert 'error' not in B
 
 def test_serializing_and_deserializing_recipes():
   '''Test generation of recipes.'''

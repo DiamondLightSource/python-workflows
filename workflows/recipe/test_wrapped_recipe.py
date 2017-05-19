@@ -18,7 +18,7 @@ def generate_recipe_message():
           },
        2: { 'service': 'service 2',
             'queue': 'queue.two',
-            'output': 3,
+            'output': [ 3 ],
           },
        3: { 'service': 'service 3',
             'topic': 'topic.three',

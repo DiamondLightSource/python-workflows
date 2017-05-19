@@ -14,9 +14,15 @@ def check_message_handling_via_unwrapper(callback, recipient, transport, rw_mock
   callback(header, message)
   recipient.assert_called_once_with(None, header, message)
 
+  # This message does not contain an encoded recipe. It should be passed through directly.
+  header = { 'workflows-recipe': "False" }
+  recipient.reset_mock()
+  callback(header, message)
+  recipient.assert_called_once_with(None, header, message)
+
   # This message contains an encoded recipe. It should be interpreted and the payload passed
   # through with a helper object for simple recipe-conformant replies.
-  header = { 'workflows-recipe': True }
+  header = { 'workflows-recipe': "True" }
   message = {
      'recipe': mock.sentinel.recipe,
      'recipe-pointer': mock.sentinel.recipe_pointer,
