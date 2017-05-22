@@ -59,6 +59,7 @@ def test_equality_and_inequality_operator():
 
   # This is a semi-mangled recipe, containing a string pointer instead of an integer pointer
   # This can't happen with a recipe object, but can happen with dictionary representation.
+  # They are still equivalent.
   B.recipe["1"] = B.recipe[1]
   del B.recipe[1]
   assert A == B.recipe
