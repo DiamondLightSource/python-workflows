@@ -94,6 +94,17 @@ def test_recipe_wrapper_instantiated_from_recipe():
   assert rw.recipe_path == []
   assert rw.environment == {}
 
+  # Constructor can also accept Recipe objects
+
+  r = Recipe(r)
+  rw = RecipeWrapper(recipe=r)
+
+  assert rw.recipe == r
+  assert rw.recipe_pointer is None
+  assert rw.recipe_step is None
+  assert rw.recipe_path == []
+  assert rw.environment == {}
+
 def test_recipe_wrapper_empty_constructor_fails():
   '''A RecipeWrapper must be built from either a recipe or a message containing
      a recipe. Otherwise there is nothing to wrap.'''

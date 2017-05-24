@@ -22,7 +22,10 @@ class RecipeWrapper(object):
       self.recipe_path = message.get('recipe-path', [])
       self.environment = message.get('environment', {})
     elif recipe:
-      self.recipe = workflows.recipe.Recipe(recipe)
+      if isinstance(recipe, workflows.recipe.Recipe):
+        self.recipe = recipe
+      else:
+        self.recipe = workflows.recipe.Recipe(recipe)
       self.recipe_pointer = None
       self.recipe_step = None
       self.recipe_path = []
