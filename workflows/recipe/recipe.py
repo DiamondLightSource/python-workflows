@@ -50,6 +50,10 @@ class Recipe(object):
     '''Write out the current recipe as serialized json string.'''
     return json.dumps(self.recipe)
 
+  def pretty(self):
+    '''Write out the current recipe as serialized json string with pretty formatting.'''
+    return json.dumps(self.recipe, indent=2)
+
   def __getitem__(self, item):
     '''Allow direct dictionary access to recipe elements.'''
     return self.recipe.__getitem__(item)

@@ -55,6 +55,7 @@ def test_equality_and_inequality_operator():
 
   assert A == B
   assert A == B.serialize()
+  assert A == B.pretty()
   assert A == B.recipe
 
   # This is a semi-mangled recipe, containing a string pointer instead of an integer pointer
