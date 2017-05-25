@@ -233,6 +233,10 @@ def test_downstream_message_sending_via_recipewrapper_with_unnamed_output():
 def test_checkpointing_via_recipewrapper():
   '''Test resending modified message to the current destination (checkpointing).'''
   m = generate_recipe_message()
+  m['recipe-pointer'] = 3
+  # Use a step with transport-delay.
+  # Checkpointing should ignore default delay settings.
+
   t = mock.create_autospec(workflows.transport.common_transport.CommonTransport)
   def downstream_message(dest, payload):
     '''Helper function to generate expected message contents for downstream
@@ -249,12 +253,25 @@ def test_checkpointing_via_recipewrapper():
     rw.checkpoint(mock.sentinel.checkpoint, transaction=mock.sentinel.txn)
 
   rw = RecipeWrapper(message=m, transport=t)
+  # Test checkpointing. Delay should be 0.
   rw.checkpoint(mock.sentinel.checkpoint, transaction=mock.sentinel.txn)
-
-  expected = [ mock.call.send(
-      m['recipe'][1]['queue'],
-      downstream_message(1, mock.sentinel.checkpoint),
+  expected = [ mock.call.broadcast(
+      m['recipe'][3]['topic'],
+      downstream_message(3, mock.sentinel.checkpoint),
       headers={'workflows-recipe': True},
+      delay=0,
+      transaction=mock.sentinel.txn,
+  ) ]
+  assert t.mock_calls == expected
+  t.reset_mock()
+
+  # Test delay override
+  rw.checkpoint(mock.sentinel.checkpoint, transaction=mock.sentinel.txn, delay=150)
+  expected = [ mock.call.broadcast(
+      m['recipe'][3]['topic'],
+      downstream_message(3, mock.sentinel.checkpoint),
+      headers={'workflows-recipe': True},
+      delay=150,
       transaction=mock.sentinel.txn,
   ) ]
   assert t.mock_calls == expected

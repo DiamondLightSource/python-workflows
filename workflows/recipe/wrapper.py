@@ -119,8 +119,7 @@ class RecipeWrapper(object):
     for destination, payload in self.recipe['start']:
       self._send_to_destination(destination, header, payload, kwargs)
 
-  def checkpoint(self, message, header=None, **kwargs):
-    #TODO add delay=0 to kwargs
+  def checkpoint(self, message, header=None, delay=0, **kwargs):
     '''Send a message to the current recipe destination. This can be used to
        keep a state for longer processing tasks.
     '''
@@ -131,6 +130,8 @@ class RecipeWrapper(object):
     if not self.recipe_step:
       raise ValueError('This RecipeWrapper object does not contain ' \
                        'a recipe with a selected step.')
+
+    kwargs['delay'] = delay
 
     self._send_to_destination(self.recipe_pointer, header, message, kwargs, \
                               add_path_step=False)
