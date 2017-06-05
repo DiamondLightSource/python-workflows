@@ -244,7 +244,7 @@ class CommonService(workflows.add_plugin_register_to_class(object)):
       self.log.warn('Ctrl+C detected. Shutting down.')
       return
 
-    except Exception, e:
+    except Exception as e:
       # Add information about the actual exception to the log message
       # This includes the file, line and piece of code causing the exception.
       # exc_info=True adds the full stack trace to the log message.
