@@ -1,7 +1,29 @@
 from __future__ import absolute_import, division
 import logging
 import mock
+import os
 import workflows.logging
+
+def test_obtain_exception_source():
+  '''Check that exception information can be obtained.'''
+
+  def crashfunction():
+    '''A function that crashes in a predictable manner.'''
+    everything = 42
+    nothing = 0
+    something = everything / nothing
+
+  try:
+    crashfunction()
+    assert False, "Test went past exception."
+  except Exception:
+    fp, fn, line_number, name, line = workflows.logging.get_exception_source()
+
+    assert fp == __file__
+    assert os.path.basename(fp) == fn
+    assert name == 'crashfunction'
+    assert line_number == 14 # this will break if line number in this file changes
+    assert line == "something = everything / nothing"
 
 def test_callback_handler_works_within_logging_framework():
   '''Check that the callback handler can be used by Python logging

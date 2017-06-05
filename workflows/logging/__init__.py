@@ -1,5 +1,26 @@
 from __future__ import absolute_import, division
+import linecache
 import logging
+import os.path
+import sys
+
+def get_exception_source():
+  '''Returns full file path, file name, line number, function name, and line contents
+     causing the last exception.'''
+  _, _, tb = sys.exc_info()
+  while tb.tb_next:
+    tb = tb.tb_next
+  f = tb.tb_frame
+  lineno = tb.tb_lineno
+  co = f.f_code
+  filefullpath = co.co_filename
+  filename = os.path.basename(filefullpath)
+  name = co.co_name
+  linecache.checkcache(filefullpath)
+  line = linecache.getline(filefullpath, lineno, f.f_globals)
+  if line: line = line.strip()
+  else: line = None
+  return filefullpath, filename, lineno, name, line
 
 class CallbackHandler(logging.Handler):
   '''This handler sends logrecords to a callback function.'''

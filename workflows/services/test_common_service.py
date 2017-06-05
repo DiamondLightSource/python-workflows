@@ -199,6 +199,8 @@ def test_service_initialization_crashes_are_handled_correctly():
   assert 'This crash needs to be handled' in log.exc_text
   assert 'initializing' in log.exc_text
   assert 'test_common_service' in log.exc_text
+  assert log.workflows_exc_filename == 'test_common_service.py'
+  assert log.workflows_exc_funcName == 'initializing'
 
 def test_service_can_change_name_and_shut_itself_down():
   '''Name changes should be passed to frontend'''

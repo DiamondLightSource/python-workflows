@@ -244,8 +244,18 @@ class CommonService(workflows.add_plugin_register_to_class(object)):
       self.log.warn('Ctrl+C detected. Shutting down.')
       return
 
-    except:
-      self.log.critical('Unhandled service exception', exc_info=True)
+    except Exception, e:
+      # Add information about the actual exception to the log message
+      # This includes the file, line and piece of code causing the exception.
+      # exc_info=True adds the full stack trace to the log message.
+      exc_file_fullpath, exc_file, exc_lineno, exc_func, exc_line = \
+          workflows.logging.get_exception_source()
+      self.log.critical('Unhandled service exception: %s', e, exc_info=True,
+          extra={'workflows_exc_lineno': exc_lineno,
+                 'workflows_exc_funcName': exc_func,
+                 'workflows_exc_line': exc_line,
+                 'workflows_exc_pathname': exc_file_fullpath,
+                 'workflows_exc_filename': exc_file})
       self.__update_service_status(self.SERVICE_STATUS_ERROR)
       return
 
