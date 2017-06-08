@@ -46,6 +46,7 @@ class Frontend():
     self.__lock = threading.RLock()
     self.__hostid = self._generate_unique_host_id()
     self._service = None         # pointer to the service instance
+    self._service_class_name = None
     self._service_factory = None # pointer to the service class
     self._service_name = None
     self._service_transportid = None
@@ -285,6 +286,7 @@ class Frontend():
              'status': self._service_status_announced,
              'statustext': CommonService.human_readable_state.get(self._service_status_announced),
              'service': self._service_name,
+             'serviceclass': self._service_class_name,
              'workflows': workflows.version(),
            }
 
@@ -314,6 +316,7 @@ class Frontend():
     '''
     if new_service:
       self._service_factory = new_service
+
     with self.__lock:
       # Terminate existing service if necessary
       if self._service is not None:
@@ -343,6 +346,7 @@ class Frontend():
         target=service_instance.start, args=(),
         kwargs={'verbose_log': self._verbose_service})
       self._service_name = service_instance.get_name()
+      self._service_class_name = service_instance.__class__.__name__
       self._service.daemon = True
       self._service.start()
       self._service_starttime = time.time()
@@ -368,6 +372,7 @@ class Frontend():
         self._pipe_service.close()
       self._pipe_commands = None
       self._pipe_service = None
+      self._service_class_name = None
       self._service_name = None
       self._status_history = []
       if self._service_status != CommonService.SERVICE_STATUS_TEARDOWN:
