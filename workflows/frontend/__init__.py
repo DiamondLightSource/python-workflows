@@ -62,9 +62,8 @@ class Frontend():
 
     # Status broadcast related variables
     self._status_interval = 6
-    self._status_debounce_interval = 1.5
     self._status_last_broadcast = 0
-    self._status_history = []
+    self._status_idle_since = None
 
     # Set up logging
     self._verbose_service = verbose_service
@@ -117,9 +116,9 @@ class Frontend():
 
   def update_status(self, status_code=None):
     '''Update the service status kept inside the frontend (_service_status).
-       The status is also broadcasted, however to keep the network load down
-       updates are rate-limited when the new status code has already been
-       seen within _status_debounce_interval seconds.
+       The status is broadcasted over the network immediately. If the status
+       changes to IDLE then this message is delayed. The IDLE status is only
+       broadcasted if it is held for over 0.5 seconds.
        When the status does not change it is still broadcasted every
        _status_interval seconds.
        :param status_code: Either an integer describing the service status
@@ -128,29 +127,21 @@ class Frontend():
     '''
     if status_code is not None:
       self._service_status = status_code
-    near_past = time.time() - self._status_debounce_interval
-    distant_past = time.time() - self._status_interval
-    broadcast_status = self._status_last_broadcast < distant_past
-    while len(self._status_history) > (1 if status_code is None else 0) and \
-          self._status_history[0][0] < near_past:
-      self._status_history.pop(0)
-    recent_status_codes = { sh[1] for sh in self._status_history }
-    if status_code is None:
-      if self._status_history and \
-          self._service_status_announced not in recent_status_codes:
-        self._service_status_announced = max(sh[1] for sh in self._status_history)
-        broadcast_status = True
+
+    # Check whether IDLE status should be delayed
+    if self._service_status == CommonService.SERVICE_STATUS_IDLE:
+      if self._status_idle_since is None:
+        self._status_idle_since = time.time()
+        return
+      elif self._status_idle_since + 0.5 > time.time():
+        return
     else:
-      self._status_history.append((time.time(), status_code))
-      if status_code in recent_status_codes:
-        status_code = max(recent_status_codes)
-        if status_code != self._service_status_announced:
-          broadcast_status = True
-          self._service_status_announced = status_code
-      else:
-        broadcast_status = True
-        self._service_status_announced = status_code
-    if broadcast_status and self._transport and self._transport.is_connected():
+      self._status_idle_since = None
+
+    new_status = self._service_status != self._service_status_announced
+    if (new_status or self._status_last_broadcast + self._status_interval <= time.time()) \
+        and self._transport and self._transport.is_connected():
+      self._service_status_announced = self._service_status
       self._transport.broadcast_status(self.get_status())
       self._status_last_broadcast = time.time()
 
@@ -319,7 +310,6 @@ class Frontend():
     '''
     if new_service:
       self._service_factory = new_service
-
     with self.__lock:
       # Terminate existing service if necessary
       if self._service is not None:
@@ -377,7 +367,6 @@ class Frontend():
       self._pipe_service = None
       self._service_class_name = None
       self._service_name = None
-      self._status_history = []
       if self._service_status != CommonService.SERVICE_STATUS_TEARDOWN:
         self.update_status(status_code=CommonService.SERVICE_STATUS_END)
       if self._service_transportid:

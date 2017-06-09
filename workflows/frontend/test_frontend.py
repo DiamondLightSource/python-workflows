@@ -321,29 +321,29 @@ def test_frontend_sends_status_updates(mock_mp, mock_time):
       CommonService.SERVICE_STATUS_PROCESSING
   transport.broadcast_status.reset_mock()
 
-  # not much time passes. Update call should still cause broadcast, because status has not been seen before
+  # not much time passes. Update call should not broadcast, because this is a recent IDLE status
   mock_time.time.return_value = 20.2
   fe.update_status(status_code=CommonService.SERVICE_STATUS_IDLE)
-  transport.broadcast_status.assert_called_once()
-  assert transport.broadcast_status.call_args[0][0]['status'] == \
-      CommonService.SERVICE_STATUS_IDLE
-  transport.broadcast_status.reset_mock()
+  transport.broadcast_status.assert_not_called()
 
-  # not much time passes. Update call should still cause broadcast, because status is higher
+  # not much time passes. Update call should not broadcast, because the announced status has not changed
   mock_time.time.return_value = 20.3
   fe.update_status(status_code=CommonService.SERVICE_STATUS_PROCESSING)
-  transport.broadcast_status.assert_called_once()
-  assert transport.broadcast_status.call_args[0][0]['status'] == \
-      CommonService.SERVICE_STATUS_PROCESSING
+  transport.broadcast_status.assert_not_called()
   transport.broadcast_status.reset_mock()
 
-  # not much time passes. Update call should NOT cause broadcast, because status has been seen before and is lower
+  # not much time passes. Update call should still not broadcast, because this is again a recent IDLE status
   mock_time.time.return_value = 20.4
   fe.update_status(status_code=CommonService.SERVICE_STATUS_IDLE)
   transport.broadcast_status.assert_not_called()
 
+  # not much time passes. Update call should still not broadcast, because this IDLE is still too recent
+  mock_time.time.return_value = 20.8
+  fe.update_status(status_code=CommonService.SERVICE_STATUS_IDLE)
+  transport.broadcast_status.assert_not_called()
+
   # however as time passes the update call should cause a late broadcast
-  mock_time.time.return_value = 22
+  mock_time.time.return_value = 21
   fe.update_status()
   transport.broadcast_status.assert_called_once()
   assert transport.broadcast_status.call_args[0][0]['status'] == \
