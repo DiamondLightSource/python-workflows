@@ -285,6 +285,8 @@ class Frontend():
            }
 
   def exponential_backoff(self):
+    '''A function that keeps waiting longer and longer the more rapidly it is called.
+       It can be used to increasingly slow down service starts when they keep failing.'''
     last_service_switch = self._service_starttime
     if not last_service_switch:
       return

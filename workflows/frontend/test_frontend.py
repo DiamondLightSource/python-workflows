@@ -23,7 +23,8 @@ class MockPipe(object):
     self.contents = contents
     self.on_empty = on_empty
 
-  def poll(self, time=None):
+  @staticmethod
+  def poll(time=None):
     '''Check if pipe is empty. There is always something there, either
        some content or an EOFError.'''
     return True
