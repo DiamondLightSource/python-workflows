@@ -159,6 +159,9 @@ class Frontend():
        are processed and forwarded to the corresponding callback methods.'''
     self.log.debug("Entered main loop")
     while not self.shutdown:
+      # If no service is running slow down the main loop
+      if not self._pipe_service:
+        time.sleep(0.3)
       self.update_status()
       # While a service is running, check for incoming messages from that service
       if self._pipe_service and self._pipe_service.poll(1):
