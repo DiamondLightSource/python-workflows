@@ -210,10 +210,10 @@ class Frontend():
       if not self._transport.is_connected():
         self._terminate_service()
         raise workflows.WorkflowsError('Lost transport layer connection')
-    self.log.info("Left main loop")
+    self.log.debug("Left main loop")
     self.update_status(status_code=CommonService.SERVICE_STATUS_TEARDOWN)
     self._terminate_service()
-    self.log.info("Terminating.")
+    self.log.debug("Terminating.")
 
   def send_command(self, command):
     '''Send command to service via the command queue.'''
