@@ -72,7 +72,7 @@ class ServiceStarter(object):
     (options, args) = parser.parse_args(cmdline_args)
 
     # Call on_parsing hook
-    (options, args) = retval = self.on_parsing(options, args) or (options, args)
+    (options, args) = self.on_parsing(options, args) or (options, args)
 
     # Create Transport object
     transport = workflows.transport.lookup(options.transport)()

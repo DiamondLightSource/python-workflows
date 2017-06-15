@@ -393,8 +393,7 @@ class Frontend():
     try:
       handler = getattr(self, 'parse_band_transport_' + message['call'])
     except AttributeError:
-      # TODO: This should go to a log
-      print('Unknown transport handler for message ' + str(message))
+      self.log.error("Unknown transport handler '%s'.\n%s", str(message.get('call')), str(message)[:1000])
       return
     if 'transaction' in message['payload'][1]:
 #     print("Mapping transaction %s to %s for %s" % (

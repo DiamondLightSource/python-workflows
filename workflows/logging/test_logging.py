@@ -11,7 +11,7 @@ def test_obtain_exception_source():
     '''A function that crashes in a predictable manner.'''
     everything = 42
     nothing = 0
-    something = everything / nothing
+    print everything / nothing
 
   try:
     crashfunction()
@@ -23,7 +23,7 @@ def test_obtain_exception_source():
     assert os.path.basename(fp) == fn
     assert name == 'crashfunction'
     assert line_number == 14 # this will break if line number in this file changes
-    assert line == "something = everything / nothing"
+    assert line == "print everything / nothing"
 
 def test_callback_handler_works_within_logging_framework():
   '''Check that the callback handler can be used by Python logging
