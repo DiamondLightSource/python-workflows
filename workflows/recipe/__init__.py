@@ -11,16 +11,21 @@ def _wrap_subscription(transport_layer, subscription_call, channel, callback,
        :param subscription_call: Reference to the subscribing function of the
                                  transport layer.
        :param channel:  Channel name to subscribe to.
-       :allow_non_recipe_messages: Pass on incoming messages that do not
-                        include recipe information. In this case the first
-                        argument to the callback function will be 'None'.
        :param callback: Real function to be called when messages are received.
                         The callback will pass three arguments,
                         a RecipeWrapper object (details below), the header as
                         a dictionary structure, and the message.
+
+       :allow_non_recipe_messages: Pass on incoming messages that do not
+                        include recipe information. In this case the first
+                        argument to the callback function will be 'None'.
+       :log:            A python logger object that is passed to the
+                        RecipeWrapper and may provide additional,
+                        message-specific context to log messages.
   '''
 
   allow_non_recipe_messages = kwargs.pop('allow_non_recipe_messages', False)
+  log = kwargs.pop('log', None)
 
   def unwrap_recipe(header, message):
     '''This is a helper function unpacking incoming messages when they are
@@ -33,7 +38,8 @@ def _wrap_subscription(transport_layer, subscription_call, channel, callback,
     '''
     if header.get('workflows-recipe') in (True, 'True', 'true', 1):
       return callback(RecipeWrapper(message=message,
-                                    transport=transport_layer),
+                                    transport=transport_layer,
+                                    log=log),
                       header, message.get('payload'))
     if allow_non_recipe_messages:
       return callback(None, header, message)
