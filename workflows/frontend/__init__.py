@@ -116,10 +116,10 @@ class Frontend():
 
   def update_status(self, status_code=None):
     '''Update the service status kept inside the frontend (_service_status).
-       The status is broadcasted over the network immediately. If the status
+       The status is broadcast over the network immediately. If the status
        changes to IDLE then this message is delayed. The IDLE status is only
-       broadcasted if it is held for over 0.5 seconds.
-       When the status does not change it is still broadcasted every
+       broadcast if it is held for over 0.5 seconds.
+       When the status does not change it is still broadcast every
        _status_interval seconds.
        :param status_code: Either an integer describing the service status
                            (see workflows.services.common_service), or None
