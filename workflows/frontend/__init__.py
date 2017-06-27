@@ -4,6 +4,7 @@ import multiprocessing
 import threading
 import time
 import workflows
+import workflows.frontend.utilization
 import workflows.services
 from workflows.services.common_service import CommonService
 import workflows.transport
@@ -64,6 +65,8 @@ class Frontend():
     self._status_interval = 6
     self._status_last_broadcast = 0
     self._status_idle_since = None
+    self._utilization = workflows.frontend.utilization.UtilizationStatistics(
+                            summation_period=self._status_interval)
 
     # Set up logging
     self._verbose_service = verbose_service
@@ -127,6 +130,7 @@ class Frontend():
     '''
     if status_code is not None:
       self._service_status = status_code
+      self._utilization.update_status(status_code)
 
     # Check whether IDLE status should be delayed
     if self._service_status == CommonService.SERVICE_STATUS_IDLE:
@@ -281,6 +285,7 @@ class Frontend():
              'statustext': CommonService.human_readable_state.get(self._service_status_announced),
              'service': self._service_name,
              'serviceclass': self._service_class_name,
+             'utilization': self._utilization.report(),
              'workflows': workflows.version(),
            }
 

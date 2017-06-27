@@ -38,5 +38,5 @@ class UtilizationStatistics(object):
     if truncate:
       self.status_history = self.status_history[truncate:]
     total_duration = sum(summary.values())
-    summary = { s: d / total_duration for s, d in summary.items() }
+    summary = { s: round(d / total_duration, 4) for s, d in summary.items() }
     return summary
