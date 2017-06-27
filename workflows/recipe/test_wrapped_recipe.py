@@ -320,11 +320,15 @@ def test_wrapper_adds_context_information_to_logger():
      log messages originating from the same recipe.'''
   m = generate_recipe_message()
   t = mock.create_autospec(workflows.transport.common_transport.CommonTransport)
-  l = mock.create_autospec(logging.getLogger('workflows'))
+  l = logging.getLogger('workflows.recipe.tst_wrapped_recipe')
+  l.setLevel(1)
+  l._log = mock.create_autospec(l._log)
   rw = RecipeWrapper(message=m, transport=t, log=l)
   assert rw.log != l
   for method in ('debug', 'info', 'warning', 'error', 'critical'):
     # Try out common logging methods
+    loglevel = getattr(logging, method.upper())
     sentinel = getattr(mock.sentinel, method)
+    l._log.reset_mock()
     getattr(rw.log, method)(sentinel)
-    getattr(l, method).assert_called_once_with(sentinel, extra={'recipe_ID': m['environment']['ID']})
+    l._log.assert_called_once_with(loglevel, sentinel, (), extra={'recipe_ID': m['environment']['ID']})
