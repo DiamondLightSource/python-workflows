@@ -1,6 +1,7 @@
 from __future__ import absolute_import, division
 
 import copy
+import logging
 import workflows.recipe
 
 class RecipeWrapper(object):
@@ -34,7 +35,11 @@ class RecipeWrapper(object):
       raise ValueError('A message or recipe is required to create ' \
                        'a RecipeWrapper object.')
     self.default_channel = None
-    self.log = log
+
+    extra_logging = {}
+    if self.environment.get('ID'):
+      extra_logging['recipe_ID'] = self.environment['ID']
+    self.log = logging.LoggerAdapter(log, extra_logging)
     self.transport = transport
 
   def send(self, *args, **kwargs):

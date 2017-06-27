@@ -1,4 +1,5 @@
 from __future__ import absolute_import, division
+import logging
 import mock
 import pytest
 import workflows
@@ -312,3 +313,18 @@ def test_start_command_via_recipewrapper():
       transaction=mock.sentinel.txn,
   ) ]
   assert t.mock_calls == expected
+
+def test_wrapper_adds_context_information_to_logger():
+  '''Log messages sent to the logger encapsulated in a RecipeWrapper should
+     include contextual information, such as a unique ID tying together all
+     log messages originating from the same recipe.'''
+  m = generate_recipe_message()
+  t = mock.create_autospec(workflows.transport.common_transport.CommonTransport)
+  l = mock.create_autospec(logging.getLogger('workflows'))
+  rw = RecipeWrapper(message=m, transport=t, log=l)
+  assert rw.log != l
+  for method in ('debug', 'info', 'warning', 'error', 'critical'):
+    # Try out common logging methods
+    sentinel = getattr(mock.sentinel, method)
+    getattr(rw.log, method)(sentinel)
+    getattr(l, method).assert_called_once_with(sentinel, extra={'recipe_ID': m['environment']['ID']})
