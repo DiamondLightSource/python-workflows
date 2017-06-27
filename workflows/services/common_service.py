@@ -1,8 +1,53 @@
 from __future__ import absolute_import, division
+import enum
 import logging
 import workflows
 import workflows.logging
 from workflows.transport.queue_transport import QueueTransport
+
+class Status(enum.Enum):
+  '''
+  Internal service status codes
+  ---------------------------------------------
+  These codes will be sent to the frontend to indicate the current state of
+  the main loop regardless of the status text, which can be set freely by
+  the specific service.
+  '''
+
+  # The state transitions are: (see definition of CommonService.start() below)
+  #  constructor() -> NEW
+  #            NEW -> start() being called -> STARTING
+  #       STARTING -> self.initializing() -> IDLE
+  #           IDLE -> wait for messages on command queue -> PROCESSING
+  #              \--> optionally: idle timer elapsed -> TIMER
+  #     PROCESSING -> process command -> IDLE
+  #              \--> shutdown command received -> SHUTDOWN
+  #          TIMER -> process event -> IDLE
+  #       SHUTDOWN -> self.in_shutdown() -> END
+  #  unhandled exception -> ERROR
+
+  NEW        = (0, 'constructing')
+  STARTING   = (1, 'starting')
+  IDLE       = (2, 'idle')
+  TIMER      = (3, 'timer event')
+  PROCESSING = (4, 'processing')
+  SHUTDOWN   = (5, 'shutting down')
+  END        = (6, 'shutdown')
+  ERROR      = (7, 'error')
+
+  # Extra states that are not used by services themselves but may be used
+  # externally:
+
+  NONE       = (-1, 'no service loaded') # Node has no service instance loaded
+  TEARDOWN   = (-2, 'shutdown')          # Node is shutting down
+
+  def __init__(self, intval, description):
+    '''
+    Each status is defined as a tuple of a unique integer value and a
+    descriptive string. These are available via enum properties
+    '''
+    self.intval = intval
+    self.description = description
 
 class CommonService(workflows.add_plugin_register_to_class(object)):
   '''
@@ -41,47 +86,20 @@ class CommonService(workflows.add_plugin_register_to_class(object)):
        This function can be overridden by specific service implementations.'''
     pass
 
-  # Internal service status codes ---------------------------------------------
-  # These codes will be sent to the frontend to indicate the current state of
-  # the main loop regardless of the status text, which can be set freely by
-  # the specific service.
-
-  # The state transitions are: (see definition of start() below)
-  #  constructor() -> NEW
-  #            NEW -> start() being called -> STARTING
-  #       STARTING -> self.initializing() -> IDLE
-  #           IDLE -> wait for messages on command queue -> PROCESSING
-  #              \--> optionally: idle timer elapsed -> TIMER
-  #     PROCESSING -> process command -> IDLE
-  #              \--> shutdown command received -> SHUTDOWN
-  #          TIMER -> process event -> IDLE
-  #       SHUTDOWN -> self.in_shutdown() -> END
-  #  unhandled exception -> ERROR
-
-  SERVICE_STATUS_NEW, SERVICE_STATUS_STARTING, SERVICE_STATUS_IDLE, \
-    SERVICE_STATUS_TIMER, SERVICE_STATUS_PROCESSING, SERVICE_STATUS_SHUTDOWN, \
-    SERVICE_STATUS_END, SERVICE_STATUS_ERROR = range(8)
-
-  # Extra states that are not used by services themselves but may be used
-  # externally:
-
-  SERVICE_STATUS_NONE = -1     # Node has no service instance loaded
-  SERVICE_STATUS_TEARDOWN = -2 # Node is shutting down
+  SERVICE_STATUS_NEW = Status.NEW.intval
+  SERVICE_STATUS_STARTING = Status.STARTING.intval
+  SERVICE_STATUS_IDLE = Status.IDLE.intval
+  SERVICE_STATUS_TIMER = Status.TIMER.intval
+  SERVICE_STATUS_PROCESSING = Status.PROCESSING.intval
+  SERVICE_STATUS_SHUTDOWN = Status.SHUTDOWN.intval
+  SERVICE_STATUS_END = Status.END.intval
+  SERVICE_STATUS_ERROR = Status.ERROR.intval
+  SERVICE_STATUS_NONE = Status.NONE.intval
+  SERVICE_STATUS_TEARDOWN = Status.TEARDOWN.intval
 
   # Number to short string conversion
 
-  human_readable_state = {
-    SERVICE_STATUS_NEW: 'constructing',
-    SERVICE_STATUS_STARTING: 'starting',
-    SERVICE_STATUS_IDLE: 'idle',
-    SERVICE_STATUS_TIMER: 'timer event',
-    SERVICE_STATUS_PROCESSING: 'processing',
-    SERVICE_STATUS_SHUTDOWN: 'shutting down',
-    SERVICE_STATUS_END: 'shutdown',
-    SERVICE_STATUS_ERROR: 'error',
-    SERVICE_STATUS_NONE: 'no service loaded',
-    SERVICE_STATUS_TEARDOWN: 'shutdown',
-  }
+  human_readable_state = { e.intval: e.description for e in Status }
 
   # Default logging level for log messages from this service
 
