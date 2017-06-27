@@ -43,11 +43,10 @@ def _wrap_subscription(transport_layer, subscription_call, channel, callback,
                       header, message.get('payload'))
     if allow_non_recipe_messages:
       return callback(None, header, message)
-
-#   self.log.warn('Discarding non-recipe message:\n' + \
-#                 "First 1000 characters of header:\n%s\n" + \
-#                 "First 1000 characters of message:\n%s",
-#                 str(header)[:1000], str(message)[:1000])
+#   self.log.warning('Discarding non-recipe message:\n' + \
+#                    "First 1000 characters of header:\n%s\n" + \
+#                    "First 1000 characters of message:\n%s",
+#                    str(header)[:1000], str(message)[:1000])
     transport_layer.nack(header)
 
   subscription_call(channel, unwrap_recipe, *args, **kwargs)

@@ -19,7 +19,7 @@ def test_logging_to_frontend():
   service.start()
 
   # Note that by default only warning and higher are passed to frontend
-  service.log.warn(mock.sentinel.logmessage)
+  service.log.warning(mock.sentinel.logmessage)
 
   fe_pipe.send.assert_called()
   assert fe_pipe.send.call_args == (({'band': 'log', 'payload': mock.ANY},), {})

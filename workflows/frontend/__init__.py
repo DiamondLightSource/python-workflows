@@ -89,7 +89,7 @@ class Frontend():
     self.log = logging.LoggerAdapter(
                    logging.getLogger('workflows.frontend'),
                    LogAdapter())
-    self.log.warn = self.log.warning # LoggerAdapter does not support .warn
+    self.log.warn = self.log.warning # Add support for deprecated .warn
 
     # Connect to the network transport layer
     if transport is None or isinstance(transport, basestring):
@@ -168,14 +168,14 @@ class Frontend():
               handler = getattr(self, 'parse_band_' + message['band'])
             except AttributeError:
               handler = None
-              self.log.warn("Unknown band %s", str(message['band']))
+              self.log.warning("Unknown band %s", str(message['band']))
             if handler:
 #              try:
                 handler(message)
 #              except Exception:
 #                print('Uh oh. What to do.')
           else:
-            self.log.warn("Invalid message received %s", str(message))
+            self.log.warning("Invalid message received %s", str(message))
         except EOFError:
           # Service has gone away
           error_message = False
@@ -232,7 +232,7 @@ class Frontend():
       if message['command'] == 'shutdown':
         self.shutdown = True
     else:
-      self.log.warn('Received invalid transport command message')
+      self.log.warning('Received invalid transport command message')
 
   def parse_band_log(self, message):
     '''Process incoming logging messages from the service.'''
@@ -246,7 +246,8 @@ class Frontend():
         setattr(record, 'workflows_' + k, v)
       logging.getLogger(record.name).handle(record)
     else:
-      self.log.warn("Received broken record on log band\nMessage: %s\nRecord: %s",
+      self.log.warning("Received broken record on log band\n" + \
+                       "Message: %s\nRecord: %s",
                     str(message),
                     str(hasattr(message.get('payload'), '__dict__') and message['payload'].__dict__))
 
@@ -255,7 +256,7 @@ class Frontend():
     if message.get('name'):
       self._service_name = message['name']
     else:
-      self.log.warn("Received broken record on set_name band\nMessage: %s",
+      self.log.warning("Received broken record on set_name band\nMessage: %s",
                     str(message))
 
   def parse_band_status_update(self, message):

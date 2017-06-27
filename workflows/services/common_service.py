@@ -228,11 +228,13 @@ class CommonService(workflows.add_plugin_register_to_class(object)):
         if message and 'band' in message:
           processor = self.__callback_register.get(message['band'])
           if processor is None:
-            self.log.warn('received message on unregistered band\n%s', message)
+            self.log.warning('received message on unregistered band\n%s',
+                             message)
           else:
             processor(message.get('payload'))
         else:
-          self.log.warn('received message without band information\n%s', message)
+          self.log.warning('received message without band information\n%s',
+                           message)
 
       self.__update_service_status(self.SERVICE_STATUS_SHUTDOWN)
 
@@ -241,7 +243,7 @@ class CommonService(workflows.add_plugin_register_to_class(object)):
       self.__update_service_status(self.SERVICE_STATUS_END)
 
     except KeyboardInterrupt:
-      self.log.warn('Ctrl+C detected. Shutting down.')
+      self.log.warning('Ctrl+C detected. Shutting down.')
       return
 
     except Exception as e:
