@@ -62,7 +62,7 @@ class ServiceStarter(object):
       default="StompTransport",
       help="Transport mechanism. Known mechanisms: " + \
            ", ".join(workflows.transport.get_known_transports()) + \
-           " (default: %%default)")
+           " (default: %default)")
     workflows.transport.add_command_line_options(parser)
 
     # Call on_parser_preparation hook
