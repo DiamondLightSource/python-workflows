@@ -4,20 +4,22 @@ import workflows.frontend.utilization
 from workflows.services.common_service import CommonService
 
 def about(value, tolerance):
-  class comparator():
+  class Comparator():
+    '''A helper class to compare against a value with a tolerance.'''
     def __le__(self, other):
       return other >= value-tolerance
     def __eq__(self, other):
-      return other >= value-tolerance and other <= value+tolerance
+      return value-tolerance <= other <= value+tolerance
     def __ge__(self, other):
       return other <= value+tolerance
     def __ne__(self, other):
       return not self.__eq__(other)
     def __repr__(self):
       return "<%s +- %s>" % (str(value), str(tolerance))
-  return comparator()
+  return Comparator()
 
 def test_near_equality_helper_class():
+  '''Quick test of the above helper class.'''
   three = about(3, 0.11)
   assert 2   <= three
   assert 2   != three

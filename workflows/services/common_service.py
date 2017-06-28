@@ -265,19 +265,25 @@ class CommonService(workflows.add_plugin_register_to_class(object)):
       return
 
     except Exception as e:
-      # Add information about the actual exception to the log message
-      # This includes the file, line and piece of code causing the exception.
-      # exc_info=True adds the full stack trace to the log message.
-      exc_file_fullpath, exc_file, exc_lineno, exc_func, exc_line = \
-          workflows.logging.get_exception_source()
-      self.log.critical('Unhandled service exception: %s', e, exc_info=True,
-          extra={'workflows_exc_lineno': exc_lineno,
-                 'workflows_exc_funcName': exc_func,
-                 'workflows_exc_line': exc_line,
-                 'workflows_exc_pathname': exc_file_fullpath,
-                 'workflows_exc_filename': exc_file})
+      self.process_uncaught_exception(e)
       self.__update_service_status(self.SERVICE_STATUS_ERROR)
       return
+
+  def process_uncaught_exception(self, e):
+    '''This is called to handle otherwise uncaught exceptions from the service.
+       The service will terminate either way, but here we can do things such as
+       gathering useful environment information and logging for posterity.'''
+    # Add information about the actual exception to the log message
+    # This includes the file, line and piece of code causing the exception.
+    # exc_info=True adds the full stack trace to the log message.
+    exc_file_fullpath, exc_file, exc_lineno, exc_func, exc_line = \
+        workflows.logging.get_exception_source()
+    self.log.critical('Unhandled service exception: %s', e, exc_info=True,
+        extra={'workflows_exc_lineno': exc_lineno,
+               'workflows_exc_funcName': exc_func,
+               'workflows_exc_line': exc_line,
+               'workflows_exc_pathname': exc_file_fullpath,
+               'workflows_exc_filename': exc_file})
 
   def __process_command(self, command):
     '''Process an incoming command message from the frontend.'''
