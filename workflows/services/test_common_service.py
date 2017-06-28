@@ -27,6 +27,111 @@ def test_logging_to_frontend():
   assert logrec.levelname == 'WARNING'
   assert str(mock.sentinel.logmessage) in logrec.message
 
+def test_adding_fieldvalue_pairs_to_log_messages():
+  '''Add a custom field to all outgoing log messages using the extend_log mechanism.'''
+  fe_pipe = mock.Mock()
+  logmsg = 'Test message for extension'
+  service = CommonService(frontend=fe_pipe)
+  service.start()
+
+  fe_pipe.send.reset_mock()
+  service.log.warning(logmsg)
+  fe_pipe.send.assert_called_once()
+  record = fe_pipe.send.call_args[0][0]['payload']
+  assert record.message == logmsg
+  assert getattr(record, 'something', mock.sentinel.NA) == mock.sentinel.NA
+  assert getattr(record, 'furtherthing', mock.sentinel.NA) == mock.sentinel.NA
+
+  with service.extend_log('something', 'otherthing'):
+    fe_pipe.send.reset_mock()
+    service.log.warning(logmsg)
+    fe_pipe.send.assert_called_once()
+    record = fe_pipe.send.call_args[0][0]['payload']
+    assert record.message == logmsg
+    assert getattr(record, 'something', mock.sentinel.NA) == 'otherthing'
+    assert getattr(record, 'furtherthing', mock.sentinel.NA) == mock.sentinel.NA
+
+    with service.extend_log('furtherthing', 'morething'):
+      fe_pipe.send.reset_mock()
+      service.log.warning(logmsg)
+      fe_pipe.send.assert_called_once()
+      record = fe_pipe.send.call_args[0][0]['payload']
+      assert record.message == logmsg
+      assert getattr(record, 'something', mock.sentinel.NA) == 'otherthing'
+      assert getattr(record, 'furtherthing', mock.sentinel.NA) == 'morething'
+
+  fe_pipe.send.reset_mock()
+  service.log.warning(logmsg)
+  fe_pipe.send.assert_called_once()
+  record = fe_pipe.send.call_args[0][0]['payload']
+  assert record.message == logmsg
+  assert getattr(record, 'something', mock.sentinel.NA) == mock.sentinel.NA
+  assert getattr(record, 'furtherthing', mock.sentinel.NA) == mock.sentinel.NA
+
+def test_log_message_fieldvalue_pairs_are_removed_outside_their_context():
+  '''Custom fields added to outgoing log messages don't live on outside their extend_log context.'''
+  fe_pipe = mock.Mock()
+  logmsg = 'Test message for extension'
+  service = CommonService(frontend=fe_pipe)
+  service.start()
+
+  fe_pipe.send.reset_mock()
+  service.log.warning(logmsg)
+  fe_pipe.send.assert_called_once()
+  record = fe_pipe.send.call_args[0][0]['payload']
+  assert record.message == logmsg
+  assert getattr(record, 'something', mock.sentinel.NA) == mock.sentinel.NA
+
+  trace_exception = ZeroDivisionError(mock.sentinel.trace)
+  try:
+    with service.extend_log('something', 'otherthing'):
+      fe_pipe.send.reset_mock()
+      service.log.warning(logmsg)
+      fe_pipe.send.assert_called_once()
+      record = fe_pipe.send.call_args[0][0]['payload']
+      assert record.message == logmsg
+      assert getattr(record, 'something', mock.sentinel.NA) == 'otherthing'
+
+      raise trace_exception
+    assert False # Getting to this point means something went horribly wrong.
+
+  except ZeroDivisionError as e:
+    assert e == trace_exception
+
+    fe_pipe.send.reset_mock()
+    service.log.warning(logmsg)
+    fe_pipe.send.assert_called_once()
+    record = fe_pipe.send.call_args[0][0]['payload']
+    assert record.message == logmsg
+    assert getattr(record, 'something', mock.sentinel.NA) == mock.sentinel.NA
+
+def test_log_message_fieldvalue_pairs_are_attached_to_unhandled_exceptions_and_logged_properly():
+  '''When an exception falls through the extend_log context handler the fields are removed from future log messages,
+     but they are also attached to the exception object, as they may contain valuable information for debugging.'''
+  fe_pipe = mock.Mock()
+  logmsg = 'Test message for extension'
+  service = CommonService(frontend=fe_pipe)
+  service.start()
+
+  try:
+    with service.extend_log('something', 'otherthing'):
+      nonsense = 7 / 0
+    assert False # Getting to this point means something went horribly wrong.
+  except ZeroDivisionError as e:
+    assert getattr(e, 'workflows_log_something', None) == 'otherthing'
+
+    # Now check that the default process_uncaught_exception handler adds that
+    # field to the resulting log message
+    fe_pipe.send.reset_mock()
+    service.process_uncaught_exception(e)
+    fe_pipe.send.assert_called_once()
+    record = fe_pipe.send.call_args[0][0]['payload']
+    import pprint
+    pprint.pprint(dir(record))
+    assert 'Unhandled service exception' in record.message
+    assert 'zero' in record.message.lower()
+    assert getattr(record, 'something', mock.sentinel.NA) == 'otherthing'
+
 def test_receive_and_follow_shutdown_command():
   '''Receive a shutdown message via the command pipe and act on it.
      Check that status codes are updated properly.'''

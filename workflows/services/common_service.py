@@ -1,4 +1,5 @@
 from __future__ import absolute_import, division
+import contextlib
 import enum
 import logging
 import workflows
@@ -123,9 +124,10 @@ class CommonService(workflows.add_plugin_register_to_class(object)):
     self._transport = workflows.transport.queue_transport.QueueTransport()
     self._transport.set_send_function(self.__send_to_frontend)
     self._transport.connect()
-    self.__shutdown = False
     self.__callback_register = {}
+    self.__log_extensions = []
     self.__service_status = None
+    self.__shutdown = False
     self.__update_service_status(self.SERVICE_STATUS_NEW)
     self._idle_callback = None
     self._idle_time = None
@@ -138,8 +140,23 @@ class CommonService(workflows.add_plugin_register_to_class(object)):
     if self.__pipe_frontend:
       self.__pipe_frontend.send(data_structure)
 
+  @contextlib.contextmanager
+  def extend_log(self, field, value):
+    '''A context wherein a specified extra field in log messages is populated
+       with a fixed value. This affects all log messages within the context.'''
+    self.__log_extensions.append((field, value))
+    try:
+      yield
+    except Exception as e:
+      setattr(e, 'workflows_log_' + field, value)
+      raise
+    finally:
+      self.__log_extensions.remove((field, value))
+
   def _log_send(self, logrecord):
     '''Forward log records to the frontend.'''
+    for field, value in self.__log_extensions:
+      setattr(logrecord, field, value)
     self.__send_to_frontend({
       'band': 'log',
       'payload': logrecord
@@ -278,12 +295,17 @@ class CommonService(workflows.add_plugin_register_to_class(object)):
     # exc_info=True adds the full stack trace to the log message.
     exc_file_fullpath, exc_file, exc_lineno, exc_func, exc_line = \
         workflows.logging.get_exception_source()
+    added_information = {
+        'workflows_exc_lineno': exc_lineno,
+        'workflows_exc_funcName': exc_func,
+        'workflows_exc_line': exc_line,
+        'workflows_exc_pathname': exc_file_fullpath,
+        'workflows_exc_filename': exc_file,
+    }
+    for field in filter(lambda x: x.startswith('workflows_log_'), dir(e)):
+      added_information[field[14:]] = getattr(e, field, None)
     self.log.critical('Unhandled service exception: %s', e, exc_info=True,
-        extra={'workflows_exc_lineno': exc_lineno,
-               'workflows_exc_funcName': exc_func,
-               'workflows_exc_line': exc_line,
-               'workflows_exc_pathname': exc_file_fullpath,
-               'workflows_exc_filename': exc_file})
+        extra=added_information)
 
   def __process_command(self, command):
     '''Process an incoming command message from the frontend.'''
