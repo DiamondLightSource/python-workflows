@@ -1,7 +1,6 @@
 from __future__ import absolute_import, division
 
 import copy
-import logging
 import workflows.recipe
 
 class RecipeWrapper(object):
@@ -9,12 +8,10 @@ class RecipeWrapper(object):
      life easier for recipe users.
   '''
 
-  def __init__(self, message=None, transport=None, log=None, recipe=None):
+  def __init__(self, message=None, transport=None, recipe=None, **kwargs):
     '''Create a RecipeWrapper object from a wrapped message.
        References to the transport layer are required to send directly to
-       connected downstream processes. Optionally a logger is wrapped and
-       extended to include global recipe information in log messages for
-       tracking.
+       connected downstream processes.
     '''
     if message:
       self.recipe = workflows.recipe.Recipe(message['recipe'])
@@ -35,11 +32,6 @@ class RecipeWrapper(object):
       raise ValueError('A message or recipe is required to create ' \
                        'a RecipeWrapper object.')
     self.default_channel = None
-
-    extra_logging = {}
-    if self.environment.get('ID'):
-      extra_logging['recipe_ID'] = self.environment['ID']
-    self.log = logging.LoggerAdapter(log, extra_logging)
     self.transport = transport
 
   def send(self, *args, **kwargs):
