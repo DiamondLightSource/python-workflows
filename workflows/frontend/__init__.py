@@ -8,6 +8,7 @@ import workflows.frontend.utilization
 import workflows.services
 from workflows.services.common_service import CommonService
 import workflows.transport
+import workflows.util
 
 try: # Python3 compatibility
   basestring = basestring
@@ -45,7 +46,7 @@ class Frontend():
            An optional dictionary that is passed to started services.
     '''
     self.__lock = threading.RLock()
-    self.__hostid = self._generate_unique_host_id()
+    self.__hostid = workflows.util.generate_unique_host_id()
     self._service = None         # pointer to the service instance
     self._service_class_name = None
     self._service_factory = None # pointer to the service class
@@ -267,16 +268,6 @@ class Frontend():
   def get_host_id(self):
     '''Get a cached copy of the host id.'''
     return self.__hostid
-
-  @staticmethod
-  def _generate_unique_host_id():
-    '''Generate a unique ID, that is somewhat guaranteed to be unique among all
-       instances running at the same time.'''
-    import socket
-    host = '.'.join(reversed(socket.gethostname().split('.')))
-    import os
-    pid = os.getpid()
-    return "%s.%d" % (host, pid)
 
   def get_status(self):
     '''Returns a dictionary containing all relevant status information to be
