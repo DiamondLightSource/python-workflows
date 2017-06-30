@@ -150,7 +150,6 @@ class StompTransport(CommonTransport):
     if channel:
       destination.append(channel)
     destination = '.'.join(destination)
-    import json
     message = json.dumps(status)
     with self._lock:
       self._conn.send(
