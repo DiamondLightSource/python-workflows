@@ -340,6 +340,7 @@ class Frontend():
       self._service_name = service_instance.get_name()
       self._service_class_name = service_instance.__class__.__name__
       self._service.daemon = True
+      self._service.name = 'workflows-service'
       self._service.start()
       self._service_starttime = time.time()
 
