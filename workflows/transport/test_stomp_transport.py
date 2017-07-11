@@ -68,7 +68,7 @@ prefix = namespace
     globals()['StompTransport'] = workflows.transport.stomp_transport.StompTransport
 
     mockstomp.Connection.assert_called_once_with([('localhost', 1234)])
-    mockconn.connect.assert_called_once_with(mock.sentinel.user, 'somesecret', wait=True)
+    mockconn.connect.assert_called_once_with(mock.sentinel.user, 'somesecret', wait=False)
     assert stomp.get_namespace() == 'namespace'
 
   finally:
@@ -98,7 +98,7 @@ def test_anonymous_connection(mockstomp):
   reload(workflows.transport.stomp_transport)
   globals()['StompTransport'] = workflows.transport.stomp_transport.StompTransport
 
-  mockconn.connect.assert_called_once_with(wait=True)
+  mockconn.connect.assert_called_once_with(wait=False)
 
 @mock.patch('workflows.transport.stomp_transport.stomp')
 def test_instantiate_link_and_connect_to_broker(mockstomp):

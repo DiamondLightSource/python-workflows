@@ -118,13 +118,26 @@ class StompTransport(CommonTransport):
                                  self.defaults.get('--stomp-user'))
       password = self.config.get('--stomp-pass',
                                  self.defaults.get('--stomp-pass'))
+      timeout = time.time() + 30
+      connection_failure = False
+      def disconnect_handler():
+        connection_failure = True
+      handler_old = self._stomp_listener.on_disconnected
+      self._stomp_listener.on_disconnected = disconnect_handler
       try:
         if username or password:
-          self._conn.connect(username, password, wait=True)
+          self._conn.connect(username, password, wait=False)
         else: # anonymous access
-          self._conn.connect(wait=True)
+          self._conn.connect(wait=False)
       except stomp.exception.ConnectFailedException:
         raise AuthenticationError('Could not connect to stomp host: Authentication error')
+      while time.time() < timeout and not self._conn.is_connected() and not connection_failure:
+        time.sleep(0.02)
+      self._stomp_listener.on_disconnected = handler_old
+      if connection_failure:
+        raise DisconnectedError('Could not initiate connection to stomp host - disconnected')
+      if not self._conn.is_connected():
+        raise DisconnectedError('Could not initiate connection to stomp host')
       self._namespace = \
         self.config.get('--stomp-prfx', self.defaults.get('--stomp-prfx'))
       if self._namespace and not self._namespace.endswith('.'):
