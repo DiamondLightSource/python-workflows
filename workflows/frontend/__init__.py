@@ -8,6 +8,7 @@ import workflows.frontend.utilization
 import workflows.services
 from workflows.services.common_service import CommonService
 import workflows.transport
+from workflows.transport.queue_transport_counterpart import QueueTransportCounterpart
 import workflows.util
 
 try: # Python3 compatibility
@@ -101,6 +102,8 @@ class Frontend():
       self._transport = transport
     assert self._transport.connect(), "Could not connect to transport layer"
     self._service_transportid = self._transport.register_client()
+    self._qtc = QueueTransportCounterpart(transport=self._transport,
+                                          send_to_queue=self.send_command)
 
     if transport_command_prefix:
       self._transport.subscribe(transport_command_prefix + self.__hostid,
@@ -222,9 +225,10 @@ class Frontend():
 
   def send_command(self, command):
     '''Send command to service via the command queue.'''
-#   print("To command queue: " + str(command))
     if self._pipe_commands:
       self._pipe_commands.send(command)
+    else:
+      self.log.error('No command queue pipe found for command\n%s', str(command))
 
   def process_transport_command(self, header, message):
     '''Parse a command coming in through the transport command subscription'''
@@ -376,141 +380,11 @@ class Frontend():
         self._service.join() # must wait for process to be actually destroyed
       self._service = None
 
-# ---- Transport calls -----------------------------------------------------
-
-  _transaction_mapping = {}
-  _subscription_mapping = {}
-
   def parse_band_transport(self, message):
     '''Treat messages sent from service via queue. These were encoded by
-       transport.queue_transport on the other end. Forward the messages to
-       individual functions parse_band_transport_${call}() depending on the
-       'call' field.
+       transport.queue_transport on the other end. Decode them via a
+       QueueTransportCounterpart and process them using the real transport
+       object.
        param: message: The full queue message data structure.
     '''
-    try:
-      handler = getattr(self, 'parse_band_transport_' + message['call'])
-    except AttributeError:
-      self.log.error("Unknown transport handler '%s'.\n%s", str(message.get('call')), str(message)[:1000])
-      return
-    if 'transaction' in message['payload'][1]:
-#     print("Mapping transaction %s to %s for %s" % (
-#         str( message['payload'][1]['transaction'] ),
-#         str( self._transaction_mapping[message['payload'][1]['transaction']] ),
-#         message['call']))
-      message['payload'][1]['transaction'] = \
-        self._transaction_mapping[message['payload'][1]['transaction']]
-    handler(message)
-
-  def parse_band_transport_send(self, message):
-    '''Counterpart to the transport.send call from the service.
-       Forward the call to the real transport layer.'''
-    args, kwargs = message['payload']
-    self._transport.send(*args, **kwargs)
-
-  def parse_band_transport_broadcast(self, message):
-    '''Counterpart to the transport.broadcast call from the service.
-       Forward the call to the real transport layer.'''
-    args, kwargs = message['payload']
-    self._transport.broadcast(*args, **kwargs)
-
-  def parse_band_transport_ack(self, message):
-    '''Counterpart to the transport.ack call from the service.
-       Forward the call to the real transport layer.'''
-    args, kwargs = message['payload']
-    message_id, subscription_id = args[:2]
-    assert subscription_id in self._subscription_mapping
-    self._transport.ack(message_id,
-                        self._subscription_mapping[subscription_id],
-                        *args[2:], **kwargs)
-
-  def parse_band_transport_nack(self, message):
-    '''Counterpart to the transport.nack call from the service.
-       Forward the call to the real transport layer.'''
-    args, kwargs = message['payload']
-    message_id, subscription_id = args[:2]
-    assert subscription_id in self._subscription_mapping
-    self._transport.nack(message_id,
-                         self._subscription_mapping[subscription_id],
-                         *args[2:], **kwargs)
-
-  def parse_band_transport_transaction_begin(self, message):
-    '''Counterpart to the transport.transaction_begin call from the service.
-       Forward the call to the real transport layer.'''
-    args, kwargs = message['payload']
-    service_txn_id = args[0]
-    self._transaction_mapping[service_txn_id] = \
-      self._transport.transaction_begin(client_id=self._service_transportid)
-
-  def parse_band_transport_transaction_commit(self, message):
-    '''Counterpart to the transport.transaction_begin call from the service.
-       Forward the call to the real transport layer.'''
-    args, kwargs = message['payload']
-    service_txn_id = args[0]
-    assert service_txn_id in self._transaction_mapping
-    self._transport.transaction_commit(self._transaction_mapping[service_txn_id])
-    del self._transaction_mapping[service_txn_id]
-
-  def parse_band_transport_transaction_abort(self, message):
-    '''Counterpart to the transport.transaction_abort call from the service.
-       Forward the call to the real transport layer.'''
-    args, kwargs = message['payload']
-    service_txn_id = args[0]
-    assert service_txn_id in self._transaction_mapping
-    self._transport.transaction_abort(self._transaction_mapping[service_txn_id])
-    del self._transaction_mapping[service_txn_id]
-
-  def parse_band_transport_subscribe(self, message):
-    '''Counterpart to the transport.subscribe call from the service.
-       Forward the call to the real transport layer.'''
-    subscription_id, channel = message['payload'][0][:2]
-    def callback_helper(cb_header, cb_message):
-      '''Helper function to rewrite the message header and redirect it towards
-         the service.'''
-      cb_header['subscription'] = subscription_id
-      self.send_command( {
-        'band': 'transport_message',
-        'payload': {
-          'subscription_id': subscription_id,
-          'header': cb_header,
-          'message': cb_message,
-        }
-      } )
-    self._subscription_mapping[subscription_id] = self._transport.subscribe(
-      channel,
-      callback_helper,
-      *message['payload'][0][2:],
-      client_id=self._service_transportid,
-      **message['payload'][1]
-    )
-
-  def parse_band_transport_subscribe_broadcast(self, message):
-    '''Counterpart to the transport.subscribe_broadcast call from the service.
-       Forward the call to the real transport layer.'''
-    subscription_id, channel = message['payload'][0][:2]
-    def callback_helper(cb_header, cb_message):
-      '''Helper function to rewrite the message header and redirect it towards
-         the service.'''
-      cb_header['subscription'] = subscription_id
-      self.send_command( {
-        'band': 'transport_message',
-        'payload': {
-          'subscription_id': subscription_id,
-          'header': cb_header,
-          'message': cb_message,
-        }
-      } )
-    self._subscription_mapping[subscription_id] = self._transport.subscribe_broadcast(
-      channel,
-      callback_helper,
-      *message['payload'][0][2:],
-      client_id=self._service_transportid,
-      **message['payload'][1]
-    )
-
-  def parse_band_transport_unsubscribe(self, message):
-    '''Counterpart to the transport.unsubscribe call from the service.
-       Forward the call to the real transport layer.'''
-    subscription_id = message['payload'][0][0]
-    self._transport.unsubscribe(self._subscription_mapping[subscription_id])
-    del self._subscription_mapping[subscription_id]
+    return self._qtc.handle(message, client_id=self._service_transportid)
