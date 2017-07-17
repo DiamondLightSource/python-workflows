@@ -2,7 +2,7 @@ from __future__ import absolute_import, division
 from setuptools import setup, find_packages
 import sys
 
-package_version = '0.49'
+package_version = '0.50'
 
 # to release:
 #  - increment number
