@@ -8,7 +8,7 @@ package_version = '0.50'
 #  - increment number
 #  - export NUMBER="$(grep package_version setup.py | head -1 | cut -d"'" -f 2)"
 #  - git add -u; git commit -m "v${NUMBER} release"; git tag -a v${NUMBER} -m v${NUMBER}; git push; git push origin v${NUMBER}
-#  - python setup.py register sdist upload
+#  - python setup.py sdist upload
 
 if sys.version_info < (2,7):
   sys.exit('Sorry, Python < 2.7 is not supported')
