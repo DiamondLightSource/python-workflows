@@ -157,19 +157,13 @@ class StompTransport(CommonTransport):
         self._conn.disconnect()
         self._connected = False
 
-  def broadcast_status(self, status, channel=None):
+  def broadcast_status(self, status):
     '''Broadcast transient status information to all listeners'''
-    destination = ['/topic/' + self._namespace + 'transient.status']
-    if channel:
-      destination.append(channel)
-    destination = '.'.join(destination)
-    message = json.dumps(status)
-    with self._lock:
-      self._conn.send(
-          destination, message,
-          headers={
-                    'expires': '%d' % int((90 + time.time()) * 1000)
-                  })
+    self._broadcast('transient.status',
+                    json.dumps(status),
+                    headers={
+                      'expires': str(int((15 + time.time()) * 1000))
+                    })
 
   def _subscribe(self, sub_id, channel, callback, **kwargs):
     '''Listen to a queue, notify via callback function.

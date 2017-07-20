@@ -172,8 +172,8 @@ def test_broadcast_status(mockstomp, mocktime):
 
   mockconn.send.assert_called_once()
   args, kwargs = mockconn.send.call_args
-  # expiration should be 90 seconds in the future
-  assert int(kwargs['headers']['expires']) == 1000 * (20000 + 90)
+  # expiration should be 15 seconds in the future
+  assert int(kwargs['headers']['expires']) == 1000 * (20000 + 15)
   destination, message = args
   assert destination.startswith('/topic/transient.status')
   statusdict = json.loads(message)
@@ -500,6 +500,6 @@ def test_namespace_is_used_correctly(mockstomp):
   stomp._subscribe_broadcast( 4, 'sub_topic', None, ignore_namespace=True )
   assert mockconn.subscribe.call_args[0] == ('/topic/sub_topic', 4)
 
-  stomp.broadcast_status('some status', channel='extra')
-  assert mockconn.send.call_args[0] == ('/topic/ns.transient.status.extra', '"some status"')
+  stomp.broadcast_status('some status')
+  assert mockconn.send.call_args[0] == ('/topic/ns.transient.status', '"some status"')
 
