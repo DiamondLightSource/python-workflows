@@ -24,7 +24,7 @@ class Frontend():
   '''
 
   def __init__(self, transport=None, service=None,
-      transport_command_prefix=None, restart_service=False,
+      transport_command_channel=None, restart_service=False,
       verbose_service=False, environment=None):
     '''Create a frontend instance. Connect to the transport layer, start any
        requested service, begin broadcasting status information and listen
@@ -38,8 +38,8 @@ class Frontend():
        :param transport:
            Either the name of a transport class, a transport class, or a
            transport class object.
-       :param transport_command_prefix:
-           An optional prefix of a transport subscription to be listened to for
+       :param transport_command_channel:
+           An optional channel of a transport subscription to be listened to for
            commands.
        :param verbose_service:
            If set, run services with increased logging level (DEBUG).
@@ -105,9 +105,9 @@ class Frontend():
     self._qtc = QueueTransportCounterpart(transport=self._transport,
                                           send_to_queue=self.send_command)
 
-    if transport_command_prefix:
-      self._transport.subscribe(transport_command_prefix + self.__hostid,
-                                self.process_transport_command)
+    if transport_command_channel:
+      self._transport.subscribe_broadcast(transport_command_channel,
+                                          self.process_transport_command)
       self.log.debug('Listening for commands on transport layer')
 
     # Save environment for service starts
@@ -232,7 +232,10 @@ class Frontend():
 
   def process_transport_command(self, header, message):
     '''Parse a command coming in through the transport command subscription'''
-    if isinstance(message, dict) and message.get('command'):
+    if not isinstance(message, dict) or message.get('host') != self.__hostid:
+      return
+
+    if message.get('command'):
       self.log.info('Received command \'%s\' via transport layer', message['command'])
       if message['command'] == 'shutdown':
         self.shutdown = True

@@ -82,13 +82,16 @@ def test_frontend_subscribes_to_command_channel(mock_transport):
   transport.connect.assert_called_once()
   transport.subscribe.assert_not_called()
 
-  fe = workflows.frontend.Frontend(transport_command_prefix='sentinel.')
-  transport.subscribe.assert_called_once()
-  assert transport.subscribe.call_args == (('sentinel.' + fe.get_host_id(), mock.ANY), {})
-  callbackfn = transport.subscribe.call_args[0][1]
+  fe = workflows.frontend.Frontend(transport_command_channel=mock.sentinel.command)
+  transport.subscribe_broadcast.assert_called_once_with(mock.sentinel.command, mock.ANY)
+  callbackfn = transport.subscribe_broadcast.call_args[0][1]
 
   assert fe.shutdown == False
   callbackfn({}, { 'command': 'shutdown' })
+  assert fe.shutdown == False
+  callbackfn({}, { 'command': 'shutdown', 'host': fe.get_host_id() + 'x' })
+  assert fe.shutdown == False
+  callbackfn({}, { 'command': 'shutdown', 'host': fe.get_host_id() })
   assert fe.shutdown == True
 
 @mock.patch('workflows.frontend.multiprocessing')
