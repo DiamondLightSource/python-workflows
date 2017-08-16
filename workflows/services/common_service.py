@@ -271,20 +271,22 @@ class CommonService(workflows.add_plugin_register_to_class(object)):
           self.log.warning('received message without band information\n%s',
                            message)
 
-      self.__update_service_status(self.SERVICE_STATUS_SHUTDOWN)
-
-      self.in_shutdown()
-
-      self.__update_service_status(self.SERVICE_STATUS_END)
-
     except KeyboardInterrupt:
       self.log.warning('Ctrl+C detected. Shutting down.')
-      return
 
     except Exception as e:
       self.process_uncaught_exception(e)
       self.__update_service_status(self.SERVICE_STATUS_ERROR)
+      self.in_shutdown()
       return
+
+    try:
+      self.__update_service_status(self.SERVICE_STATUS_SHUTDOWN)
+      self.in_shutdown()
+      self.__update_service_status(self.SERVICE_STATUS_END)
+    except Exception as e:
+      self.process_uncaught_exception(e)
+      self.__update_service_status(self.SERVICE_STATUS_ERROR)
 
   def process_uncaught_exception(self, e):
     '''This is called to handle otherwise uncaught exceptions from the service.
