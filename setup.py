@@ -1,16 +1,28 @@
 from __future__ import absolute_import, division
 
+import io
+import os
+import re
 import sys
 
 from setuptools import find_packages, setup
 
-package_version = '0.51'
+# cf.
+# https://packaging.python.org/guides/single-sourcing-package-version/#single-sourcing-the-version
+def read(*names, **kwargs):
+  with io.open(
+    os.path.join(os.path.dirname(__file__), *names),
+    encoding=kwargs.get("encoding", "utf8")
+  ) as fp:
+    return fp.read()
 
-# to release:
-#  - increment number
-#  - export NUMBER="$(grep package_version setup.py | head -1 | cut -d"'" -f 2)"
-#  - git add -u; git commit -m "v${NUMBER} release"; git tag -a v${NUMBER} -m v${NUMBER}; git push; git push origin v${NUMBER}
-#  - python setup.py sdist upload
+def find_version(*file_paths):
+  version_file = read(*file_paths)
+  version_match = re.search(r"^__version__ = ['\"]([^'\"]*)['\"]",
+                            version_file, re.M)
+  if version_match:
+    return version_match.group(1)
+  raise RuntimeError("Unable to find version string.")
 
 if sys.version_info < (2,7):
   sys.exit('Sorry, Python < 2.7 is not supported')
@@ -19,13 +31,14 @@ setup(name='workflows',
       description='Supervised data processing in distributed environments',
       url='https://github.com/DiamondLightSource/python-workflows',
       author='Markus Gerstel',
-      author_email='anthchirp@users.noreply.github.com',
+      author_email='scientificsoftware@diamond.ac.uk',
       download_url="https://github.com/DiamondLightSource/python-workflows/releases",
-      version=package_version,
+      version=find_version('workflows', '__init__.py'),
       install_requires=['enum-compat', 'stomp.py'],
       packages=find_packages(),
       license='BSD',
-      tests_require=['mock'],
+      tests_require=['mock',
+                     'pytest'],
       zip_safe=False,
       classifiers = [
         'Development Status :: 4 - Beta',

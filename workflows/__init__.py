@@ -19,10 +19,11 @@ def load_plugins(paths):
       if fid:
         fid.close()
 
+__version__ = '0.52'
+
 def version():
   '''Returns the version number of the installed workflows package.'''
-  import pkg_resources # part of setuptools
-  return pkg_resources.require("workflows")[0].version
+  return __version__
 
 class WorkflowsError(Exception):
   '''Common class for exceptions deliberately raised by workflows package.'''
