@@ -1,14 +1,17 @@
 from __future__ import absolute_import, division
+
+import json
+import threading
+import time
+
+import stomp
+from workflows import AuthenticationError, DisconnectedError, WorkflowsError
+from workflows.transport.common_transport import CommonTransport
+
 try:
   import ConfigParser
 except ImportError: # Python3 compatibility
   import configparser as ConfigParser
-import json
-import stomp
-import threading
-import time
-from workflows import WorkflowsError, DisconnectedError, AuthenticationError
-from workflows.transport.common_transport import CommonTransport
 
 class StompTransport(CommonTransport):
   '''Abstraction layer for messaging infrastructure. Here we are using ActiveMQ

@@ -1,8 +1,9 @@
 from __future__ import absolute_import, division
 
-from workflows.services.common_service import Commands, CommonService
-import mock
 from multiprocessing import Pipe
+
+import mock
+from workflows.services.common_service import Commands, CommonService
 
 def test_instantiate_basic_service():
   '''Create a basic service object'''

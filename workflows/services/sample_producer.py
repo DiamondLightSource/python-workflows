@@ -1,6 +1,8 @@
 from __future__ import absolute_import, division
-from workflows.services.common_service import CommonService
+
 import time
+
+from workflows.services.common_service import CommonService
 
 class SampleProducer(CommonService):
   '''An example service building on top of the workflow.services architecture,

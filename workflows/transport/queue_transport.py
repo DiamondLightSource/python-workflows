@@ -1,6 +1,7 @@
 from __future__ import absolute_import, division
-from workflows import WorkflowsError
+
 import workflows.transport
+from workflows import WorkflowsError
 from workflows.transport.common_transport import CommonTransport
 
 class QueueTransport(CommonTransport):

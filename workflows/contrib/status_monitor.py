@@ -1,9 +1,11 @@
 from __future__ import absolute_import, division
+
 import curses
-import time
-from workflows.services.common_service import CommonService
-import workflows.transport
 import threading
+import time
+
+import workflows.transport
+from workflows.services.common_service import CommonService
 
 try: # Python3 compatibility
   basestring = basestring

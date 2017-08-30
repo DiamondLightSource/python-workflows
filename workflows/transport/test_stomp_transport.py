@@ -1,15 +1,17 @@
 from __future__ import absolute_import, division
+
+import json
+import optparse
+import os
+import tempfile
+from imp import reload
+
+import mock
+import pytest
+import stomp as stomppy
 import workflows
 import workflows.transport
 from workflows.transport.stomp_transport import StompTransport
-from imp import reload
-import json
-import mock
-import optparse
-import os
-import pytest
-import stomp as stomppy
-import tempfile
 
 def test_lookup_and_initialize_stomp_transport_layer():
   '''Find the stomp transport layer via the lookup mechanism and run
@@ -502,4 +504,3 @@ def test_namespace_is_used_correctly(mockstomp):
 
   stomp.broadcast_status('some status')
   assert mockconn.send.call_args[0] == ('/topic/ns.transient.status', '"some status"')
-

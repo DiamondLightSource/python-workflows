@@ -1,8 +1,9 @@
 from __future__ import absolute_import, division
-from workflows.transport.common_transport import CommonTransport
+
 import mock
 import pytest
 import workflows
+from workflows.transport.common_transport import CommonTransport
 
 def test_subscribe_unsubscribe_a_channel():
   """Public subscribe()-call should be routed to specific _subscribe().

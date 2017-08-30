@@ -1,6 +1,8 @@
 from __future__ import absolute_import, division
-from setuptools import setup, find_packages
+
 import sys
+
+from setuptools import find_packages, setup
 
 package_version = '0.51'
 

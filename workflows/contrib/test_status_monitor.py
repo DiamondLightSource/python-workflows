@@ -1,6 +1,7 @@
 from __future__ import absolute_import, division
-import workflows.contrib.status_monitor as status_monitor
+
 import mock
+import workflows.contrib.status_monitor as status_monitor
 
 @mock.patch('workflows.contrib.status_monitor.curses')
 @mock.patch('workflows.contrib.status_monitor.time')

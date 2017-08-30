@@ -1,4 +1,5 @@
 from __future__ import absolute_import, division
+
 import workflows.util
 
 def test_generated_host_ids_are_somewhat_sensible():

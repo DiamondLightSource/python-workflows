@@ -1,8 +1,8 @@
 from __future__ import absolute_import, division
 
+import mock
 import workflows.services
 import workflows.services.sample_producer
-import mock
 
 def test_service_can_be_looked_up():
   '''Attempt to look up the service by its name'''

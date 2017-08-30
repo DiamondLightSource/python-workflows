@@ -1,7 +1,9 @@
 from __future__ import absolute_import, division
+
 import logging
-import mock
 import os
+
+import mock
 import workflows.logging
 
 def test_obtain_exception_source():
@@ -22,7 +24,7 @@ def test_obtain_exception_source():
     assert fp == __file__
     assert os.path.basename(fp) == fn
     assert name == 'crashfunction'
-    assert line_number == 14 # this will break if line number in this file changes
+    assert line_number == 16 # this will break if line number in this file changes
     assert line == "print(everything / nothing)"
 
 def test_callback_handler_works_within_logging_framework():
