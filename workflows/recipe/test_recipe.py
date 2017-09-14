@@ -255,6 +255,32 @@ def test_replacing_parameters_in_recipe():
   assert A.recipe[1]['queue'] == 'some.queue.{first}'
   assert A.recipe[2]['queue'] == 'another.queue.replacement'
 
+def test_replacing_parameters_in_recipe_with_datastructures():
+  '''Recipe may contain placeholders that should be replaced with actual data structures by running apply_parameters.'''
+  A, _ = generate_recipes()
+
+  replacements = {'name': 'replacement',
+                  'some-list': [ 1, 2, 3 ],
+                  'nested': { 'some-dictionary': { 'number': 3,
+                                                   'oddlist': [ 1, 3, 5 ],
+                                                   'text': 'string',
+                                                   'dict': { 'key': 'value' },
+                                                 } },
+                }
+
+  A.recipe[2]['list'] = '{$REPLACE:some-list}'
+  A.recipe[2]['dictionary'] = '{$REPLACE:nested}'
+  A.recipe[2]['deep-dictionary'] = '{$REPLACE:nested[some-dictionary]}'
+  A.apply_parameters(replacements)
+
+  assert A.recipe[2]['list'] == replacements['some-list']
+  assert A.recipe[2]['list'] is not replacements['some-list'], 'same list returned, not copied'
+  assert A.recipe[2]['dictionary'] == replacements['nested']
+  assert A.recipe[2]['dictionary'] is not replacements['nested'], 'same dictionary returned, not copied'
+  assert A.recipe[2]['dictionary']['some-dictionary'] is not replacements['nested']['some-dictionary'], 'same dictionary returned, not deep-copied'
+  assert A.recipe[2]['deep-dictionary'] == replacements['nested']['some-dictionary']
+  assert A.recipe[2]['deep-dictionary'] is not replacements['nested']['some-dictionary']
+
 def test_merging_recipes():
   '''Test recipes can be merged and merging results in a valid minimal DAG.'''
   A, B = generate_recipes()
