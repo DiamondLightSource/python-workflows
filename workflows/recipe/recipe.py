@@ -1,5 +1,6 @@
 from __future__ import absolute_import, division
 
+import copy
 import json
 import string
 
@@ -158,7 +159,10 @@ class Recipe(object):
 
   def apply_parameters(self, parameters):
     '''Recursively apply dictionary entries in 'parameters' to {item}s in recipe
-       structure, leaving undefined {item}s as they are.
+       structure, leaving undefined {item}s as they are. A special case is a
+       {$REPLACE:item}, which replaces the string with a copy of the referenced
+       parameter item.
+
        Examples:
 
        parameters = { 'x':'5' }
@@ -172,6 +176,10 @@ class Recipe(object):
        parameters = { 'x':'3', 'y':'5' }
        apply_parameters( { '{x}': '{y}' }, parameters )
           => { '3': '5' }
+
+       parameters = { 'l': [ 1, 2 ] }
+       apply_parameters( { 'x': '{$REPLACE:l}' }, parameters )
+          => { 'x': [ 1, 2 ] }
     '''
 
     class SafeDict(dict):
@@ -180,12 +188,28 @@ class Recipe(object):
       def __missing__(self, key):
         return '{' + key + '}'
 
+    # By default the python formatter class is used to resolve {item} references
+    formatter = string.Formatter()
+
+    # Special format strings "{$REPLACE:(...)}" use this data structure
+    # formatter to return the referenced data structure rather than a formatted
+    # string.
+    ds_formatter = string.Formatter()
+    def ds_format_field(value, spec):
+      ds_format_field.last = value
+      return ''
+    ds_formatter.format_field = ds_format_field
+
     params = SafeDict(parameters)
 
     def _recursive_apply(item):
       '''Helper function to recursively apply replacements.'''
       if isinstance(item, basestring):
-        return string.Formatter().vformat(item, (), params)
+        if item.startswith('{$REPLACE') and item.endswith('}'):
+          ds_formatter.vformat("{" + item[10:-1] + "}", (), params)
+          return copy.deepcopy(ds_formatter.format_field.last)
+        else:
+          return formatter.vformat(item, (), params)
       if isinstance(item, dict):
         return { _recursive_apply(key): _recursive_apply(value) for
                  key, value in item.items() }

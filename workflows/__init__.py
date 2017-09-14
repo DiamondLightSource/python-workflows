@@ -19,7 +19,7 @@ def load_plugins(paths):
       if fid:
         fid.close()
 
-__version__ = '0.52'
+__version__ = '0.53'
 
 def version():
   '''Returns the version number of the installed workflows package.'''
