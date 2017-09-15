@@ -206,7 +206,10 @@ class Recipe(object):
       '''Helper function to recursively apply replacements.'''
       if isinstance(item, basestring):
         if item.startswith('{$REPLACE') and item.endswith('}'):
-          ds_formatter.vformat("{" + item[10:-1] + "}", (), params)
+          try:
+            ds_formatter.vformat("{" + item[10:-1] + "}", (), parameters)
+          except KeyError:
+            return None
           return copy.deepcopy(ds_formatter.format_field.last)
         else:
           return formatter.vformat(item, (), params)

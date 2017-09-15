@@ -271,6 +271,7 @@ def test_replacing_parameters_in_recipe_with_datastructures():
   A.recipe[2]['list'] = '{$REPLACE:some-list}'
   A.recipe[2]['dictionary'] = '{$REPLACE:nested}'
   A.recipe[2]['deep-dictionary'] = '{$REPLACE:nested[some-dictionary]}'
+  A.recipe[2]['undefined'] = '{$REPLACE:undefined}'
   A.apply_parameters(replacements)
 
   assert A.recipe[2]['list'] == replacements['some-list']
@@ -280,6 +281,7 @@ def test_replacing_parameters_in_recipe_with_datastructures():
   assert A.recipe[2]['dictionary']['some-dictionary'] is not replacements['nested']['some-dictionary'], 'same dictionary returned, not deep-copied'
   assert A.recipe[2]['deep-dictionary'] == replacements['nested']['some-dictionary']
   assert A.recipe[2]['deep-dictionary'] is not replacements['nested']['some-dictionary']
+  assert A.recipe[2]['undefined'] == None
 
 def test_merging_recipes():
   '''Test recipes can be merged and merging results in a valid minimal DAG.'''
