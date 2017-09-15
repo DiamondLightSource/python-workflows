@@ -1,6 +1,7 @@
 from __future__ import absolute_import, division
 
 import json
+import pprint
 import time
 
 from workflows.services.common_service import CommonService
@@ -28,6 +29,9 @@ class SampleConsumer(CommonService):
     if header:
       logmessage['header'] = json.dumps(header, indent=2) + '\n' + \
                              '----------------' + '\n'
+    if isinstance(message, dict):
+      logmessage['message'] = json.dumps(message, indent=2) + '\n' + \
+                              '----------------' + '\n'
 
     print("=== Consume ====\n{header}{message}".format(**logmessage))
     self.log.info("Received message @{time}".format(**logmessage))
