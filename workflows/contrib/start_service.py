@@ -1,6 +1,6 @@
 from __future__ import absolute_import, division
 
-from optparse import OptionParser, SUPPRESS_HELP
+from optparse import SUPPRESS_HELP, OptionParser
 
 import workflows
 import workflows.frontend
