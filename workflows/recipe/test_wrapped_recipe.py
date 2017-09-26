@@ -15,6 +15,7 @@ def generate_recipe_message():
             'output': { 'somewhere': [ 2 ],
                         'multi-output': [ 2, 3, 4 ],
                       },
+            'parameter': 'some {placeholder} to test replacement',
             'error': 2,
           },
        2: { 'service': 'service 2',
@@ -313,3 +314,22 @@ def test_start_command_via_recipewrapper():
       transaction=mock.sentinel.txn,
   ) ]
   assert t.mock_calls == expected
+
+def test_parameter_replacement_in_recipe_wrapper():
+  '''A RecipeWrapper should support the recipe's .apply_parameters call, and
+     this should affect the stored recipe as well as internal referenced parts
+     of the recipe.'''
+  m = generate_recipe_message()
+
+  rw = RecipeWrapper(message=m)
+
+  rw.apply_parameters( { 'placeholder': 'replacement' } )
+
+  assert rw.recipe[1]["parameter"] == 'some replacement to test replacement'
+  assert rw.recipe_step["parameter"] == 'some replacement to test replacement'
+
+  assert rw.recipe != Recipe(m['recipe'])
+  assert rw.recipe_pointer == m['recipe-pointer']
+  assert rw.recipe_step != m['recipe'][m['recipe-pointer']]
+  assert rw.recipe_path == m['recipe-path']
+  assert rw.environment == m['environment']

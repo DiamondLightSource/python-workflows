@@ -134,6 +134,16 @@ class RecipeWrapper(object):
     self._send_to_destination(self.recipe_pointer, header, message, kwargs, \
                               add_path_step=False)
 
+  def apply_parameters(self, parameters):
+    '''Recursively apply parameter replacement (see recipe.py) to the wrapped
+       recipe, updating internal references afterwards.
+       While this operation is useful for testing it should not be used in
+       production. Replacing parameters means that the recipe changes as it is
+       passed down the chain of services. This makes debugging very difficult.
+    '''
+    self.recipe.apply_parameters(parameters)
+    self.recipe_step = self.recipe[self.recipe_pointer]
+
   def _generate_full_recipe_message(self, destination, message, add_path_step):
     '''Factory function to generate independent message objects for
        downstream recipients with different destinations.'''
