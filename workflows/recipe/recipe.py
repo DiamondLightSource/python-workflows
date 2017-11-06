@@ -82,6 +82,10 @@ class Recipe(object):
       return result
     return not result
 
+  def __hash__(self):
+    '''Recipe objects are mutable and therefore should not be hashable.'''
+    return None
+
   def validate(self):
     '''Check whether the encoded recipe is valid. It must describe a directed
        acyclical graph, all connections must be defined, etc.'''
