@@ -37,6 +37,12 @@ setup(name='workflows',
       install_requires=['enum-compat', 'stomp.py'],
       packages=find_packages(),
       license='BSD',
+      entry_points={
+        'workflows.transport': [
+          'StompTransport = workflows.transport.stomp_transport:StompTransport',
+          'QueueTransport = workflows.transport.queue_transport:QueueTransport',
+        ],
+      },
       tests_require=['mock',
                      'pytest'],
       zip_safe=False,

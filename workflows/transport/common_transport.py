@@ -1,10 +1,10 @@
-from __future__ import absolute_import, division
+from __future__ import absolute_import, division, print_function
 
 import logging
 
 import workflows
 
-class CommonTransport(workflows.add_plugin_register_to_class(object)):
+class CommonTransport():
   '''A common transport class, containing e.g. the logic to connect clients
      to message subscriptions and transactions, so that these can be cleanly
      terminated when the client goes away.'''

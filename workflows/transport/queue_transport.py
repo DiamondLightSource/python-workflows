@@ -1,7 +1,6 @@
-from __future__ import absolute_import, division
+from __future__ import absolute_import, division, print_function
 
-import workflows.transport
-from workflows import WorkflowsError
+import workflows
 from workflows.transport.common_transport import CommonTransport
 
 class QueueTransport(CommonTransport):
@@ -36,7 +35,7 @@ class QueueTransport(CommonTransport):
 
   def assert_connected(self):
     if not self._connected:
-      raise WorkflowsError('Transport not connected')
+      raise workflows.WorkflowsError('Transport not connected')
 
   def _send(self, *args, **kwargs):
     '''Forward message sending command to queue.'''
