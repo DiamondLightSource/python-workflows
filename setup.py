@@ -38,6 +38,12 @@ setup(name='workflows',
       packages=find_packages(),
       license='BSD',
       entry_points={
+        'workflows.services': [
+          'SampleConsumer = workflows.services.sample_consumer:SampleConsumer',
+          'SampleProducer = workflows.services.sample_producer:SampleProducer',
+          'SampleTxn = workflows.services.sample_transaction:SampleTxn',
+          'SampleTxnProducer = workflows.services.sample_transaction:SampleTxnProducer',
+        ],
         'workflows.transport': [
           'StompTransport = workflows.transport.stomp_transport:StompTransport',
           'QueueTransport = workflows.transport.queue_transport:QueueTransport',
