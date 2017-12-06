@@ -84,17 +84,19 @@ def test_frontend_subscribes_to_command_channel(mock_transport):
   transport.connect.assert_called_once()
   transport.subscribe.assert_not_called()
 
-  fe = workflows.frontend.Frontend(transport_command_channel=mock.sentinel.command)
-  transport.subscribe_broadcast.assert_called_once_with(mock.sentinel.command, mock.ANY)
-  callbackfn = transport.subscribe_broadcast.call_args[0][1]
+  def frontend_with_message(message):
+    transport.reset_mock()
+    fe = workflows.frontend.Frontend(transport_command_channel=mock.sentinel.command)
+    transport.subscribe_broadcast.assert_called_once_with(mock.sentinel.command, mock.ANY)
+    transport.subscribe_broadcast.call_args[0][1]({}, message)
+    return fe
 
-  assert fe.shutdown == False
-  callbackfn({}, { 'command': 'shutdown' })
-  assert fe.shutdown == False
-  callbackfn({}, { 'command': 'shutdown', 'host': fe.get_host_id() + 'x' })
-  assert fe.shutdown == False
-  callbackfn({}, { 'command': 'shutdown', 'host': fe.get_host_id() })
-  assert fe.shutdown == True
+  assert frontend_with_message({}).shutdown == False
+  assert frontend_with_message({ 'command': 'shutdown' }).shutdown == False
+  assert frontend_with_message({ 'command': 'shutdown', 'host': fe.get_host_id() }).shutdown == True
+  assert frontend_with_message({ 'command': 'shutdown', 'host': mock.sentinel.different_host }).shutdown == False
+  assert frontend_with_message({ 'command': 'shutdown', 'service': fe.get_status()['serviceclass'] }).shutdown == True
+  assert frontend_with_message({ 'command': 'shutdown', 'service': mock.sentinel.different_service }).shutdown == False
 
 @mock.patch('workflows.frontend.multiprocessing')
 @mock.patch('workflows.frontend.workflows.transport')

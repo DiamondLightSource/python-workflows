@@ -232,7 +232,17 @@ class Frontend():
 
   def process_transport_command(self, header, message):
     '''Parse a command coming in through the transport command subscription'''
-    if not isinstance(message, dict) or message.get('host') != self.__hostid:
+    if not isinstance(message, dict):
+      return
+
+    relevant = False
+    if 'host' in message: # Filter by host
+      if message['host'] != self.__hostid: return
+      relevant = True
+    if 'service' in message: # Filter by service
+      if message['service'] != self._service_class_name: return
+      relevant = True
+    if not relevant: # Ignore message unless at least one filter matches
       return
 
     if message.get('command'):
