@@ -1,4 +1,4 @@
-from __future__ import absolute_import, division
+from __future__ import absolute_import, division, print_function
 
 def load_plugins(paths):
   '''Import all python files (except test_*) in directories. This is required

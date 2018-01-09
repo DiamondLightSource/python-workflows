@@ -1,4 +1,5 @@
 from __future__ import absolute_import, division, print_function
+
 import pkg_resources
 
 default_transport = 'StompTransport'

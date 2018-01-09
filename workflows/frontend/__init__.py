@@ -1,15 +1,18 @@
-from __future__ import absolute_import, division
+from __future__ import absolute_import, division, print_function
+
 import logging
 import multiprocessing
 import threading
 import time
+
 import workflows
 import workflows.frontend.utilization
 import workflows.services
-from workflows.services.common_service import CommonService
 import workflows.transport
-from workflows.transport.queue_transport_counterpart import QueueTransportCounterpart
 import workflows.util
+from workflows.services.common_service import CommonService
+from workflows.transport.queue_transport_counterpart import \
+    QueueTransportCounterpart
 
 try: # Python3 compatibility
   basestring = basestring
