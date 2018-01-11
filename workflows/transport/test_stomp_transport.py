@@ -208,13 +208,14 @@ def test_send_message(mockstomp):
 @mock.patch('workflows.transport.stomp_transport.time')
 def test_sending_message_with_expiration(time, mockstomp):
   '''Test sending a message that expires some time in the future.'''
-  stomp = StompTransport()
-  stomp.connect()
-  mockconn = mockstomp.Connection.return_value
   system_time = 1234567.1234567
   message_lifetime = 120
   expiration_time = int((system_time + message_lifetime) * 1000)
   time.time.return_value = system_time
+
+  stomp = StompTransport()
+  stomp.connect()
+  mockconn = mockstomp.Connection.return_value
 
   stomp._send( str(mock.sentinel.channel), mock.sentinel.message,
                expiration=120 )
@@ -268,13 +269,14 @@ def test_send_broadcast(mockstomp):
 @mock.patch('workflows.transport.stomp_transport.time')
 def test_broadcasting_message_with_expiration(time, mockstomp):
   '''Test sending a message that expires some time in the future.'''
-  stomp = StompTransport()
-  stomp.connect()
-  mockconn = mockstomp.Connection.return_value
   system_time = 1234567.1234567
   message_lifetime = 120
   expiration_time = int((system_time + message_lifetime) * 1000)
   time.time.return_value = system_time
+
+  stomp = StompTransport()
+  stomp.connect()
+  mockconn = mockstomp.Connection.return_value
 
   stomp._broadcast( str(mock.sentinel.channel), mock.sentinel.message,
                     expiration=120 )
