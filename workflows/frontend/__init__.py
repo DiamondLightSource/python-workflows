@@ -340,13 +340,18 @@ class Frontend():
       if not self._service_factory:
         return False
 
-      # Set up pipes and connect new service object
+      # Set up new service object
+      service_instance = self._service_factory(
+        environment=self._service_environment,
+      )
+
+      # Set up pipes and connect service object
       svc_commands, self._pipe_commands = multiprocessing.Pipe(False)
       self._pipe_service, svc_tofrontend = multiprocessing.Pipe(False)
-      service_instance = self._service_factory(
+      service_instance.connect(
         commands=svc_commands,
         frontend=svc_tofrontend,
-        environment=self._service_environment)
+      )
 
       # Clean out transport layer for new service
       if self._service_transportid:

@@ -122,6 +122,12 @@ class CommonService(workflows.add_plugin_register_to_class(object)):
        available to the service during runtime.'''
     self.__pipe_frontend = kwargs.get('frontend')
     self.__pipe_commands = kwargs.get('commands')
+    if kwargs.get('frontend'):
+      import warnings
+      warnings.warn(DeprecationWarning("use .connect(frontend=) to connect pipes rather than constructor arguments"))
+    if kwargs.get('commands'):
+      import warnings
+      warnings.warn(DeprecationWarning("use .connect(commands=) to connect pipes rather than constructor arguments"))
     self._environment = kwargs.get('environment', {})
     self._transport = workflows.transport.queue_transport.QueueTransport()
     self._transport.set_send_function(self.__send_to_frontend)
@@ -141,6 +147,18 @@ class CommonService(workflows.add_plugin_register_to_class(object)):
     '''Put a message in the pipe for the frontend.'''
     if self.__pipe_frontend:
       self.__pipe_frontend.send(data_structure)
+
+  def connect(self, frontend=None, commands=None):
+    '''Inject pipes connecting the service to the frontend. Two arguments are
+       supported: frontend= for messages from the service to the frontend,
+       and commands= for messages from the frontend to the service.
+       The injection should happen before the service is started, otherwise the
+       underlying file descriptor references may not be handled correctly.'''
+    if frontend:
+      self.__pipe_frontend = frontend
+      self.__send_service_status_to_frontend()
+    if commands:
+      self.__pipe_commands = commands
 
   @contextlib.contextmanager
   def extend_log(self, field, value):
@@ -178,10 +196,14 @@ class CommonService(workflows.add_plugin_register_to_class(object)):
     '''Set the internal status of the service object, and notify frontend.'''
     if self.__service_status != statuscode:
       self.__service_status = statuscode
-      self.__send_to_frontend({
-        'band': 'status_update',
-        'statuscode': self.__service_status
-      })
+      self.__send_service_status_to_frontend()
+
+  def __send_service_status_to_frontend(self):
+    '''Actually send the internal status of the service object to the frontend.'''
+    self.__send_to_frontend({
+      'band': 'status_update',
+      'statuscode': self.__service_status
+    })
 
   def get_name(self):
     '''Get the name for this service.'''

@@ -3,6 +3,7 @@ from __future__ import absolute_import, division, print_function
 from multiprocessing import Pipe
 
 import mock
+import pytest
 from workflows.services.common_service import Commands, CommonService
 
 def test_instantiate_basic_service():
@@ -14,7 +15,10 @@ def test_instantiate_basic_service():
 def test_logging_to_frontend():
   '''Log messages should be passed to frontend'''
   fe_pipe = mock.Mock()
-  service = CommonService(frontend=fe_pipe)
+  service = CommonService()
+
+  # Connect service instance to pipe
+  service.connect(frontend=fe_pipe)
 
   # Start service to initialize logging
   service.start()
@@ -32,7 +36,8 @@ def test_adding_fieldvalue_pairs_to_log_messages():
   '''Add a custom field to all outgoing log messages using the extend_log mechanism.'''
   fe_pipe = mock.Mock()
   logmsg = 'Test message for extension'
-  service = CommonService(frontend=fe_pipe)
+  service = CommonService()
+  service.connect(frontend=fe_pipe)
   service.start()
 
   fe_pipe.send.reset_mock()
@@ -73,7 +78,8 @@ def test_log_message_fieldvalue_pairs_are_removed_outside_their_context():
   '''Custom fields added to outgoing log messages don't live on outside their extend_log context.'''
   fe_pipe = mock.Mock()
   logmsg = 'Test message for extension'
-  service = CommonService(frontend=fe_pipe)
+  service = CommonService()
+  service.connect(frontend=fe_pipe)
   service.start()
 
   fe_pipe.send.reset_mock()
@@ -111,7 +117,8 @@ def test_log_message_fieldvalue_pairs_are_attached_to_unhandled_exceptions_and_l
      but they are also attached to the exception object, as they may contain valuable information for debugging.'''
   fe_pipe = mock.Mock()
   logmsg = 'Test message for extension'
-  service = CommonService(frontend=fe_pipe)
+  service = CommonService()
+  service.connect(frontend=fe_pipe)
   service.start()
 
   try:
@@ -145,8 +152,8 @@ def test_receive_and_follow_shutdown_command():
   fe_pipe, fe_pipe_out = Pipe()
 
   # Create service
-  service = CommonService(
-      commands=cmd_pipe, frontend=fe_pipe)
+  service = CommonService()
+  service.connect(commands=cmd_pipe, frontend=fe_pipe)
   # override class API to ensure overidden functions are called
   service.initializing = mock.Mock()
   service.in_shutdown = mock.Mock()
@@ -191,7 +198,8 @@ def test_idle_timer_is_triggered():
   idle_trigger = mock.Mock()
 
   # Create service
-  service = CommonService(commands=cmd_pipe, frontend=fe_pipe)
+  service = CommonService()
+  service.connect(commands=cmd_pipe, frontend=fe_pipe)
   service._register_idle(10, idle_trigger)
 
   # Start service
@@ -234,7 +242,8 @@ def test_callbacks_are_routed_correctly():
   callback = mock.Mock()
 
   # Create service
-  service = CommonService(commands=cmd_pipe, frontend=fe_pipe)
+  service = CommonService()
+  service.connect(commands=cmd_pipe, frontend=fe_pipe)
   service._register(mock.sentinel.band, callback)
 
   # Start service
@@ -256,7 +265,41 @@ def test_log_unknown_band_data():
   fe_pipe, fe_pipe_out = Pipe()
 
   # Create service
-  service = CommonService(commands=cmd_pipe, frontend=fe_pipe)
+  service = CommonService()
+  service.connect(commands=cmd_pipe, frontend=fe_pipe)
+
+  # Start service
+  service.start()
+
+  # Check startup/shutdown sequence
+  messages = []
+  while fe_pipe_out.poll():
+    message = fe_pipe_out.recv()
+    if message.get('band') == 'log':
+      messages.append(message.get('payload'))
+  assert len(messages) == 2
+  assert messages[0].name == 'workflows.service'
+  assert 'unregistered band' in messages[0].message
+  assert str(mock.sentinel.band) in messages[0].message
+  assert messages[1].name == 'workflows.service'
+  assert 'without band' in messages[1].message
+
+def test_log_unknown_band_data_using_legacy_initialization():
+  '''Same as above, but using old initialization,
+     passing the pipes directly to the constructor'''
+  cmd_pipe = mock.Mock()
+  cmd_pipe.poll.return_value = True
+  cmd_pipe.recv.side_effect = [
+    { 'band': mock.sentinel.band, 'payload': mock.sentinel.failure1 },
+    { 'payload': mock.sentinel.failure2 },
+    { 'band': 'command',
+      'payload': Commands.SHUTDOWN },
+    AssertionError('Not observing commands') ]
+  fe_pipe, fe_pipe_out = Pipe()
+
+  # Create service
+  with pytest.deprecated_call():
+    service = CommonService(commands=cmd_pipe, frontend=fe_pipe)
 
   # Start service
   service.start()
@@ -289,7 +332,8 @@ def test_service_initialization_crashes_are_handled_correctly():
       '''Crash.'''
       assert False, 'This crash needs to be handled'
 
-  service = CrashOnInitService(frontend=fe_pipe)
+  service = CrashOnInitService()
+  service.connect(frontend=fe_pipe)
   service.start()
 
   fe_pipe.send.assert_called()
@@ -318,7 +362,8 @@ def test_service_can_change_name_and_shut_itself_down():
       '''Change name.'''
       self._set_name(mock.sentinel.newname)
       self._shutdown()
-  service = NameChangingService(frontend=fe_pipe)
+  service = NameChangingService()
+  service.connect(frontend=fe_pipe)
   service.start()
 
   # Check for service name update
@@ -340,10 +385,12 @@ def test_can_pass_environment_to_service():
       return self._environment
 
   # Initialization without enviroment should still result in an available dictionary
-  service = EnvironmentPassingService(frontend=fe_pipe)
+  service = EnvironmentPassingService()
+  service.connect(frontend=fe_pipe)
   assert service.get_environment().get("non-existing-key-for-environment-passing-test") is None
 
   # Check that passed environment is available
   sample_environment = { 'environment': mock.sentinel.environment }
-  service = EnvironmentPassingService(frontend=fe_pipe, environment=sample_environment)
+  service = EnvironmentPassingService(environment=sample_environment)
+  service.connect(frontend=fe_pipe)
   assert service.get_environment().get('environment') == mock.sentinel.environment
