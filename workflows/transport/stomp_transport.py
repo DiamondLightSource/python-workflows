@@ -247,7 +247,8 @@ class StompTransport(CommonTransport):
     self._conn.unsubscribe(id=subscription)
     # Callback reference is kept as further messages may already have been received
 
-  def _send(self, destination, message, headers=None, delay=None, **kwargs):
+  def _send(self, destination, message, headers=None, delay=None,
+            expiration=None, **kwargs):
     '''Send a message to a queue.
        :param destination: Queue name to send to
        :param message: A string to be sent
@@ -269,6 +270,8 @@ class StompTransport(CommonTransport):
       # The 'delay' mechanism is only supported when
       # schedulerSupport is enabled on the broker.
       headers['AMQ_SCHEDULED_DELAY'] = 1000 * delay
+    if expiration:
+      headers['expires'] = int((time.time() + expiration) * 1000)
     if kwargs.get('ignore_namespace'):
       destination = '/queue/' + destination
     else:
@@ -282,7 +285,8 @@ class StompTransport(CommonTransport):
         self._connected = False
         raise DisconnectedError('No connection to stomp host')
 
-  def _broadcast(self, destination, message, headers=None, delay=None, **kwargs):
+  def _broadcast(self, destination, message, headers=None, delay=None,
+                 expiration=None, **kwargs):
     '''Broadcast a message.
        :param destination: Topic name to send to
        :param message: A string to be broadcast
@@ -298,6 +302,8 @@ class StompTransport(CommonTransport):
       headers = {}
     if delay:
       headers['AMQ_SCHEDULED_DELAY'] = 1000 * delay
+    if expiration:
+      headers['expires'] = int((time.time() + expiration) * 1000)
     if kwargs.get('ignore_namespace'):
       destination = '/topic/' + destination
     else:

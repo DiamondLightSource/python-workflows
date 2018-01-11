@@ -205,6 +205,26 @@ def test_send_message(mockstomp):
                                   'AMQ_SCHEDULED_DELAY': 123000 } }
 
 @mock.patch('workflows.transport.stomp_transport.stomp')
+@mock.patch('workflows.transport.stomp_transport.time')
+def test_sending_message_with_expiration(time, mockstomp):
+  '''Test sending a message that expires some time in the future.'''
+  stomp = StompTransport()
+  stomp.connect()
+  mockconn = mockstomp.Connection.return_value
+  system_time = 1234567.1234567
+  message_lifetime = 120
+  expiration_time = int((system_time + message_lifetime) * 1000)
+  time.time.return_value = system_time
+
+  stomp._send( str(mock.sentinel.channel), mock.sentinel.message,
+               expiration=120 )
+
+  mockconn.send.assert_called_once()
+  args, kwargs = mockconn.send.call_args
+  assert args == ('/queue/' + str(mock.sentinel.channel), mock.sentinel.message)
+  assert kwargs.get('headers') == { 'persistent': 'true', 'expires': expiration_time }
+
+@mock.patch('workflows.transport.stomp_transport.stomp')
 def test_error_handling_on_send(mockstomp):
   '''Unrecoverable errors during sending should mark the connection as disconnected.'''
   stomp = StompTransport()
@@ -242,6 +262,28 @@ def test_send_broadcast(mockstomp):
   args, kwargs = mockconn.send.call_args
   assert args == ('/topic/' + str(mock.sentinel.channel), mock.sentinel.message)
   assert kwargs['headers'].get('AMQ_SCHEDULED_DELAY') == 123000
+
+
+@mock.patch('workflows.transport.stomp_transport.stomp')
+@mock.patch('workflows.transport.stomp_transport.time')
+def test_broadcasting_message_with_expiration(time, mockstomp):
+  '''Test sending a message that expires some time in the future.'''
+  stomp = StompTransport()
+  stomp.connect()
+  mockconn = mockstomp.Connection.return_value
+  system_time = 1234567.1234567
+  message_lifetime = 120
+  expiration_time = int((system_time + message_lifetime) * 1000)
+  time.time.return_value = system_time
+
+  stomp._broadcast( str(mock.sentinel.channel), mock.sentinel.message,
+                    expiration=120 )
+
+  mockconn.send.assert_called_once()
+  args, kwargs = mockconn.send.call_args
+  assert args == ('/topic/' + str(mock.sentinel.channel), mock.sentinel.message)
+  assert kwargs.get('headers') == { 'expires': expiration_time }
+
 
 @mock.patch('workflows.transport.stomp_transport.stomp')
 def test_error_handling_on_broadcast(mockstomp):
