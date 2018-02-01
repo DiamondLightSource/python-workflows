@@ -231,7 +231,11 @@ class Frontend():
     if self._pipe_commands:
       self._pipe_commands.send(command)
     else:
-      self.log.error('No command queue pipe found for command\n%s', str(command))
+      if self.shutdown:
+        # Stop delivering messages in shutdown.
+        self.log.info('During shutdown no command queue pipe found for command\n%s', str(command))
+      else:
+        self.log.error('No command queue pipe found for command\n%s', str(command))
 
   def process_transport_command(self, header, message):
     '''Parse a command coming in through the transport command subscription'''
