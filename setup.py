@@ -34,7 +34,10 @@ setup(name='workflows',
       author_email='scientificsoftware@diamond.ac.uk',
       download_url="https://github.com/DiamondLightSource/python-workflows/releases",
       version=find_version('workflows', '__init__.py'),
-      install_requires=['enum-compat', 'stomp.py'],
+      install_requires=[
+          'enum-compat',
+          'stomp.py==4.1.18',
+      ],
       packages=find_packages(),
       license='BSD',
       entry_points={
