@@ -4,7 +4,7 @@ import logging
 
 import workflows
 
-class CommonTransport():
+class CommonTransport(object):
   '''A common transport class, containing e.g. the logic to connect clients
      to message subscriptions and transactions, so that these can be cleanly
      terminated when the client goes away.'''

@@ -52,7 +52,7 @@ class Status(enum.Enum):
     self.intval = intval
     self.description = description
 
-class CommonService(workflows.add_plugin_register_to_class(object)):
+class CommonService(object):
   '''
   Base class for workflow services. A service is a piece of software that runs
   in an isolated environment, communicating only via pipes with the outside

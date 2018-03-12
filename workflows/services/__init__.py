@@ -1,8 +1,6 @@
 from __future__ import absolute_import, division, print_function
 
 import pkg_resources
-import workflows
-from workflows.services.common_service import CommonService
 
 def lookup(service):
   '''Find a service class based on a name.
@@ -26,8 +24,5 @@ def get_known_services():
       e.name: e.load()
       for e in pkg_resources.iter_entry_points('workflows.services')
     })
-  register = CommonService.plugin_register
-  register.update(get_known_services.cache)
+  register = get_known_services.cache.copy()
   return register
-
-workflows.load_plugins(__path__)
