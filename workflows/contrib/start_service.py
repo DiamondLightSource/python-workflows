@@ -25,9 +25,14 @@ class ServiceStarter(object):
        '''
 
   @staticmethod
+  def on_transport_factory_preparation(transport_factory):
+    '''Plugin hook to intercept/manipulate newly created Transport factories
+       before first invocation.'''
+
+  @staticmethod
   def on_transport_preparation(transport):
-    '''Plugin hook to intercept/manipulate the Transport object before passing
-       it to the Frontend object.'''
+    '''Plugin hook to intercept/manipulate newly created Transport objects
+       before connecting.'''
 
   @staticmethod
   def before_frontend_construction(kwargs):
@@ -76,11 +81,18 @@ class ServiceStarter(object):
     # Call on_parsing hook
     (options, args) = self.on_parsing(options, args) or (options, args)
 
-    # Create Transport object
-    transport = workflows.transport.lookup(options.transport)()
+    # Create Transport factory
+    transport_factory = workflows.transport.lookup(options.transport)
 
-    # Call on_transport_preparation hook
-    transport = self.on_transport_preparation(transport) or transport
+    # Call on_transport_factory_preparation hook
+    transport_factory = self.on_transport_factory_preparation(transport_factory) or transport_factory
+
+    # Set up on_transport_preparation hook to affect newly created transport objects
+    true_transport_factory_call = transport_factory.__call__
+    def on_transport_preparation_hook():
+      transport_object = true_transport_factory_call()
+      return self.on_transport_preparation(transport_object) or transport_object
+    transport_factory.__call__ = on_transport_preparation_hook
 
     # When service name is specified, check if service exists or can be derived
     if options.service and options.service not in known_services:
@@ -92,7 +104,7 @@ class ServiceStarter(object):
         options.service = matching[0]
 
     kwargs.update({ 'service': options.service,
-                    'transport': transport })
+                    'transport': transport_factory })
 
     # Call before_frontend_construction hook
     kwargs = self.before_frontend_construction(kwargs) or kwargs

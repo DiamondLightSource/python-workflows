@@ -298,8 +298,8 @@ def test_log_unknown_band_data_using_legacy_initialization():
   fe_pipe, fe_pipe_out = Pipe()
 
   # Create service
-  with pytest.deprecated_call():
-    service = CommonService(commands=cmd_pipe, frontend=fe_pipe)
+  service = CommonService()
+  service.connect(commands=cmd_pipe, frontend=fe_pipe)
 
   # Start service
   service.start()
@@ -394,3 +394,35 @@ def test_can_pass_environment_to_service():
   service = EnvironmentPassingService(environment=sample_environment)
   service.connect(frontend=fe_pipe)
   assert service.get_environment().get('environment') == mock.sentinel.environment
+
+def test_transport_object_can_be_injected():
+  '''Transport object must be stored, but not connected immediately.'''
+  service = CommonService()
+
+  transport = mock.Mock()
+  service.transport = transport
+
+  assert service.transport == transport
+  transport.connect.assert_not_called()
+
+def test_transport_object_can_not_be_overwritten():
+  '''Transport object must be stored, but not connected immediately.'''
+  service = CommonService()
+
+  transport1 = mock.Mock()
+  transport2 = mock.Mock()
+  service.transport = transport1
+  with pytest.raises(AttributeError):
+    service.transport = transport2
+
+  assert service.transport == transport1
+
+def test_transport_connection_is_started_on_initialization():
+  '''Transport object must be stored, but not connected immediately.'''
+  service = CommonService()
+  transport = mock.Mock()
+  service.transport = transport
+
+  service.start()
+
+  transport.connect.assert_called_once_with()

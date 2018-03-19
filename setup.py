@@ -49,7 +49,6 @@ setup(name='workflows',
         ],
         'workflows.transport': [
           'StompTransport = workflows.transport.stomp_transport:StompTransport',
-          'QueueTransport = workflows.transport.queue_transport:QueueTransport',
         ],
       },
       tests_require=['mock',

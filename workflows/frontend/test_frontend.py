@@ -133,56 +133,6 @@ def test_get_frontend_status(mock_transport):
   status = fe.get_status()
   assert status['host'] == fe.get_host_id()
 
-def test_connect_queue_communication_to_transport_layer():
-  '''Check that communication messages coming in from the service layer are
-     passed correctly to the transport layer and vice versa in the other
-     direction.'''
-  transport = mock.Mock()
-  commqueue = mock.Mock()
-
-  fe = workflows.frontend.Frontend(transport=transport)
-  setattr(fe, '_pipe_commands', commqueue)
-
-  transport.assert_called_once()
-  transport = transport.return_value
-  transport.connect.assert_called_once()
-  client_id = transport.register_client.return_value
-
-  fe.parse_band_transport( {
-      'call': 'send',
-      'payload': (
-        ( mock.sentinel.channel, mock.sentinel.message ),
-        {}
-      )
-    } )
-  transport.send.assert_called_once_with(mock.sentinel.channel,
-                                         mock.sentinel.message)
-
-  fe.parse_band_transport( {
-      'call': 'subscribe',
-      'payload': (
-        ( mock.sentinel.subid, mock.sentinel.channel, mock.sentinel.something ),
-        { 'kwarg': mock.sentinel.kwarg }
-      )
-    } )
-  transport.subscribe.assert_called_once_with(
-    mock.sentinel.channel,
-    mock.ANY,
-    mock.sentinel.something, kwarg=mock.sentinel.kwarg,
-    client_id=client_id
-    )
-  callback_function = transport.subscribe.call_args[0][1]
-
-  callback_function({'header': mock.sentinel.header}, mock.sentinel.message)
-  commqueue.send.assert_called_once_with( {
-      'band': 'transport_message',
-      'payload': {
-          'subscription_id': mock.sentinel.subid,
-          'header': {'header': mock.sentinel.header, 'subscription': mock.sentinel.subid},
-          'message': mock.sentinel.message,
-        }
-    } )
-
 @pytest.mark.timeout(3)
 def test_frontend_can_handle_unhandled_service_initialization_exceptions():
   '''When a service crashes on initialization an exception should be thrown.'''
@@ -409,8 +359,14 @@ def test_frontend_does_not_restart_nonrestartable_service_on_error(mock_mp):
 @mock.patch('workflows.frontend.multiprocessing')
 def test_frontend_does_restart_restartable_service_on_segfault(mock_mp):
   '''When the frontend is constructed with restart_service=True failing services must be restarted.'''
-  transport = mock.Mock()
-  transport.return_value.register_client.side_effect = [ 1, 2, 3, None ]
+  transport_factory = mock.Mock()
+  transport1 = mock.Mock()
+  transport2 = mock.Mock()
+  transport3 = mock.Mock()
+  transport1.return_value.connect.return_value = True
+  transport2.return_value.connect.return_value = True
+  transport3.return_value.connect.return_value = True
+  transport_factory.side_effect = [ transport1, transport2, transport3, None ]
   service_factory = mock.Mock()
   service_process = mock.Mock()
   dummy_pipe = mock.Mock()
@@ -423,22 +379,21 @@ def test_frontend_does_restart_restartable_service_on_segfault(mock_mp):
   service_instances = [ mock.Mock(), mock.Mock() ]
   service_factory.side_effect = service_instances + [ sentinel_exception ]
 
-  fe = workflows.frontend.Frontend(transport=transport, service=service_factory, restart_service=True)
-  try:
+  fe = workflows.frontend.Frontend(transport=transport_factory, service=service_factory, restart_service=True)
+  with pytest.raises(Exception) as e:
     fe.run()
-    assert False, "Exception should have been raised"
-  except Exception as e:
-    if e != sentinel_exception:
-      raise
+  assert e.value == sentinel_exception
 
   assert service_factory.call_count == 3
   assert service_process.start.call_count == 2
   assert service_process.join.call_count == 2
   mock_mp.Process.assert_has_calls( [ mock.call(args=(), kwargs=mock.ANY, target=service_instances[0].start),
                                       mock.call(args=(), kwargs=mock.ANY, target=service_instances[1].start) ], any_order=True )
-  transport = transport.return_value
-  assert transport.register_client.call_count == 3
-  transport.drop_client.assert_has_calls( [ mock.call(1), mock.call(2), mock.call(3) ] )
+  assert service_instances[0].transport == transport2
+  assert service_instances[1].transport == transport3
+  assert transport1.connect.call_count == 1
+  assert transport2.connect.call_count == 0
+  assert transport3.connect.call_count == 0
 
 @mock.patch('workflows.frontend.multiprocessing')
 def test_frontend_does_restart_restartable_service_on_error(mock_mp):

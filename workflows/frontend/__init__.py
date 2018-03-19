@@ -11,8 +11,6 @@ import workflows.services
 import workflows.transport
 import workflows.util
 from workflows.services.common_service import CommonService
-from workflows.transport.queue_transport_counterpart import \
-    QueueTransportCounterpart
 
 try: # Python3 compatibility
   basestring = basestring
@@ -55,7 +53,6 @@ class Frontend():
     self._service_class_name = None
     self._service_factory = None # pointer to the service class
     self._service_name = None
-    self._service_transportid = None
     self._service_starttime = None
     self._service_rapidstarts = None
     self._pipe_commands = None # frontend -> service
@@ -98,15 +95,12 @@ class Frontend():
 
     # Connect to the network transport layer
     if transport is None or isinstance(transport, basestring):
-      self._transport = workflows.transport.lookup(transport)()
-    elif hasattr(transport, '__call__'):
-      self._transport = transport()
+      self._transport_factory = workflows.transport.lookup(transport)
     else:
-      self._transport = transport
+      self._transport_factory = transport
+    assert hasattr(self._transport_factory, '__call__'), "No valid transport factory given"
+    self._transport = self._transport_factory()
     assert self._transport.connect(), "Could not connect to transport layer"
-    self._service_transportid = self._transport.register_client()
-    self._qtc = QueueTransportCounterpart(transport=self._transport,
-                                          send_to_queue=self.send_command)
 
     if transport_command_channel:
       self._transport.subscribe_broadcast(transport_command_channel,
@@ -357,10 +351,8 @@ class Frontend():
         frontend=svc_tofrontend,
       )
 
-      # Clean out transport layer for new service
-      if self._service_transportid:
-        self._transport.drop_client(self._service_transportid)
-      self._service_transportid = self._transport.register_client()
+      # Set up transport layer for new service
+      service_instance.transport = self._transport_factory()
 
       # Start new service in a separate process
       self._service = multiprocessing.Process(
@@ -398,18 +390,6 @@ class Frontend():
       self._service_name = None
       if self._service_status != CommonService.SERVICE_STATUS_TEARDOWN:
         self.update_status(status_code=CommonService.SERVICE_STATUS_END)
-      if self._service_transportid:
-        self._transport.drop_client(self._service_transportid)
-      self._service_transportid = None
       if self._service:
         self._service.join() # must wait for process to be actually destroyed
       self._service = None
-
-  def parse_band_transport(self, message):
-    '''Treat messages sent from service via queue. These were encoded by
-       transport.queue_transport on the other end. Decode them via a
-       QueueTransportCounterpart and process them using the real transport
-       object.
-       param: message: The full queue message data structure.
-    '''
-    return self._qtc.handle(message, client_id=self._service_transportid)

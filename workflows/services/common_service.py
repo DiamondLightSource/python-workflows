@@ -6,7 +6,6 @@ import logging
 
 import workflows
 import workflows.logging
-from workflows.transport.queue_transport import QueueTransport
 
 class Status(enum.Enum):
   '''
@@ -120,18 +119,10 @@ class CommonService(object):
        and commands= for messages from the frontend to the service.
        A dictionary can optionally be passed with environment=, which is then
        available to the service during runtime.'''
-    self.__pipe_frontend = kwargs.get('frontend')
-    self.__pipe_commands = kwargs.get('commands')
-    if kwargs.get('frontend'):
-      import warnings
-      warnings.warn(DeprecationWarning("use .connect(frontend=) to connect pipes rather than constructor arguments"))
-    if kwargs.get('commands'):
-      import warnings
-      warnings.warn(DeprecationWarning("use .connect(commands=) to connect pipes rather than constructor arguments"))
+    self.__pipe_frontend = None
+    self.__pipe_commands = None
     self._environment = kwargs.get('environment', {})
-    self._transport = workflows.transport.queue_transport.QueueTransport()
-    self._transport.set_send_function(self.__send_to_frontend)
-    self._transport.connect()
+    self._transport = None
     self.__callback_register = {}
     self.__log_extensions = []
     self.__service_status = None
@@ -147,6 +138,26 @@ class CommonService(object):
     '''Put a message in the pipe for the frontend.'''
     if self.__pipe_frontend:
       self.__pipe_frontend.send(data_structure)
+
+  @property
+  def transport(self):
+    return self._transport
+
+  @transport.setter
+  def transport(self, value):
+    if self._transport:
+      raise AttributeError("Transport already defined")
+    self._transport = value
+
+  def start_transport(self):
+    '''If a transport object has been defined then connect it now.'''
+    if self.transport:
+      if self.transport.connect():
+        self.log.debug('Service successfully connected to transport layer')
+      else:
+        raise RuntimeError('Service could not connect to transport layer')
+    else:
+      self.log.debug('No transport layer defined for service. Skipping.')
 
   def connect(self, frontend=None, commands=None):
     '''Inject pipes connecting the service to the frontend. Two arguments are
@@ -240,6 +251,7 @@ class CommonService(object):
     # Set up the service logger and pass all info (and higher) level messages
     # (or other level if set differently)
     self.log = logging.getLogger(self._logger_name)
+
     if self.start_kwargs.get('verbose_log'):
       self.log_verbosity = logging.DEBUG
     self.log.setLevel(self.log_verbosity)
@@ -262,9 +274,10 @@ class CommonService(object):
 
       self.__update_service_status(self.SERVICE_STATUS_STARTING)
 
+      self.start_transport()
+
       self.initializing()
       self._register('command', self.__process_command)
-      self._register('transport_message', self.__process_transport)
 
       if self.__pipe_commands is None:
         # can only listen to commands if command queue is defined
@@ -337,11 +350,6 @@ class CommonService(object):
     '''Process an incoming command message from the frontend.'''
     if command == Commands.SHUTDOWN:
       self.__shutdown = True
-
-  def __process_transport(self, message):
-    '''Process an incoming transport message from the frontend.'''
-    self._transport.subscription_callback(message['subscription_id']) \
-      ( message['header'], message['message'] )
 
 class Commands():
   '''A list of command strings used for communicating with the frontend.'''
