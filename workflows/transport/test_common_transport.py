@@ -130,65 +130,6 @@ def test_simple_broadcast_message():
 
   ct._broadcast.assert_called_with(mock.sentinel.destination, mock.sentinel.message)
 
-def test_register_and_drop_clients():
-  "Register clients, should get unique IDs, unregister clients."
-  ct = CommonTransport()
-
-  client = ct.register_client()
-  assert client
-
-  client2 = ct.register_client()
-  assert client2
-  assert client2 != client
-
-  ct.drop_client(client)
-  ct.drop_client(client2)
-
-def test_dropping_an_unregistered_client_should_fail():
-  "Get error when unregistering unregistered client."
-  ct = CommonTransport()
-
-  with pytest.raises(workflows.WorkflowsError):
-    ct.drop_client(mock.sentinel.unregistered_client)
-
-def test_dropping_subscriptions_when_dropping_client():
-  "Subscriptions associated with a client should be cancelled when client is dropped."
-  ct = CommonTransport()
-  ct._subscribe = mock.Mock()
-  ct._unsubscribe = mock.Mock()
-
-  client = ct.register_client()
-  subid = ct.subscribe(mock.sentinel.channel, mock.sentinel.callback, client_id=client)
-  ct.drop_client(client)
-
-  ct._unsubscribe.assert_called_with(subid)
-  with pytest.raises(workflows.WorkflowsError):
-    ct.subscription_callback(subid)
-  with pytest.raises(workflows.WorkflowsError):
-    ct.unsubscribe(subid)
-
-  client = ct.register_client()
-  subid = ct.subscribe(mock.sentinel.channel, mock.sentinel.callback, client_id=client)
-  subid2 = ct.subscribe(mock.sentinel.channel2, mock.sentinel.callback2, client_id=client)
-  assert ct.subscription_callback(subid) == mock.sentinel.callback
-  assert ct.subscription_callback(subid2) == mock.sentinel.callback2
-  ct.unsubscribe(subid2) # reference to callback is kept here
-  ct.drop_client(client)
-
-  assert ct._unsubscribe.call_count == 3
-
-  # Callbacks should be dropped automatically
-  with pytest.raises(workflows.WorkflowsError):
-    ct.subscription_callback(subid)
-  with pytest.raises(workflows.WorkflowsError):
-    ct.subscription_callback(subid2)
-
-  # Subsequent unsubscribes should fail
-  with pytest.raises(workflows.WorkflowsError):
-    ct.unsubscribe(subid)
-  with pytest.raises(workflows.WorkflowsError):
-    ct.unsubscribe(subid2)
-
 def test_create_and_destroy_transactions():
   "Create, commit and abort transactions."
   ct = CommonTransport()
@@ -213,42 +154,6 @@ def test_create_and_destroy_transactions():
   with pytest.raises(workflows.WorkflowsError):
     ct.transaction_abort(t2)
   ct._transaction_commit.assert_called_once_with(t2)
-
-def test_dropping_transactions_when_dropping_client():
-  '''Transactions associated with a client should be aborted when client is dropped.'''
-  ct = CommonTransport()
-  ct._transaction_begin = mock.Mock()
-  ct._transaction_commit = mock.Mock()
-  ct._transaction_abort = mock.Mock()
-
-  client = ct.register_client()
-  t = ct.transaction_begin(client_id=client)
-  ct.drop_client(client)
-  ct._transaction_abort.assert_called_once_with(t)
-  with pytest.raises(workflows.WorkflowsError):
-    ct.transaction_abort(t)
-  with pytest.raises(workflows.WorkflowsError):
-    ct.transaction_commit(t)
-
-  client = ct.register_client()
-  t = ct.transaction_begin(client_id=client)
-  ct.transaction_commit(t)
-  ct.drop_client(client)
-  ct._transaction_abort.assert_called_once
-  with pytest.raises(workflows.WorkflowsError):
-    ct.transaction_abort(t)
-  with pytest.raises(workflows.WorkflowsError):
-    ct.transaction_commit(t)
-
-  client = ct.register_client()
-  t = ct.transaction_begin(client_id=client)
-  ct.transaction_abort(t)
-  ct.drop_client(client)
-  assert ct._transaction_abort.call_count == 2
-  with pytest.raises(workflows.WorkflowsError):
-    ct.transaction_abort(t)
-  with pytest.raises(workflows.WorkflowsError):
-    ct.transaction_commit(t)
 
 def test_messages_can_be_acknowledged_and_rejected():
   '''Check that ack() and nack() calls are passed to implementations.'''
@@ -286,14 +191,6 @@ def test_messages_can_be_acknowledged_and_rejected():
     ct.nack({'message-id': mock.sentinel.crash})
   with pytest.raises(workflows.WorkflowsError):
     ct.nack({'message-id': None, 'subscription': mock.sentinel.crash})
-
-def mock_transport_factory_with_client():
-  '''Set up a CommonTransport with mocked internals and one connected client.'''
-  ct = CommonTransport()
-  ct._ack, ct._nack, ct._transaction_begin, ct._transaction_abort, ct._transaction_commit, ct._subscribe, ct._subscribe_broadcast, ct._unsubscribe = \
-    mock.Mock(), mock.Mock(), mock.Mock(), mock.Mock(), mock.Mock(), mock.Mock(), mock.Mock(), mock.Mock()
-  client = ct.register_client()
-  return ct, client
 
 def test_unimplemented_communication_methods_should_fail():
   '''Check that low-level communication calls raise WorkflowsError when not

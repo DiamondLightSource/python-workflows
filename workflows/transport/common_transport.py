@@ -5,15 +5,12 @@ import logging
 import workflows
 
 class CommonTransport(object):
-  '''A common transport class, containing e.g. the logic to connect clients
-     to message subscriptions and transactions, so that these can be cleanly
-     terminated when the client goes away.'''
+  '''A common transport class, containing e.g. the logic to manage
+     subscriptions and transactions.'''
 
-  __clients = {}
-  __client_id = 0
   __subscriptions = {}
   __subscription_id = 0
-  __transactions = {}
+  __transactions = set()
   __transaction_id = 0
 
   log = logging.getLogger('workflows.transport')
@@ -48,9 +45,6 @@ class CommonTransport(object):
                         The callback will pass two arguments, the header as a
                         dictionary structure, and the message.
        :param **kwargs: Further parameters for the transport layer. For example
-              client_id: Value tying a subscription to one client. This allows
-                         removing all subscriptions for a client simultaneously
-                         when the client goes away.
               disable_mangling: Receive messages as unprocessed strings.
               exclusive: Attempt to become exclusive subscriber to the queue.
               acknowledgement: If true receipt of each message needs to be
@@ -60,17 +54,12 @@ class CommonTransport(object):
     self.__subscription_id += 1
     self.__subscriptions[self.__subscription_id] = {
       'channel': channel,
-      'client': kwargs.get('client_id'),
       'callback': callback,
       'ack': kwargs.get('acknowledgement'),
       'unsubscribed': False,
     }
-    self.log.debug('Subscribing to %s for client %s with ID %d',
-        channel, kwargs.get('client_id'), self.__subscription_id)
-    if 'client_id' in kwargs:
-      self.__clients[kwargs['client_id']]['subscriptions'].add \
-        (self.__subscription_id)
-      del kwargs['client_id']
+    self.log.debug('Subscribing to %s with ID %d',
+        channel, self.__subscription_id)
     if kwargs.get('disable_mangling'):
       self._subscribe(self.__subscription_id, channel, callback, **kwargs)
     else:
@@ -113,9 +102,6 @@ class CommonTransport(object):
     if not self.__subscriptions[subscription]['unsubscribed']:
       raise workflows.WorkflowsError \
             ("Attempting to drop callback reference for live subscription")
-    if self.__subscriptions[subscription]['client']:
-      self.__clients[self.__subscriptions[subscription]['client']] \
-        ['subscriptions'].remove(subscription)
     del self.__subscriptions[subscription]
 
   def subscribe_broadcast(self, channel, callback, **kwargs):
@@ -124,9 +110,6 @@ class CommonTransport(object):
        :param callback: Function to be called when messages are received.
                         The callback will pass two arguments, the header as a
                         dictionary structure, and the message.
-       :param client_id: Value tying a subscription to one client. This allows
-                         removing all subscriptions for a client simultaneously
-                         when the client goes away.
        :param **kwargs: Further parameters for the transport layer. For example
               disable_mangling: Receive messages as unprocessed strings.
               retroactive: Ask broker to send old messages if possible
@@ -135,17 +118,12 @@ class CommonTransport(object):
     self.__subscription_id += 1
     self.__subscriptions[self.__subscription_id] = {
       'channel': channel,
-      'client': kwargs.get('client_id'),
       'callback': callback,
       'ack': False,
       'unsubscribed': False,
     }
-    self.log.debug('Subscribing to broadcasts on %s for client %s with ID %d',
-        channel, kwargs.get('client_id'), self.__subscription_id)
-    if 'client_id' in kwargs:
-      self.__clients[kwargs['client_id']]['subscriptions'].add \
-        (self.__subscription_id)
-      del kwargs['client_id']
+    self.log.debug('Subscribing to broadcasts on %s with ID %d',
+        channel, self.__subscription_id)
     if kwargs.get('disable_mangling'):
       self._subscribe_broadcast(self.__subscription_id, channel,
           callback, **kwargs)
@@ -254,21 +232,12 @@ class CommonTransport(object):
   def transaction_begin(self, **kwargs):
     '''Start a new transaction.
        :param **kwargs: Further parameters for the transport layer. For example
-              client_id: Value tying a transaction to one client. This allows
-                         aborting all transactions for a client simultaneously
-                         when the client goes away.
        :return: A transaction ID that can be passed to other functions.
     '''
     self.__transaction_id += 1
-    self.__transactions[self.__transaction_id] = {
-      'client': kwargs.get('client_id'),
-    }
-    self.log.debug('Starting transaction for client %s with ID %d',
-        kwargs.get('client_id'), self.__subscription_id)
-    if 'client_id' in kwargs:
-      self.__clients[kwargs['client_id']]['transactions'].add \
-        (self.__transaction_id)
-      del kwargs['client_id']
+    self.__transactions.add(self.__transaction_id)
+    self.log.debug('Starting transaction with ID %d',
+        self.__subscription_id)
     self._transaction_begin(self.__transaction_id, **kwargs)
     return self.__transaction_id
 
@@ -280,10 +249,7 @@ class CommonTransport(object):
     if transaction_id not in self.__transactions:
       raise workflows.WorkflowsError("Attempting to abort unknown transaction")
     self.log.debug('Aborting transaction %s', transaction_id)
-    if self.__transactions[transaction_id]['client']:
-      self.__clients[self.__transactions[transaction_id]['client']] \
-        ['transactions'].remove(transaction_id)
-    del self.__transactions[transaction_id]
+    self.__transactions.remove(transaction_id)
     self._transaction_abort(transaction_id, **kwargs)
 
   def transaction_commit(self, transaction_id, **kwargs):
@@ -294,43 +260,8 @@ class CommonTransport(object):
     if transaction_id not in self.__transactions:
       raise workflows.WorkflowsError("Attempting to commit unknown transaction")
     self.log.debug('Committing transaction %s', transaction_id)
-    if self.__transactions[transaction_id]['client']:
-      self.__clients[self.__transactions[transaction_id]['client']] \
-        ['transactions'].remove(transaction_id)
-    del self.__transactions[transaction_id]
+    self.__transactions.remove(transaction_id)
     self._transaction_commit(transaction_id, **kwargs)
-
-  #
-  # -- Client management calls -----------------------------------------------
-  #
-
-  def register_client(self):
-    '''Generates a new unique client ID. Subscriptions and transactions can be
-       tied to client IDs, so that they can be collectively dropped when
-       clients go away.'''
-    self.__client_id += 1
-    self.__clients[self.__client_id] = { 'subscriptions': set(),
-                                         'transactions': set() }
-    self.log.debug('Registered new client ID %d', self.__client_id)
-    return self.__client_id
-
-  def drop_client(self, client_id):
-    '''Remove a client ID and all connected subscriptions, transactions and
-       unacknowledged messages.
-       :param client_id: Client to be dropped.'''
-    self.log.debug('Unregistering client ID %d', client_id)
-    if client_id not in self.__clients:
-      raise workflows.WorkflowsError("Attempting to drop unregistered client")
-    channel_subscriptions = list(self.__clients[client_id]['subscriptions'])
-    for subscription in channel_subscriptions:
-      if self.__subscriptions[subscription]['unsubscribed']:
-        self.drop_callback_reference(subscription)
-      else:
-        self.unsubscribe(subscription, drop_callback_reference=True)
-    transactions = list(self.__clients[client_id]['transactions'])
-    for transaction in transactions:
-      self.transaction_abort(transaction)
-    del self.__clients[client_id]
 
   #
   # -- Low level communication calls to be implemented by subclass -----------
