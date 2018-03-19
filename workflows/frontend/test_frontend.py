@@ -143,7 +143,7 @@ def test_frontend_can_handle_unhandled_service_initialization_exceptions():
   transport = transport.return_value
   transport.connect.assert_called_once()
 
-  with pytest.raises(workflows.WorkflowsError):
+  with pytest.raises(workflows.Error):
     fe.run()
 
   status_list = [ args[0].get('status') for args, kwargs in transport.broadcast_status.call_args_list if args ]
@@ -170,7 +170,7 @@ def test_frontend_can_handle_service_initialization_segfaults(mock_mp):
   transport.connect.assert_called_once()
   mock_mp.Process.assert_called_once_with(target=service.return_value.start, args=(), kwargs=mock.ANY)
 
-  with pytest.raises(workflows.WorkflowsError):
+  with pytest.raises(workflows.Error):
     fe.run()
   service_process.start.assert_called()
   service_process.join.assert_called()
@@ -193,7 +193,7 @@ def test_frontend_terminates_on_transport_disconnection(mock_mp):
   transport.is_connected.return_value = False
   mock_mp.Process.assert_called_once_with(target=service.return_value.start, args=(), kwargs=mock.ANY)
 
-  with pytest.raises(workflows.WorkflowsError):
+  with pytest.raises(workflows.Error):
     fe.run()
 
   service_process.terminate.assert_called()
@@ -322,7 +322,7 @@ def test_frontend_does_not_restart_nonrestartable_service_on_segfault(mock_mp):
   service_factory.side_effect = service_instances + [ Exception('More than one service object instantiated') ]
 
   fe = workflows.frontend.Frontend(transport=mock.Mock(), service=service_factory, restart_service=False)
-  with pytest.raises(workflows.WorkflowsError):
+  with pytest.raises(workflows.Error):
     fe.run()
 
   service_factory.assert_called_once()
@@ -349,7 +349,7 @@ def test_frontend_does_not_restart_nonrestartable_service_on_error(mock_mp):
   mock_mp.Pipe.return_value = (dummy_pipe, dummy_pipe)
 
   fe = workflows.frontend.Frontend(transport=mock.Mock(), service=service_factory, restart_service=False)
-  with pytest.raises(workflows.WorkflowsError):
+  with pytest.raises(workflows.Error):
     fe.run()
 
   service_factory.assert_called_once()

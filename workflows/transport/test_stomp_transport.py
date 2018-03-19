@@ -77,7 +77,7 @@ prefix = namespace
     os.remove(cfgfile.name)
 
   # Loading a non-existing configuration file
-  with pytest.raises(workflows.WorkflowsError):
+  with pytest.raises(workflows.Error):
     parser.parse_args(['--stomp-conf', ''])
 
 @mock.patch('workflows.transport.stomp_transport.stomp')
@@ -148,7 +148,7 @@ def test_error_handling_when_connecting_to_broker(mockstomp):
   mockconn.start.side_effect = stomppy.exception.ConnectFailedException()
   mockstomp.exception = stomppy.exception
 
-  with pytest.raises(workflows.DisconnectedError):
+  with pytest.raises(workflows.Disconnected):
     stomp.connect()
 
   assert not stomp.is_connected()
@@ -156,7 +156,7 @@ def test_error_handling_when_connecting_to_broker(mockstomp):
   mockconn.start.side_effect = None
   mockconn.connect.side_effect = stomppy.exception.ConnectFailedException()
 
-  with pytest.raises(workflows.AuthenticationError):
+  with pytest.raises(workflows.AuthenticationFailed):
     stomp.connect()
 
   assert not stomp.is_connected()
@@ -234,7 +234,7 @@ def test_error_handling_on_send(mockstomp):
   mockconn.send.side_effect = stomppy.exception.NotConnectedException()
   mockstomp.exception = stomppy.exception
 
-  with pytest.raises(workflows.DisconnectedError):
+  with pytest.raises(workflows.Disconnected):
     stomp._send( str(mock.sentinel.channel), mock.sentinel.message )
   assert not stomp.is_connected()
 

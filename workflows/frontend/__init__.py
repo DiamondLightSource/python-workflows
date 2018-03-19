@@ -204,7 +204,7 @@ class Frontend():
           else:
             self.shutdown = True
             if error_message:
-              raise workflows.WorkflowsError(error_message)
+              raise workflows.Error(error_message)
 
       with self.__lock:
         if self._service is None and self.restart_service and self._service_factory:
@@ -214,7 +214,7 @@ class Frontend():
       # Check that the transport is alive
       if not self._transport.is_connected():
         self._terminate_service()
-        raise workflows.WorkflowsError('Lost transport layer connection')
+        raise workflows.Error('Lost transport layer connection')
     self.log.debug("Left main loop")
     self.update_status(status_code=CommonService.SERVICE_STATUS_TEARDOWN)
     self._terminate_service()

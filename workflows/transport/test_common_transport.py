@@ -26,7 +26,7 @@ def test_subscribe_unsubscribe_a_channel():
   callback(mock.sentinel.header, mock.sentinel.message)
   mock_callback.assert_called_once_with(mock.sentinel.header, mock.sentinel.message)
   # Should not be able to drop callback reference for live subscription
-  with pytest.raises(workflows.WorkflowsError):
+  with pytest.raises(workflows.Error):
     ct.drop_callback_reference(subid)
 
   ct.unsubscribe(subid)
@@ -34,7 +34,7 @@ def test_subscribe_unsubscribe_a_channel():
   ct._unsubscribe.assert_called_once_with(subid)
 
   # Multiple unsubscribes should not work
-  with pytest.raises(workflows.WorkflowsError):
+  with pytest.raises(workflows.Error):
     ct.unsubscribe(subid)
   ct._unsubscribe.assert_called_once()
 
@@ -42,11 +42,11 @@ def test_subscribe_unsubscribe_a_channel():
   ct.subscription_callback(subid)
 
   ct.drop_callback_reference(subid)
-  with pytest.raises(workflows.WorkflowsError):
+  with pytest.raises(workflows.Error):
     ct.subscription_callback(subid)
 
   # Should not be able to double-drop reference
-  with pytest.raises(workflows.WorkflowsError):
+  with pytest.raises(workflows.Error):
     ct.drop_callback_reference(subid)
 
 def test_simple_subscribe_unsubscribe_a_broadcast():
@@ -68,14 +68,14 @@ def test_simple_subscribe_unsubscribe_a_broadcast():
   callback(mock.sentinel.header, mock.sentinel.message)
   mock_callback.assert_called_once_with(mock.sentinel.header, mock.sentinel.message)
   # Should not be able to drop callback reference for live subscription
-  with pytest.raises(workflows.WorkflowsError):
+  with pytest.raises(workflows.Error):
     ct.drop_callback_reference(subid)
 
   ct.unsubscribe(subid)
 
   ct._unsubscribe.assert_called_once_with(subid)
   # Multiple unsubscribes should not work
-  with pytest.raises(workflows.WorkflowsError):
+  with pytest.raises(workflows.Error):
     ct.unsubscribe(subid)
   ct._unsubscribe.assert_called_once()
 
@@ -83,11 +83,11 @@ def test_simple_subscribe_unsubscribe_a_broadcast():
   ct.subscription_callback(subid)
 
   ct.drop_callback_reference(subid)
-  with pytest.raises(workflows.WorkflowsError):
+  with pytest.raises(workflows.Error):
     ct.subscription_callback(subid)
 
   # Should not be able to double-drop reference
-  with pytest.raises(workflows.WorkflowsError):
+  with pytest.raises(workflows.Error):
     ct.drop_callback_reference(subid)
 
 def test_simple_send_message():
@@ -143,7 +143,7 @@ def test_create_and_destroy_transactions():
   ct._transaction_begin.assert_called_once_with(t)
 
   ct.transaction_abort(t)
-  with pytest.raises(workflows.WorkflowsError):
+  with pytest.raises(workflows.Error):
     ct.transaction_commit(t)
   ct._transaction_abort.assert_called_once_with(t)
 
@@ -151,7 +151,7 @@ def test_create_and_destroy_transactions():
   assert t2
   assert t != t2
   ct.transaction_commit(t2)
-  with pytest.raises(workflows.WorkflowsError):
+  with pytest.raises(workflows.Error):
     ct.transaction_abort(t2)
   ct._transaction_commit.assert_called_once_with(t2)
 
@@ -175,25 +175,25 @@ def test_messages_can_be_acknowledged_and_rejected():
   ct._nack.assert_any_call(mock.sentinel.message_id4, mock.sentinel.subscription_id4)
   ct._nack.assert_any_call(mock.sentinel.message_id6, mock.sentinel.subscription_id6)
 
-  with pytest.raises(workflows.WorkflowsError):
+  with pytest.raises(workflows.Error):
     ct.ack(None)
-  with pytest.raises(workflows.WorkflowsError):
+  with pytest.raises(workflows.Error):
     ct.ack(mock.sentinel.crash)
-  with pytest.raises(workflows.WorkflowsError):
+  with pytest.raises(workflows.Error):
     ct.ack({'message-id': mock.sentinel.crash})
-  with pytest.raises(workflows.WorkflowsError):
+  with pytest.raises(workflows.Error):
     ct.ack({'message-id': None, 'subscription': mock.sentinel.crash})
-  with pytest.raises(workflows.WorkflowsError):
+  with pytest.raises(workflows.Error):
     ct.nack(None)
-  with pytest.raises(workflows.WorkflowsError):
+  with pytest.raises(workflows.Error):
     ct.nack(mock.sentinel.crash)
-  with pytest.raises(workflows.WorkflowsError):
+  with pytest.raises(workflows.Error):
     ct.nack({'message-id': mock.sentinel.crash})
-  with pytest.raises(workflows.WorkflowsError):
+  with pytest.raises(workflows.Error):
     ct.nack({'message-id': None, 'subscription': mock.sentinel.crash})
 
 def test_unimplemented_communication_methods_should_fail():
-  '''Check that low-level communication calls raise WorkflowsError when not
+  '''Check that low-level communication calls raise NotImplementedError when not
      overridden.'''
   ct = CommonTransport()
   assert not ct.connect()
@@ -209,5 +209,5 @@ def test_unimplemented_communication_methods_should_fail():
       ('_transaction_abort', 1),
       ('_transaction_commit', 1),
       ]:
-    with pytest.raises(workflows.WorkflowsError):
+    with pytest.raises(NotImplementedError):
       getattr(ct, function)(*([mock.Mock()] * argcount))

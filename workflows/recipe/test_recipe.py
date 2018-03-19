@@ -105,40 +105,40 @@ def test_validate_tests_for_empty_recipe():
   '''Validating a recipe that has not been defined must throw an error.'''
   A, _ = generate_recipes()
   A.recipe = None
-  with pytest.raises(workflows.WorkflowsError):
+  with pytest.raises(workflows.Error):
     A.validate()
 
 def test_validate_tests_for_invalid_nodes():
   '''Check that the recipe contains only numeric nodes, a non-empty 'start' node, and an optional 'error' node.'''
   A, _ = generate_recipes()
   A.recipe['xnode'] = None
-  with pytest.raises(workflows.WorkflowsError) as excinfo:
+  with pytest.raises(workflows.Error) as excinfo:
     A.validate()
   assert 'xnode' in str(excinfo.value)
 
   A, _ = generate_recipes()
   del A.recipe['start']
-  with pytest.raises(workflows.WorkflowsError) as excinfo:
+  with pytest.raises(workflows.Error) as excinfo:
     A.validate()
   assert 'start' in str(excinfo.value)
 
   A.recipe['start'] = []
-  with pytest.raises(workflows.WorkflowsError) as excinfo:
+  with pytest.raises(workflows.Error) as excinfo:
     A.validate()
   assert 'start' in str(excinfo.value)
 
   A.recipe['start'] = [ ('something',) ]
-  with pytest.raises(workflows.WorkflowsError) as excinfo:
+  with pytest.raises(workflows.Error) as excinfo:
     A.validate()
   assert 'start' in str(excinfo.value)
 
   A.recipe['start'] = [ (1, 'something'), 'banana' ]
-  with pytest.raises(workflows.WorkflowsError) as excinfo:
+  with pytest.raises(workflows.Error) as excinfo:
     A.validate()
   assert 'start' in str(excinfo.value)
 
   A.recipe['start'] = [ (1, 'something'), ('start', 'banana') ]
-  with pytest.raises(workflows.WorkflowsError) as excinfo:
+  with pytest.raises(workflows.Error) as excinfo:
     A.validate()
   assert 'start' in str(excinfo.value)
 
@@ -156,7 +156,7 @@ def test_validate_tests_for_invalid_nodes():
   A.validate()
 
   A.recipe['error'] = "something"
-  with pytest.raises(workflows.WorkflowsError) as excinfo:
+  with pytest.raises(workflows.Error) as excinfo:
     A.validate()
   assert 'error' in str(excinfo.value)
 
@@ -166,61 +166,61 @@ def test_validate_tests_for_invalid_links():
   # Part 1: Check outgoing links from start/error node:
   A, _ = generate_recipes()
   A.recipe['start'] = [ ('asdf', None) ]
-  with pytest.raises(workflows.WorkflowsError):
+  with pytest.raises(workflows.Error):
     A.validate()
 
   A.recipe['start'] = [ (1, None), (2, None) ]
   A.validate()
 
   A.recipe['start'] = [ (1, None), (99, None) ]
-  with pytest.raises(workflows.WorkflowsError):
+  with pytest.raises(workflows.Error):
     A.validate()
 
   A, _ = generate_recipes()
   A.recipe['error'] = [ "start", 2 ]
-  with pytest.raises(workflows.WorkflowsError) as excinfo:
+  with pytest.raises(workflows.Error) as excinfo:
     A.validate()
   assert 'error' in str(excinfo.value)
 
   A.recipe['error'] = "error"
-  with pytest.raises(workflows.WorkflowsError) as excinfo:
+  with pytest.raises(workflows.Error) as excinfo:
     A.validate()
   assert 'error' in str(excinfo.value)
 
   A.recipe['error'] = 99
-  with pytest.raises(workflows.WorkflowsError):
+  with pytest.raises(workflows.Error):
     A.validate()
 
   # Part 2 & 3: Check outgoing links from other nodes (output and error)
   for outgoing in ('output', 'error'):
     A, _ = generate_recipes()
     A.recipe[1][outgoing] = 'asdf'
-    with pytest.raises(workflows.WorkflowsError):
+    with pytest.raises(workflows.Error):
       A.validate()
 
     A.recipe[1][outgoing] = 99
-    with pytest.raises(workflows.WorkflowsError):
+    with pytest.raises(workflows.Error):
       A.validate()
 
     A.recipe[1][outgoing] = [2, 99]
-    with pytest.raises(workflows.WorkflowsError):
+    with pytest.raises(workflows.Error):
       A.validate()
 
     A.recipe[1][outgoing] = [2, 'banana']
-    with pytest.raises(workflows.WorkflowsError):
+    with pytest.raises(workflows.Error):
       A.validate()
 
     A.recipe[1][outgoing] = { 'all': 2, 'some': [ 2, 2 ] }
     A.validate()
 
     A.recipe[1][outgoing] = { 'all': 2, 'some': [ 2, 99 ] }
-    with pytest.raises(workflows.WorkflowsError):
+    with pytest.raises(workflows.Error):
       A.validate()
 
   # Part 4: Check for unreferenced nodes
   A, _ = generate_recipes()
   A.recipe[99] = {}
-  with pytest.raises(workflows.WorkflowsError) as excinfo:
+  with pytest.raises(workflows.Error) as excinfo:
     A.validate()
   assert '99' in str(excinfo.value)
 
@@ -228,19 +228,19 @@ def test_validate_tests_for_cycles():
   '''Check that validation detects cycles in recipes.  Recipes must be acyclical.'''
   A, _ = generate_recipes()
   A.recipe[2]['output'] = 1
-  with pytest.raises(workflows.WorkflowsError) as excinfo:
+  with pytest.raises(workflows.Error) as excinfo:
     A.validate()
   assert 'cycle' in str(excinfo.value)
 
   A, _ = generate_recipes()
   A.recipe[2]['output'] = 2
-  with pytest.raises(workflows.WorkflowsError) as excinfo:
+  with pytest.raises(workflows.Error) as excinfo:
     A.validate()
   assert 'cycle' in str(excinfo.value)
 
   A, _ = generate_recipes()
   A.recipe[2]['output'] = [1, 2]
-  with pytest.raises(workflows.WorkflowsError) as excinfo:
+  with pytest.raises(workflows.Error) as excinfo:
     A.validate()
   assert 'cycle' in str(excinfo.value)
 

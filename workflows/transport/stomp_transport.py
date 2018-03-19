@@ -5,7 +5,7 @@ import threading
 import time
 
 import stomp
-from workflows import AuthenticationError, DisconnectedError, WorkflowsError
+import workflows
 from workflows.transport.common_transport import CommonTransport
 
 try:
@@ -57,7 +57,7 @@ class StompTransport(CommonTransport):
   def load_configuration_file(cls, filename):
     cfgparser = ConfigParser.ConfigParser(allow_no_value=True)
     if not cfgparser.read(filename):
-      raise WorkflowsError('Could not read from configuration file %s' % filename)
+      raise workflows.Error('Could not read from configuration file %s' % filename)
     for cfgoption, target in [
           ('host', '--stomp-host'),
           ('port', '--stomp-port'),
@@ -116,7 +116,7 @@ class StompTransport(CommonTransport):
       try:
         self._conn.start()
       except stomp.exception.ConnectFailedException:
-        raise DisconnectedError('Could not initiate connection to stomp host')
+        raise workflows.Disconnected('Could not initiate connection to stomp host')
       username = self.config.get('--stomp-user',
                                  self.defaults.get('--stomp-user'))
       password = self.config.get('--stomp-pass',
@@ -133,14 +133,14 @@ class StompTransport(CommonTransport):
         else: # anonymous access
           self._conn.connect(wait=False)
       except stomp.exception.ConnectFailedException:
-        raise AuthenticationError('Could not connect to stomp host: Authentication error')
+        raise workflows.AuthenticationFailed('Could not connect to stomp host: Authentication error')
       while time.time() < timeout and not self._conn.is_connected() and not connection_failure:
         time.sleep(0.02)
       self._stomp_listener.on_disconnected = handler_old
       if connection_failure:
-        raise DisconnectedError('Could not initiate connection to stomp host - disconnected')
+        raise workflows.Disconnected('Could not initiate connection to stomp host - disconnected')
       if not self._conn.is_connected():
-        raise DisconnectedError('Could not initiate connection to stomp host')
+        raise workflows.Disconnected('Could not initiate connection to stomp host')
       self._namespace = \
         self.config.get('--stomp-prfx', self.defaults.get('--stomp-prfx'))
       if self._namespace and not self._namespace.endswith('.'):
@@ -283,7 +283,7 @@ class StompTransport(CommonTransport):
           headers=headers, **kwargs)
       except stomp.exception.NotConnectedException:
         self._connected = False
-        raise DisconnectedError('No connection to stomp host')
+        raise workflows.Disconnected('No connection to stomp host')
 
   def _broadcast(self, destination, message, headers=None, delay=None,
                  expiration=None, **kwargs):
@@ -395,4 +395,4 @@ class StompTransport(CommonTransport):
     if target_function is not None:
       target_function(headers, body)
     else:
-      raise WorkflowsError('Unhandled message %s %s' % (repr(headers), repr(body)))
+      raise workflows.Error('Unhandled message %s %s' % (repr(headers), repr(body)))

@@ -90,33 +90,33 @@ class Recipe(object):
     '''Check whether the encoded recipe is valid. It must describe a directed
        acyclical graph, all connections must be defined, etc.'''
     if not self.recipe:
-      raise workflows.WorkflowsError('Invalid recipe: No recipe defined')
+      raise workflows.Error('Invalid recipe: No recipe defined')
 
     # Without a 'start' node nothing would happen
     if 'start' not in self.recipe:
-      raise workflows.WorkflowsError('Invalid recipe: "start" node missing')
+      raise workflows.Error('Invalid recipe: "start" node missing')
     if not self.recipe['start']:
-      raise workflows.WorkflowsError('Invalid recipe: "start" node empty')
+      raise workflows.Error('Invalid recipe: "start" node empty')
     if not all(isinstance(x, (list, tuple)) and len(x) == 2
                for x in self.recipe['start']):
-      raise workflows.WorkflowsError('Invalid recipe: "start" node invalid')
+      raise workflows.Error('Invalid recipe: "start" node invalid')
     if any(x[0] == 'start' for x in self.recipe['start']):
-      raise workflows.WorkflowsError('Invalid recipe: "start" node points to itself')
+      raise workflows.Error('Invalid recipe: "start" node points to itself')
 
     # Check that 'error' node points to regular nodes only
     if 'error' in self.recipe and \
         isinstance(self.recipe['error'], (list, tuple, basestring)):
       if 'start' in self.recipe['error']:
-        raise workflows.WorkflowsError('Invalid recipe: "error" node points to "start" node')
+        raise workflows.Error('Invalid recipe: "error" node points to "start" node')
       if 'error' in self.recipe['error']:
-        raise workflows.WorkflowsError('Invalid recipe: "error" node points to itself')
+        raise workflows.Error('Invalid recipe: "error" node points to itself')
 
     # All other nodes must be numeric
     nodes = list(filter(lambda x: not isinstance(x, int)
                              and x not in ('start', 'error'),
                         self.recipe))
     if nodes:
-      raise workflows.WorkflowsError('Invalid recipe: Node "%s" is not numeric' % nodes[0])
+      raise workflows.Error('Invalid recipe: Node "%s" is not numeric' % nodes[0])
 
     # Detect cycles
     touched_nodes = set(['start', 'error'])
@@ -126,18 +126,18 @@ class Recipe(object):
       if isinstance(struct, int): return [ struct ]
       if isinstance(struct, list):
         if not all(isinstance(x, int) for x in struct):
-          raise workflows.WorkflowsError('Invalid recipe: Invalid link in recipe (%s)' % str(struct))
+          raise workflows.Error('Invalid recipe: Invalid link in recipe (%s)' % str(struct))
         return struct
       if isinstance(struct, dict):
         joined_list = []
         for sub_list in struct.values():
           joined_list += flatten_links(sub_list)
         return joined_list
-      raise workflows.WorkflowsError('Invalid recipe: Invalid link in recipe (%s)' % str(struct))
+      raise workflows.Error('Invalid recipe: Invalid link in recipe (%s)' % str(struct))
     def find_cycles(path):
       '''Depth-First-Search helper function to identify cycles.'''
       if path[-1] not in self.recipe:
-        raise workflows.WorkflowsError('Invalid recipe: Node "%s" is referenced via "%s" but missing' % (str(path[-1]), str(path[:-1])))
+        raise workflows.Error('Invalid recipe: Node "%s" is referenced via "%s" but missing' % (str(path[-1]), str(path[:-1])))
       touched_nodes.add(path[-1])
       node = self.recipe[path[-1]]
       for outgoing in ('output', 'error'):
@@ -145,7 +145,7 @@ class Recipe(object):
           references = flatten_links(node[outgoing])
           for n in references:
             if n in path:
-              raise workflows.WorkflowsError('Invalid recipe: Recipe contains cycle (%s -> %s)' % (str(path), str(n)))
+              raise workflows.Error('Invalid recipe: Recipe contains cycle (%s -> %s)' % (str(path), str(n)))
             find_cycles(path + [n])
     for link in self.recipe['start']:
       find_cycles(['start', link[0]])
@@ -159,7 +159,7 @@ class Recipe(object):
     # Test recipe for unreferenced nodes
     for node in self.recipe:
       if node not in touched_nodes:
-        raise workflows.WorkflowsError('Invalid recipe: Recipe contains unreferenced node "%s"' % str(node))
+        raise workflows.Error('Invalid recipe: Recipe contains unreferenced node "%s"' % str(node))
 
   def apply_parameters(self, parameters):
     '''Recursively apply dictionary entries in 'parameters' to {item}s in recipe

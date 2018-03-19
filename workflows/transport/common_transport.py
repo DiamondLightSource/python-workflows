@@ -80,10 +80,10 @@ class CommonTransport(object):
        :param **kwargs: Further parameters for the transport layer.
     '''
     if subscription not in self.__subscriptions:
-      raise workflows.WorkflowsError \
+      raise workflows.Error \
             ("Attempting to unsubscribe unknown subscription")
     if self.__subscriptions[subscription]['unsubscribed']:
-      raise workflows.WorkflowsError \
+      raise workflows.Error \
             ("Attempting to unsubscribe already unsubscribed subscription")
     self._unsubscribe(subscription, **kwargs)
     self.__subscriptions[subscription]['unsubscribed'] = True
@@ -97,10 +97,10 @@ class CommonTransport(object):
        :param subscription: Subscription ID to delete callback reference for.
     '''
     if subscription not in self.__subscriptions:
-      raise workflows.WorkflowsError \
+      raise workflows.Error \
             ("Attempting to drop callback reference for unknown subscription")
     if not self.__subscriptions[subscription]['unsubscribed']:
-      raise workflows.WorkflowsError \
+      raise workflows.Error \
             ("Attempting to drop callback reference for live subscription")
     del self.__subscriptions[subscription]
 
@@ -136,12 +136,12 @@ class CommonTransport(object):
 
   def subscription_callback(self, subscription):
     '''Retrieve the callback function for a subscription. Raise a
-       WorkflowsError if the subscription does not exist.
+       workflows.Error if the subscription does not exist.
        :param subscription: Subscription ID to look up
        :return: Callback function
     '''
     if subscription not in self.__subscriptions:
-      raise workflows.WorkflowsError \
+      raise workflows.Error \
             ("Attempting to callback on unknown subscription")
     return self.__subscriptions[subscription]['callback']
 
@@ -192,10 +192,10 @@ class CommonTransport(object):
     else:
       message_id = message
     if not message_id:
-      raise workflows.WorkflowsError('Cannot acknowledge message without ' + \
+      raise workflows.Error('Cannot acknowledge message without ' + \
                                      'message ID')
     if not subscription_id:
-      raise workflows.WorkflowsError('Cannot acknowledge message without ' + \
+      raise workflows.Error('Cannot acknowledge message without ' + \
                                      'subscription ID')
     self.log.debug('Acknowledging message %s on subscription %s',
                    message_id, subscription_id)
@@ -220,10 +220,10 @@ class CommonTransport(object):
     else:
       message_id = message
     if not message_id:
-      raise workflows.WorkflowsError('Cannot reject message without ' + \
+      raise workflows.Error('Cannot reject message without ' + \
                                      'message ID')
     if not subscription_id:
-      raise workflows.WorkflowsError('Cannot reject message without ' + \
+      raise workflows.Error('Cannot reject message without ' + \
                                      'subscription ID')
     self.log.debug('Rejecting message %s on subscription %s',
                    message_id, subscription_id)
@@ -247,7 +247,7 @@ class CommonTransport(object):
        :param **kwargs: Further parameters for the transport layer.
     '''
     if transaction_id not in self.__transactions:
-      raise workflows.WorkflowsError("Attempting to abort unknown transaction")
+      raise workflows.Error("Attempting to abort unknown transaction")
     self.log.debug('Aborting transaction %s', transaction_id)
     self.__transactions.remove(transaction_id)
     self._transaction_abort(transaction_id, **kwargs)
@@ -258,7 +258,7 @@ class CommonTransport(object):
        :param **kwargs: Further parameters for the transport layer.
     '''
     if transaction_id not in self.__transactions:
-      raise workflows.WorkflowsError("Attempting to commit unknown transaction")
+      raise workflows.Error("Attempting to commit unknown transaction")
     self.log.debug('Committing transaction %s', transaction_id)
     self.__transactions.remove(transaction_id)
     self._transaction_commit(transaction_id, **kwargs)
@@ -278,7 +278,7 @@ class CommonTransport(object):
               acknowledgement: If true receipt of each message needs to be
                                acknowledged.
     '''
-    raise workflows.WorkflowsError("Transport interface not implemented")
+    raise NotImplementedError("Transport interface not implemented")
 
   @staticmethod
   def _subscribe_broadcast(sub_id, channel, callback, **kwargs):
@@ -289,14 +289,14 @@ class CommonTransport(object):
        :param **kwargs: Further parameters for the transport layer. For example
               retroactive: Ask broker to send old messages if possible
     '''
-    raise workflows.WorkflowsError("Transport interface not implemented")
+    raise NotImplementedError("Transport interface not implemented")
 
   @staticmethod
   def _unsubscribe(sub_id):
     '''Stop listening to a queue or a broadcast
        :param sub_id: ID for this subscription in the transport layer
     '''
-    raise workflows.WorkflowsError("Transport interface not implemented")
+    raise NotImplementedError("Transport interface not implemented")
 
   @staticmethod
   def _send(destination, message, **kwargs):
@@ -309,7 +309,7 @@ class CommonTransport(object):
               transaction: Transaction ID if message should be part of a
                            transaction
     '''
-    raise workflows.WorkflowsError("Transport interface not implemented")
+    raise NotImplementedError("Transport interface not implemented")
 
   @staticmethod
   def _broadcast(destination, message, **kwargs):
@@ -322,7 +322,7 @@ class CommonTransport(object):
               transaction: Transaction ID if message should be part of a
                            transaction
     '''
-    raise workflows.WorkflowsError("Transport interface not implemented")
+    raise NotImplementedError("Transport interface not implemented")
 
   @staticmethod
   def _ack(message_id, subscription_id, **kwargs):
@@ -334,7 +334,7 @@ class CommonTransport(object):
               transaction: Transaction ID if acknowledgement should be part of
                            a transaction
     '''
-    raise workflows.WorkflowsError("Transport interface not implemented")
+    raise NotImplementedError("Transport interface not implemented")
 
   @staticmethod
   def _nack(message_id, subscription_id, **kwargs):
@@ -346,7 +346,7 @@ class CommonTransport(object):
               transaction: Transaction ID if rejection should be part of a
                            transaction
     '''
-    raise workflows.WorkflowsError("Transport interface not implemented")
+    raise NotImplementedError("Transport interface not implemented")
 
   @staticmethod
   def _transaction_begin(transaction_id, **kwargs):
@@ -354,7 +354,7 @@ class CommonTransport(object):
        :param transaction_id: ID for this transaction in the transport layer.
        :param **kwargs: Further parameters for the transport layer.
     '''
-    raise workflows.WorkflowsError("Transport interface not implemented")
+    raise NotImplementedError("Transport interface not implemented")
 
   @staticmethod
   def _transaction_abort(transaction_id, **kwargs):
@@ -362,7 +362,7 @@ class CommonTransport(object):
        :param transaction_id: ID of transaction to be aborted.
        :param **kwargs: Further parameters for the transport layer.
     '''
-    raise workflows.WorkflowsError("Transport interface not implemented")
+    raise NotImplementedError("Transport interface not implemented")
 
   @staticmethod
   def _transaction_commit(transaction_id, **kwargs):
@@ -370,7 +370,7 @@ class CommonTransport(object):
        :param transaction_id: ID of transaction to be committed.
        :param **kwargs: Further parameters for the transport layer.
     '''
-    raise workflows.WorkflowsError("Transport interface not implemented")
+    raise NotImplementedError("Transport interface not implemented")
 
   #
   # -- Internal message mangling functions -----------------------------------
