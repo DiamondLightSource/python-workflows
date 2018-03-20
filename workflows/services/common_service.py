@@ -170,8 +170,23 @@ class CommonService(object):
         self.log.debug('Service successfully connected to transport layer')
       else:
         raise RuntimeError('Service could not connect to transport layer')
+      # direct all transport callbacks into the main queue
+      self._transport_interceptor_counter = itertools.count()
+      self.transport.subscription_callback_set_intercept(self._transport_interceptor)
     else:
       self.log.debug('No transport layer defined for service. Skipping.')
+
+  def _transport_interceptor(self, callback):
+    '''Takes a callback function and returns a function that takes headers and
+       messages and places them on the main service queue.'''
+    def add_item_to_queue(header, message):
+      queue_item = (
+          Priority.TRANSPORT,
+          next(self._transport_interceptor_counter), # insertion sequence to keep messages in order
+          (callback, header, message),
+      )
+      self.__queue.put(queue_item) # Block incoming transport until insertion completes
+    return add_item_to_queue
 
   def connect(self, frontend=None, commands=None):
     '''Inject pipes connecting the service to the frontend. Two arguments are
@@ -360,20 +375,25 @@ class CommonService(object):
               self._idle_callback()
             continue
 
-        message = task[2]
-
         self.__update_service_status(self.SERVICE_STATUS_PROCESSING)
 
-        if message and 'band' in message:
-          processor = self.__callback_register.get(message['band'])
-          if processor is None:
-            self.log.warning('received message on unregistered band\n%s',
-                             message)
+        if task[0] == Priority.COMMAND:
+          message = task[2]
+          if message and 'band' in message:
+            processor = self.__callback_register.get(message['band'])
+            if processor is None:
+              self.log.warning('received message on unregistered band\n%s',
+                               message)
+            else:
+              processor(message.get('payload'))
           else:
-            processor(message.get('payload'))
+            self.log.warning('received message without band information\n%s',
+                             message)
+        elif task[0] == Priority.TRANSPORT:
+          callback, header, message = task[2]
+          callback(header, message)
         else:
-          self.log.warning('received message without band information\n%s',
-                           message)
+          self.log.warning('Unknown item on main service queue\n%r', task)
 
     except KeyboardInterrupt:
       self.log.warning('Ctrl+C detected. Shutting down.')
