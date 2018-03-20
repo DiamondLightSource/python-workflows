@@ -184,7 +184,7 @@ def test_observe_shutdown_command():
   start_cmd_queue_listener = mock.Mock()
   main_queue = mock.Mock()
   main_queue.get.side_effect = [
-      (None, None, { 'band': 'command', 'payload': Commands.SHUTDOWN }),
+      (Priority.COMMAND, 1, { 'band': 'command', 'payload': Commands.SHUTDOWN }),
       AssertionError('Not observing commands'),
   ]
   fe_pipe, fe_pipe_out = Pipe()
@@ -233,7 +233,7 @@ def test_idle_timer_is_triggered():
   main_queue = mock.Mock()
   main_queue.get.side_effect = [
       queue.Empty(),
-      (None, None, { 'band': 'command', 'payload': Commands.SHUTDOWN }),
+      (Priority.COMMAND, None, { 'band': 'command', 'payload': Commands.SHUTDOWN }),
       AssertionError('Not observing commands'),
   ]
   fe_pipe, fe_pipe_out = Pipe()
