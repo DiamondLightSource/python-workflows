@@ -36,6 +36,7 @@ setup(name='workflows',
       version=find_version('workflows', '__init__.py'),
       install_requires=[
           'enum-compat',
+          'six',
           'stomp.py<4.1.20',
       ],
       packages=find_packages(),

@@ -1,6 +1,6 @@
 from __future__ import absolute_import, division, print_function
 
-import Queue
+from six.moves import queue
 import time
 from multiprocessing import Pipe
 
@@ -232,7 +232,7 @@ def test_idle_timer_is_triggered():
   start_cmd_queue_listener = mock.Mock()
   main_queue = mock.Mock()
   main_queue.get.side_effect = [
-      Queue.Empty(),
+      queue.Empty(),
       (None, None, { 'band': 'command', 'payload': Commands.SHUTDOWN }),
       AssertionError('Not observing commands'),
   ]

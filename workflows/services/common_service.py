@@ -5,7 +5,7 @@ import enum
 import itertools
 import logging
 import threading
-import Queue
+from six.moves import queue
 
 import workflows
 import workflows.logging
@@ -141,7 +141,7 @@ class CommonService(object):
     self.__service_status = None
     self.__shutdown = False
     self.__update_service_status(self.SERVICE_STATUS_NEW)
-    self.__queue = Queue.PriorityQueue()
+    self.__queue = queue.PriorityQueue()
     self._idle_callback = None
     self._idle_time = None
 
@@ -220,7 +220,7 @@ class CommonService(object):
         queue_item = (Priority.COMMAND, next(counter), message)
         try:
           self.__queue.put(queue_item, True, 60)
-        except Queue.Full:
+        except queue.Full:
           # If the message can't be stored within 60 seconds then the service is
           # operating outside normal parameters. Try to shut it down.
           self.__shutdown = True
@@ -354,7 +354,7 @@ class CommonService(object):
         else:
           try:
             task = self.__queue.get(True, self._idle_time)
-          except Queue.Empty:
+          except queue.Empty:
             self.__update_service_status(self.SERVICE_STATUS_TIMER)
             if self._idle_callback:
               self._idle_callback()
