@@ -54,7 +54,7 @@ class Status(enum.Enum):
     self.intval = intval
     self.description = description
 
-class Priority(enum.Enum):
+class Priority(enum.IntEnum):
   '''
   Priorities for the service-internal priority queue. This ensures that eg.
   frontend commands are always processed before timer events.

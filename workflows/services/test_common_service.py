@@ -439,3 +439,124 @@ def test_transport_connection_is_started_on_initialization():
   service.start()
 
   transport.connect.assert_called_once_with()
+
+def test_main_queue_can_deal_with_being_empty():
+  '''Checks that the main service queue can be empty without crashing the service.'''
+  start_cmd_queue_listener = mock.Mock()
+  main_queue = mock.Mock()
+  main_queue.poll.side_effect = [ False, True ]
+  main_queue.get.side_effect = [
+      (Priority.COMMAND, None, { 'band': 'command', 'payload': Commands.SHUTDOWN }),
+      AssertionError('Not observing commands'),
+  ]
+  fe_pipe, fe_pipe_out = Pipe()
+
+  # Create service
+  service = CommonService()
+  service.connect(commands=mock.Mock(), frontend=fe_pipe)
+
+  # Override service queue management
+  service._CommonService__start_command_queue_listener = start_cmd_queue_listener
+  service._CommonService__queue = main_queue
+
+  # Start service
+  service.start()
+
+  # Check startup/shutdown sequence
+  start_cmd_queue_listener.assert_called_once_with()
+  messages = []
+  while fe_pipe_out.poll():
+    message = fe_pipe_out.recv()
+    if 'statuscode' in message:
+      messages.append(message['statuscode'])
+  assert messages == [
+    service.SERVICE_STATUS_NEW,
+    service.SERVICE_STATUS_STARTING,
+    service.SERVICE_STATUS_IDLE,
+    service.SERVICE_STATUS_PROCESSING,
+    service.SERVICE_STATUS_SHUTDOWN,
+    service.SERVICE_STATUS_END,
+    ]
+
+def test_commands_are_processed_from_main_queue_before_transport():
+  '''Checks that the priority queue behaves as such.'''
+  start_cmd_queue_listener = mock.Mock()
+  fe_pipe, fe_pipe_out = Pipe()
+
+  mock_low_priority_callback = mock.Mock()
+
+  # Create service
+  service = CommonService()
+  service.connect(commands=mock.Mock(), frontend=fe_pipe)
+  main_queue = service._CommonService__queue
+  main_queue.put((Priority.TRANSPORT, 1, (mock_low_priority_callback, None, None)))
+  main_queue.put((Priority.COMMAND, 1, { 'band': 'command', 'payload': Commands.SHUTDOWN }))
+
+  # Override service queue management
+  service._CommonService__start_command_queue_listener = start_cmd_queue_listener
+
+  # Start service
+  service.start()
+
+  # Service should terminate before processing the transport callback
+  assert mock_low_priority_callback.called == False
+
+  # Check startup/shutdown sequence
+  start_cmd_queue_listener.assert_called_once_with()
+  messages = []
+  while fe_pipe_out.poll():
+    message = fe_pipe_out.recv()
+    if 'statuscode' in message:
+      messages.append(message['statuscode'])
+  assert messages == [
+    service.SERVICE_STATUS_NEW,
+    service.SERVICE_STATUS_STARTING,
+    service.SERVICE_STATUS_IDLE,
+    service.SERVICE_STATUS_PROCESSING,
+    service.SERVICE_STATUS_SHUTDOWN,
+    service.SERVICE_STATUS_END,
+    ]
+
+def test_transport_callbacks_are_processed_from_main_queue():
+  '''Checks that the transport callbacks are properly processed from the main queue.'''
+  start_cmd_queue_listener = mock.Mock()
+  mock_transport_callback = mock.Mock()
+  main_queue = mock.Mock()
+  main_queue.get.side_effect = [
+      (Priority.TRANSPORT, 1, (mock_transport_callback, mock.sentinel.header, mock.sentinel.message)),
+      (Priority.COMMAND, None, { 'band': 'command', 'payload': Commands.SHUTDOWN }),
+      AssertionError('Not observing commands'),
+  ]
+  fe_pipe, fe_pipe_out = Pipe()
+
+  # Create service
+  service = CommonService()
+  service.connect(commands=mock.Mock(), frontend=fe_pipe)
+
+  # Override service queue management
+  service._CommonService__start_command_queue_listener = start_cmd_queue_listener
+  service._CommonService__queue = main_queue
+
+  # Start service
+  service.start()
+
+  # Service must call transport callback
+  mock_transport_callback.assert_called_once_with(mock.sentinel.header, mock.sentinel.message)
+
+  # Check startup/shutdown sequence
+  start_cmd_queue_listener.assert_called_once_with()
+  messages = []
+  while fe_pipe_out.poll():
+    message = fe_pipe_out.recv()
+    if 'statuscode' in message:
+      messages.append(message['statuscode'])
+  assert messages == [
+    service.SERVICE_STATUS_NEW,
+    service.SERVICE_STATUS_STARTING,
+    service.SERVICE_STATUS_IDLE,
+    service.SERVICE_STATUS_PROCESSING,
+    service.SERVICE_STATUS_IDLE,
+    service.SERVICE_STATUS_PROCESSING,
+    service.SERVICE_STATUS_SHUTDOWN,
+    service.SERVICE_STATUS_END,
+    ]
