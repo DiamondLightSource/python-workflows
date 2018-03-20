@@ -7,11 +7,7 @@ import time
 import stomp
 import workflows
 from workflows.transport.common_transport import CommonTransport
-
-try:
-  import ConfigParser
-except ImportError: # Python3 compatibility
-  import configparser as ConfigParser
+from six.moves import configparser
 
 class StompTransport(CommonTransport):
   '''Abstraction layer for messaging infrastructure. Here we are using ActiveMQ
@@ -54,7 +50,7 @@ class StompTransport(CommonTransport):
 
   @classmethod
   def load_configuration_file(cls, filename):
-    cfgparser = ConfigParser.ConfigParser(allow_no_value=True)
+    cfgparser = configparser.ConfigParser(allow_no_value=True)
     if not cfgparser.read(filename):
       raise workflows.Error('Could not read from configuration file %s' % filename)
     for cfgoption, target in [
@@ -66,7 +62,7 @@ class StompTransport(CommonTransport):
           ]:
       try:
         cls.defaults[target] = cfgparser.get('stomp', cfgoption)
-      except ConfigParser.NoOptionError:
+      except configparser.NoOptionError:
         pass
 
   @classmethod
