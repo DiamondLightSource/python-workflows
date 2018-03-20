@@ -14,7 +14,8 @@ def test_subscribe_unsubscribe_a_channel():
   mock_callback = mock.Mock()
 
   subid = ct.subscribe(mock.sentinel.channel, mock_callback,
-        exclusive=mock.sentinel.exclusive, acknowledgement=mock.sentinel.ack)
+        exclusive=mock.sentinel.exclusive, acknowledgement=mock.sentinel.ack,
+        disable_mangling=True)
 
   assert subid
   assert ct.subscription_callback(subid) == mock_callback
@@ -49,6 +50,18 @@ def test_subscribe_unsubscribe_a_channel():
   with pytest.raises(workflows.Error):
     ct.drop_callback_reference(subid)
 
+def test_subscription_messages_pass_mangling_function():
+  """A message received via a subscription must pass through the mangle function."""
+  ct = CommonTransport()
+  ct._subscribe = mock.Mock()
+  mock_callback = mock.Mock()
+
+  subid = ct.subscribe(mock.sentinel.channel, mock_callback)
+  assert subid
+  assert ct.subscription_callback(subid) != mock_callback
+  ct.subscription_callback(subid)(mock.sentinel.header, mock.sentinel.message)
+  mock_callback.assert_called_once_with(mock.sentinel.header, mock.sentinel.message)
+
 def test_simple_subscribe_unsubscribe_a_broadcast():
   """Public subscribe_bc()-call should be routed to specific _subscribe_bc().
      Unsubscribes should be routed to _unsubscribe() and handled properly."""
@@ -58,7 +71,7 @@ def test_simple_subscribe_unsubscribe_a_broadcast():
   mock_callback = mock.Mock()
 
   subid = ct.subscribe_broadcast(mock.sentinel.channel, mock_callback,
-        retroactive=mock.sentinel.retro)
+        retroactive=mock.sentinel.retro, disable_mangling=True)
 
   assert subid
   assert ct.subscription_callback(subid) == mock_callback
@@ -89,6 +102,18 @@ def test_simple_subscribe_unsubscribe_a_broadcast():
   # Should not be able to double-drop reference
   with pytest.raises(workflows.Error):
     ct.drop_callback_reference(subid)
+
+def test_broadcast_subscription_messages_pass_mangling_function():
+  """A message received via a broadcast subscription must pass through the mangle function."""
+  ct = CommonTransport()
+  ct._subscribe_broadcast = mock.Mock()
+  mock_callback = mock.Mock()
+
+  subid = ct.subscribe_broadcast(mock.sentinel.channel, mock_callback)
+  assert subid
+  assert ct.subscription_callback(subid) != mock_callback
+  ct.subscription_callback(subid)(mock.sentinel.header, mock.sentinel.message)
+  mock_callback.assert_called_once_with(mock.sentinel.header, mock.sentinel.message)
 
 def test_simple_send_message():
   """Pass messages to send(), should be routed to specific _send()"""

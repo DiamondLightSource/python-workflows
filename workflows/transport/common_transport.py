@@ -52,20 +52,21 @@ class CommonTransport(object):
        :return: A unique subscription ID
     '''
     self.__subscription_id += 1
+    def mangled_callback(header, message):
+      return callback(header, self._mangle_for_receiving(message))
+    if 'disable_mangling' in kwargs:
+      if kwargs['disable_mangling']:
+        mangled_callback = callback
+      del kwargs['disable_mangling']
     self.__subscriptions[self.__subscription_id] = {
       'channel': channel,
-      'callback': callback,
+      'callback': mangled_callback,
       'ack': kwargs.get('acknowledgement'),
       'unsubscribed': False,
     }
     self.log.debug('Subscribing to %s with ID %d',
         channel, self.__subscription_id)
-    if kwargs.get('disable_mangling'):
-      self._subscribe(self.__subscription_id, channel, callback, **kwargs)
-    else:
-      def callback_bounce(header, message):
-        callback(header, self._mangle_for_receiving(message))
-      self._subscribe(self.__subscription_id, channel, callback_bounce, **kwargs)
+    self._subscribe(self.__subscription_id, channel, mangled_callback, **kwargs)
     return self.__subscription_id
 
   def unsubscribe(self, subscription, drop_callback_reference=False, **kwargs):
@@ -116,22 +117,22 @@ class CommonTransport(object):
        :return: A unique subscription ID
     '''
     self.__subscription_id += 1
+    def mangled_callback(header, message):
+      return callback(header, self._mangle_for_receiving(message))
+    if 'disable_mangling' in kwargs:
+      if kwargs['disable_mangling']:
+        mangled_callback = callback
+      del kwargs['disable_mangling']
     self.__subscriptions[self.__subscription_id] = {
       'channel': channel,
-      'callback': callback,
+      'callback': mangled_callback,
       'ack': False,
       'unsubscribed': False,
     }
     self.log.debug('Subscribing to broadcasts on %s with ID %d',
         channel, self.__subscription_id)
-    if kwargs.get('disable_mangling'):
-      self._subscribe_broadcast(self.__subscription_id, channel,
-          callback, **kwargs)
-    else:
-      def callback_bounce(header, message):
-        callback(header, self._mangle_for_receiving(message))
-      self._subscribe_broadcast(self.__subscription_id, channel,
-          callback_bounce, **kwargs)
+    self._subscribe_broadcast(self.__subscription_id, channel,
+        mangled_callback, **kwargs)
     return self.__subscription_id
 
   def subscription_callback(self, subscription):

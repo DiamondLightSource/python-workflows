@@ -374,6 +374,12 @@ def test_subscribe_to_queue(mockstomp):
   stomp.connect()
   mockconn = mockstomp.Connection.return_value
 
+  def callback_resolver(cbid):
+    if cbid == 1: return mock_cb1
+    if cbid == 2: return mock_cb2
+    raise ValueError('Unknown subscription ID %r' % cbid)
+  stomp.subscription_callback = callback_resolver
+
   mockconn.set_listener.assert_called_once()
   listener = mockconn.set_listener.call_args[0][1]
   assert listener is not None
@@ -418,6 +424,12 @@ def test_subscribe_to_broadcast(mockstomp):
   stomp = StompTransport()
   stomp.connect()
   mockconn = mockstomp.Connection.return_value
+
+  def callback_resolver(cbid):
+    if cbid == 1: return mock_cb1
+    if cbid == 2: return mock_cb2
+    raise ValueError('Unknown subscription ID %r' % cbid)
+  stomp.subscription_callback = callback_resolver
 
   mockconn.set_listener.assert_called_once()
   listener = mockconn.set_listener.call_args[0][1]

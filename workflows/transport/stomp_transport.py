@@ -32,7 +32,6 @@ class StompTransport(CommonTransport):
     self._connected = False
     self._namespace = ''
     self._idcounter = 0
-    self._subscription_callbacks = {}
     self._lock = threading.RLock()
     self._stomp_listener = stomp.listener.ConnectionListener()
 #   self._stomp_listener = stomp.PrintingListener()
@@ -208,7 +207,6 @@ class StompTransport(CommonTransport):
       ack = 'client-individual'
     else:
       ack = 'auto'
-    self._subscription_callbacks[sub_id] = callback
 
     with self._lock:
       self._conn.subscribe(destination, sub_id, headers=headers, ack=ack)
@@ -236,7 +234,6 @@ class StompTransport(CommonTransport):
         headers['transformation'] = 'jms-object-json'
       else:
         headers['transformation'] = kwargs['transformation']
-    self._subscription_callbacks[sub_id] = callback
     with self._lock:
       self._conn.subscribe(destination, sub_id, headers=headers)
 
@@ -391,7 +388,7 @@ class StompTransport(CommonTransport):
   def _on_message(self, headers, body):
     subscription_id = int(headers.get('subscription'))
     with self._lock:
-      target_function = self._subscription_callbacks.get(subscription_id)
+      target_function = self.subscription_callback(subscription_id)
     if target_function is not None:
       target_function(headers, body)
     else:
