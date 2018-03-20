@@ -8,6 +8,7 @@ class CommonTransport(object):
   '''A common transport class, containing e.g. the logic to manage
      subscriptions and transactions.'''
 
+  __callback_interceptor = None
   __subscriptions = {}
   __subscription_id = 0
   __transactions = set()
@@ -138,13 +139,28 @@ class CommonTransport(object):
   def subscription_callback(self, subscription):
     '''Retrieve the callback function for a subscription. Raise a
        workflows.Error if the subscription does not exist.
+       All transport callbacks can be intercepted by setting an
+       interceptor function with subscription_callback_intercept().
        :param subscription: Subscription ID to look up
        :return: Callback function
     '''
     if subscription not in self.__subscriptions:
       raise workflows.Error \
             ("Attempting to callback on unknown subscription")
-    return self.__subscriptions[subscription]['callback']
+    callback = self.__subscriptions[subscription]['callback']
+    if self.__callback_interceptor:
+      return self.__callback_interceptor(callback)
+    return callback
+
+  def subscription_callback_set_intercept(self, interceptor):
+    '''Set a function to intercept all callbacks. This is useful to, for
+       example, keep a thread barrier between the transport related functions
+       and processing functions.
+       :param interceptor: A function that takes the original callback function
+                           and returns a modified callback function. Or None to
+                           disable interception.
+    '''
+    self.__callback_interceptor = interceptor
 
   def send(self, destination, message, **kwargs):
     '''Send a message to a queue.

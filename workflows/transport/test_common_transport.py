@@ -115,6 +115,47 @@ def test_broadcast_subscription_messages_pass_mangling_function():
   ct.subscription_callback(subid)(mock.sentinel.header, mock.sentinel.message)
   mock_callback.assert_called_once_with(mock.sentinel.header, mock.sentinel.message)
 
+@pytest.mark.parametrize('mangling', [None, True, False])
+def test_callbacks_can_be_intercepted(mangling):
+  """The function called on message receipt must be interceptable."""
+  ct = CommonTransport()
+  ct._subscribe = mock.Mock()
+  mock_true_callback = mock.Mock()
+  intercept = mock.Mock()
+
+  if mangling is None:
+    subid = ct.subscribe(mock.sentinel.channel, mock_true_callback)
+  else:
+    subid = ct.subscribe(mock.sentinel.channel, mock_true_callback, disable_mangling=mangling)
+
+  # Original code path
+  ct.subscription_callback(subid)(mock.sentinel.header, mock.sentinel.message)
+  mock_true_callback.assert_called_once_with(mock.sentinel.header, mock.sentinel.message)
+
+  # Intercept and don't pass on
+  mock_true_callback.reset_mock()
+  ct.subscription_callback_set_intercept(intercept)
+
+  ct.subscription_callback(subid)(mock.sentinel.header, mock.sentinel.message)
+  assert not mock_true_callback.called
+  intercept.assert_called_once_with(mock.ANY)
+  intercept.return_value.assert_called_once_with(mock.sentinel.header, mock.sentinel.message)
+
+  # Pass through (tests the value passed to the interceptor function is sensible)
+  intercept = lambda x: x
+  ct.subscription_callback_set_intercept(intercept)
+
+  ct.subscription_callback(subid)(mock.sentinel.header, mock.sentinel.message)
+  mock_true_callback.assert_called_once_with(mock.sentinel.header, mock.sentinel.message)
+
+  # Disable interception
+  mock_true_callback.reset_mock()
+  ct.subscription_callback_set_intercept(None)
+
+  ct.subscription_callback(subid)(mock.sentinel.header, mock.sentinel.message)
+  mock_true_callback.assert_called_once_with(mock.sentinel.header, mock.sentinel.message)
+
+
 def test_simple_send_message():
   """Pass messages to send(), should be routed to specific _send()"""
   ct = CommonTransport()
