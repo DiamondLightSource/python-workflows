@@ -2,7 +2,10 @@ from __future__ import absolute_import, division, print_function
 
 import contextlib
 import enum
+import itertools
 import logging
+import threading
+import Queue
 
 import workflows
 import workflows.logging
@@ -50,6 +53,16 @@ class Status(enum.Enum):
     '''
     self.intval = intval
     self.description = description
+
+class Priority(enum.Enum):
+  '''
+  Priorities for the service-internal priority queue. This ensures that eg.
+  frontend commands are always processed before timer events.
+  '''
+  COMMAND = 1
+  TIMER = 2
+  TRANSPORT = 3
+  IDLE = 4
 
 class CommonService(object):
   '''
@@ -128,6 +141,7 @@ class CommonService(object):
     self.__service_status = None
     self.__shutdown = False
     self.__update_service_status(self.SERVICE_STATUS_NEW)
+    self.__queue = Queue.PriorityQueue()
     self._idle_callback = None
     self._idle_time = None
 
@@ -183,6 +197,52 @@ class CommonService(object):
       raise
     finally:
       self.__log_extensions.remove((field, value))
+
+  def __command_queue_listener(self):
+    '''Function to continuously retrieve data from the frontend. Commands are
+       sent to the central priority queue. If the pipe from the frontend is
+       closed the service shutdown is initiated. Check every second if service
+       has shut down, then terminate.
+       This function is run by a separate daemon thread, which is started by
+       the __start_command_queue_listener function.
+    '''
+    self.log.debug("Queue listener thread started")
+    counter = itertools.count() # insertion sequence to keep messages in order
+    while not self.__shutdown:
+      if self.__pipe_commands.poll(1):
+        try:
+          message = self.__pipe_commands.recv()
+        except EOFError:
+          # Pipe was closed by frontend. Shut down service.
+          self.__shutdown = True
+          self.log.error("Pipe closed by frontend, shutting down service", exc_info=True)
+          break
+        queue_item = (Priority.COMMAND, next(counter), message)
+        try:
+          self.__queue.put(queue_item, True, 60)
+        except Queue.Full:
+          # If the message can't be stored within 60 seconds then the service is
+          # operating outside normal parameters. Try to shut it down.
+          self.__shutdown = True
+          self.log.error("Write to service priority queue failed, shutting down service", exc_info=True)
+          break
+    self.log.debug("Queue listener thread terminating")
+
+  def __start_command_queue_listener(self):
+    '''Start the function __command_queue_listener in a separate thread. This
+       function continuously listens to the pipe connected to the frontend.
+    '''
+    thread_function = self.__command_queue_listener
+    class QueueListenerThread(threading.Thread):
+      def run(qltself):
+        thread_function()
+
+    assert not hasattr(self, '__queue_listener_thread')
+    self.log.debug("Starting queue listener thread")
+    self.__queue_listener_thread = QueueListenerThread()
+    self.__queue_listener_thread.daemon = True
+    self.__queue_listener_thread.name = "Command Queue Listener"
+    self.__queue_listener_thread.start()
 
   def _log_send(self, logrecord):
     '''Forward log records to the frontend.'''
@@ -282,18 +342,25 @@ class CommonService(object):
       if self.__pipe_commands is None:
         # can only listen to commands if command queue is defined
         self.__shutdown = True
+      else:
+        # start listening to command queue in separate thread
+        self.__start_command_queue_listener()
 
       while not self.__shutdown: # main loop
         self.__update_service_status(self.SERVICE_STATUS_IDLE)
 
-        if self._idle_time is None \
-            or self.__pipe_commands.poll(self._idle_time):
-          message = self.__pipe_commands.recv()
+        if self._idle_time is None:
+          task = self.__queue.get()
         else:
-          self.__update_service_status(self.SERVICE_STATUS_TIMER)
-          if self._idle_callback is not None:
-            self._idle_callback()
-          continue
+          try:
+            task = self.__queue.get(True, self._idle_time)
+          except Queue.Empty:
+            self.__update_service_status(self.SERVICE_STATUS_TIMER)
+            if self._idle_callback:
+              self._idle_callback()
+            continue
+
+        message = task[2]
 
         self.__update_service_status(self.SERVICE_STATUS_PROCESSING)
 

@@ -1,10 +1,12 @@
 from __future__ import absolute_import, division, print_function
 
+import Queue
+import time
 from multiprocessing import Pipe
 
 import mock
 import pytest
-from workflows.services.common_service import Commands, CommonService
+from workflows.services.common_service import Commands, CommonService, Priority
 
 def test_instantiate_basic_service():
   '''Create a basic service object'''
@@ -140,23 +142,62 @@ def test_log_message_fieldvalue_pairs_are_attached_to_unhandled_exceptions_and_l
     assert 'zero' in record.message.lower()
     assert getattr(record, 'something', mock.sentinel.NA) == 'otherthing'
 
-def test_receive_and_follow_shutdown_command():
+@mock.patch('workflows.services.common_service.threading.Thread')
+def test_receive_frontend_commands(mock_thread):
+  '''Check that messages via the command pipe land on the main queue.'''
+  cmd_pipe = mock.Mock()
+  cmd_pipe.poll.side_effect = [
+      True, True, True,
+      AssertionError('Read past pipe lifetime')
+  ]
+  cmd_pipe.recv.side_effect = [
+      mock.sentinel.msg1,
+      mock.sentinel.msg2,
+      EOFError(),
+      AssertionError('Read past pipe lifetime'),
+  ]
+  main_queue = mock.Mock()
+
+  # Create service
+  service = CommonService()
+  service._CommonService__queue = main_queue
+  service.connect(commands=cmd_pipe, frontend=mock.Mock())
+
+  # Check that thread would be started
+  service._CommonService__start_command_queue_listener()
+  mock_thread.start.assert_called_once()
+  assert mock_thread.daemon == True
+  # Can't make assertions about the run() method, limitations of mocking
+
+  # Now start listener in main thread
+  service._CommonService__command_queue_listener()
+  main_queue.put.assert_called()
+  expected = [
+      mock.call((Priority.COMMAND, 0, mock.sentinel.msg1), True, mock.ANY),
+      mock.call((Priority.COMMAND, 1, mock.sentinel.msg2), True, mock.ANY),
+  ]
+  assert main_queue.put.call_args_list == expected
+
+def test_observe_shutdown_command():
   '''Receive a shutdown message via the command pipe and act on it.
      Check that status codes are updated properly.'''
-  cmd_pipe = mock.Mock()
-  cmd_pipe.poll.return_value = True
-  cmd_pipe.recv.side_effect = [
-    { 'band': 'command',
-      'payload': Commands.SHUTDOWN },
-    AssertionError('Not observing commands') ]
+  start_cmd_queue_listener = mock.Mock()
+  main_queue = mock.Mock()
+  main_queue.get.side_effect = [
+      (None, None, { 'band': 'command', 'payload': Commands.SHUTDOWN }),
+      AssertionError('Not observing commands'),
+  ]
   fe_pipe, fe_pipe_out = Pipe()
 
   # Create service
   service = CommonService()
-  service.connect(commands=cmd_pipe, frontend=fe_pipe)
+  service.connect(commands=mock.Mock(), frontend=fe_pipe)
   # override class API to ensure overidden functions are called
   service.initializing = mock.Mock()
   service.in_shutdown = mock.Mock()
+  # override service queue management
+  service._CommonService__start_command_queue_listener = start_cmd_queue_listener
+  service._CommonService__queue = main_queue
 
   # Check new status
   messages = []
@@ -172,7 +213,7 @@ def test_receive_and_follow_shutdown_command():
   # Check startup/shutdown sequence
   service.initializing.assert_called_once()
   service.in_shutdown.assert_called_once()
-  cmd_pipe.recv.assert_called_once_with()
+  main_queue.get.assert_called_once_with()
   messages = []
   while fe_pipe_out.poll():
     message = fe_pipe_out.recv()
@@ -188,30 +229,35 @@ def test_receive_and_follow_shutdown_command():
 
 def test_idle_timer_is_triggered():
   '''Check that the idle timer callback is run if set.'''
-  cmd_pipe = mock.Mock()
-  cmd_pipe.poll.side_effect = [ False, True ]
-  cmd_pipe.recv.side_effect = [
-    { 'band': 'command',
-      'payload': Commands.SHUTDOWN },
-    AssertionError('Not observing commands') ]
+  start_cmd_queue_listener = mock.Mock()
+  main_queue = mock.Mock()
+  main_queue.get.side_effect = [
+      Queue.Empty(),
+      (None, None, { 'band': 'command', 'payload': Commands.SHUTDOWN }),
+      AssertionError('Not observing commands'),
+  ]
   fe_pipe, fe_pipe_out = Pipe()
   idle_trigger = mock.Mock()
 
   # Create service
   service = CommonService()
-  service.connect(commands=cmd_pipe, frontend=fe_pipe)
-  service._register_idle(10, idle_trigger)
+  service.connect(commands=mock.Mock(), frontend=fe_pipe)
+  service._register_idle(mock.sentinel.idle_time, idle_trigger)
+
+  # Override service queue management
+  service._CommonService__start_command_queue_listener = start_cmd_queue_listener
+  service._CommonService__queue = main_queue
 
   # Start service
   service.start()
 
-  # Check trigger has been called
+  # Check trigger has been called after correct time
   idle_trigger.assert_called_once_with()
+  main_queue.get.assert_called_with(True, mock.sentinel.idle_time)
+  assert main_queue.get.call_count == 2
 
   # Check startup/shutdown sequence
-  cmd_pipe.recv.assert_called_once_with()
-  assert cmd_pipe.poll.call_count == 2
-  assert cmd_pipe.poll.call_args == ((10,),)
+  start_cmd_queue_listener.assert_called_once_with()
   messages = []
   while fe_pipe_out.poll():
     message = fe_pipe_out.recv()
@@ -254,39 +300,6 @@ def test_callbacks_are_routed_correctly():
 
 def test_log_unknown_band_data():
   '''All unidentified messages should be logged to the frondend.'''
-  cmd_pipe = mock.Mock()
-  cmd_pipe.poll.return_value = True
-  cmd_pipe.recv.side_effect = [
-    { 'band': mock.sentinel.band, 'payload': mock.sentinel.failure1 },
-    { 'payload': mock.sentinel.failure2 },
-    { 'band': 'command',
-      'payload': Commands.SHUTDOWN },
-    AssertionError('Not observing commands') ]
-  fe_pipe, fe_pipe_out = Pipe()
-
-  # Create service
-  service = CommonService()
-  service.connect(commands=cmd_pipe, frontend=fe_pipe)
-
-  # Start service
-  service.start()
-
-  # Check startup/shutdown sequence
-  messages = []
-  while fe_pipe_out.poll():
-    message = fe_pipe_out.recv()
-    if message.get('band') == 'log':
-      messages.append(message.get('payload'))
-  assert len(messages) == 2
-  assert messages[0].name == 'workflows.service'
-  assert 'unregistered band' in messages[0].message
-  assert str(mock.sentinel.band) in messages[0].message
-  assert messages[1].name == 'workflows.service'
-  assert 'without band' in messages[1].message
-
-def test_log_unknown_band_data_using_legacy_initialization():
-  '''Same as above, but using old initialization,
-     passing the pipes directly to the constructor'''
   cmd_pipe = mock.Mock()
   cmd_pipe.poll.return_value = True
   cmd_pipe.recv.side_effect = [
