@@ -186,11 +186,21 @@ class Recipe(object):
           => { 'x': [ 1, 2 ] }
     '''
 
+    class SafeString(object):
+      def __init__(self, s):
+        self.string = s
+      def __repr__(self):
+        return '{' + self.string + '}'
+      def __str__(self):
+        return '{' + self.string + '}'
+      def __getitem__(self, item):
+        return SafeString(self.string + '[' + item + ']')
+
     class SafeDict(dict):
       '''A dictionary that returns undefined keys as {keyname}.
          This can be used to selectively replace variables in datastructures.'''
       def __missing__(self, key):
-        return '{' + key + '}'
+        return SafeString(key)
 
     # By default the python formatter class is used to resolve {item} references
     formatter = string.Formatter()

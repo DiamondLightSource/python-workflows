@@ -255,6 +255,28 @@ def test_replacing_parameters_in_recipe():
   assert A.recipe[1]['queue'] == 'some.queue.{first}'
   assert A.recipe[2]['queue'] == 'another.queue.replacement'
 
+def test_replacing_parameters_in_recipe_should_keep_unknown_parameter_strings():
+  '''Recipe may contain placeholders that can't be resolved. These should stay as they are.'''
+  A = workflows.recipe.Recipe({
+        1: { 'service': 'A service',
+             'queue': 'some.queue.{first}',
+             'output': 2,
+           },
+        2: { 'service': 'C service',
+             'queue': 'another.queue.{unknownparameter[key][subkey]}',
+           },
+        'start': [
+           (1, {}),
+        ]
+      })
+
+  replacements = {'name': 'replacement'}
+
+  A.apply_parameters(replacements)
+
+  assert A.recipe[1]['queue'] == 'some.queue.{first}'
+  assert A.recipe[2]['queue'] == 'another.queue.{unknownparameter[key][subkey]}'
+
 def test_replacing_parameters_in_recipe_with_datastructures():
   '''Recipe may contain placeholders that should be replaced with actual data structures by running apply_parameters.'''
   A, _ = generate_recipes()
