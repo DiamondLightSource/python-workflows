@@ -14,6 +14,7 @@
 
 # Testing output
 /.cache
+.pytest_cache
 
 # Sonarqube
 /.scannerwork
