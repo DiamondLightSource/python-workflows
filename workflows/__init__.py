@@ -1,6 +1,6 @@
 from __future__ import absolute_import, division, print_function
 
-__version__ = '0.68'
+__version__ = '0.69'
 
 def version():
   '''Returns the version number of the installed workflows package.'''
