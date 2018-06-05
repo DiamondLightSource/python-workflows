@@ -193,7 +193,7 @@ class Frontend():
                                     self._service_status, self._service_status)
           else:
             error_message = "Service may have died unexpectedly" \
-                            " (last known status: %s" \
+                            " (last known status: %s)" \
                             % CommonService.human_readable_state.get( \
                                     self._service_status, self._service_status)
           if error_message:
