@@ -144,10 +144,11 @@ class CommonTransport(object):
        :param subscription: Subscription ID to look up
        :return: Callback function
     '''
-    if subscription not in self.__subscriptions:
+    subscription_record = self.__subscriptions.get(subscription)
+    if not subscription_record:
       raise workflows.Error \
             ("Attempting to callback on unknown subscription")
-    callback = self.__subscriptions[subscription]['callback']
+    callback = subscription_record['callback']
     if self.__callback_interceptor:
       return self.__callback_interceptor(callback)
     return callback
