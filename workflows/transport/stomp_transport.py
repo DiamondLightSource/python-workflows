@@ -150,10 +150,9 @@ class StompTransport(CommonTransport):
 
   def disconnect(self):
     '''Gracefully close connection to stomp server.'''
-    with self._lock:
-      if self._connected:
-        self._conn.disconnect()
-        self._connected = False
+    if self._connected:
+      self._connected = False
+      self._conn.disconnect()
 
   def broadcast_status(self, status):
     '''Broadcast transient status information to all listeners'''
@@ -204,8 +203,7 @@ class StompTransport(CommonTransport):
     else:
       ack = 'auto'
 
-    with self._lock:
-      self._conn.subscribe(destination, sub_id, headers=headers, ack=ack)
+    self._conn.subscribe(destination, sub_id, headers=headers, ack=ack)
 
   def _subscribe_broadcast(self, sub_id, channel, callback, **kwargs):
     '''Listen to a broadcast topic, notify via callback function.
@@ -230,8 +228,7 @@ class StompTransport(CommonTransport):
         headers['transformation'] = 'jms-object-json'
       else:
         headers['transformation'] = kwargs['transformation']
-    with self._lock:
-      self._conn.subscribe(destination, sub_id, headers=headers)
+    self._conn.subscribe(destination, sub_id, headers=headers)
 
   def _unsubscribe(self, subscription, **kwargs):
     '''Stop listening to a queue or a broadcast
@@ -269,14 +266,13 @@ class StompTransport(CommonTransport):
       destination = '/queue/' + destination
     else:
       destination = '/queue/' + self._namespace + destination
-    with self._lock:
-      try:
-        self._conn.send(
+    try:
+      self._conn.send(
           destination, message,
           headers=headers, **kwargs)
-      except stomp.exception.NotConnectedException:
-        self._connected = False
-        raise workflows.Disconnected('No connection to stomp host')
+    except stomp.exception.NotConnectedException:
+      self._connected = False
+      raise workflows.Disconnected('No connection to stomp host')
 
   def _broadcast(self, destination, message, headers=None, delay=None,
                  expiration=None, **kwargs):
@@ -301,38 +297,34 @@ class StompTransport(CommonTransport):
       destination = '/topic/' + destination
     else:
       destination = '/topic/' + self._namespace + destination
-    with self._lock:
-      try:
-        self._conn.send(
+    try:
+      self._conn.send(
           destination, message,
           headers=headers, **kwargs)
-      except stomp.exception.NotConnectedException:
-        self._connected = False
-        raise
+    except stomp.exception.NotConnectedException:
+      self._connected = False
+      raise
 
   def _transaction_begin(self, transaction_id, **kwargs):
     '''Start a new transaction.
        :param transaction_id: ID for this transaction in the transport layer.
        :param **kwargs: Further parameters for the transport layer.
     '''
-    with self._lock:
-      self._conn.begin(transaction=transaction_id)
+    self._conn.begin(transaction=transaction_id)
 
   def _transaction_abort(self, transaction_id, **kwargs):
     '''Abort a transaction and roll back all operations.
        :param transaction_id: ID of transaction to be aborted.
        :param **kwargs: Further parameters for the transport layer.
     '''
-    with self._lock:
-      self._conn.abort(transaction_id)
+    self._conn.abort(transaction_id)
 
   def _transaction_commit(self, transaction_id, **kwargs):
     '''Commit a transaction.
        :param transaction_id: ID of transaction to be committed.
        :param **kwargs: Further parameters for the transport layer.
     '''
-    with self._lock:
-      self._conn.commit(transaction_id)
+    self._conn.commit(transaction_id)
 
   def _ack(self, message_id, subscription_id, **kwargs):
     '''Acknowledge receipt of a message. This only makes sense when the
@@ -343,8 +335,7 @@ class StompTransport(CommonTransport):
               transaction: Transaction ID if acknowledgement should be part of
                            a transaction
     '''
-    with self._lock:
-      self._conn.ack(message_id, subscription_id, **kwargs)
+    self._conn.ack(message_id, subscription_id, **kwargs)
 
   def _nack(self, message_id, subscription_id, **kwargs):
     '''Reject receipt of a message. This only makes sense when the
@@ -355,8 +346,7 @@ class StompTransport(CommonTransport):
               transaction: Transaction ID if rejection should be part of a
                            transaction
     '''
-    with self._lock:
-      self._conn.nack(message_id, subscription_id, **kwargs)
+    self._conn.nack(message_id, subscription_id, **kwargs)
 
   @staticmethod
   def _mangle_for_sending(message):
@@ -383,9 +373,8 @@ class StompTransport(CommonTransport):
 
   def _on_message(self, headers, body):
     subscription_id = int(headers.get('subscription'))
-    with self._lock:
-      target_function = self.subscription_callback(subscription_id)
-    if target_function is not None:
+    target_function = self.subscription_callback(subscription_id)
+    if target_function:
       target_function(headers, body)
     else:
       raise workflows.Error('Unhandled message %s %s' % (repr(headers), repr(body)))
