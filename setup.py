@@ -28,7 +28,8 @@ if sys.version_info < (2,7):
   sys.exit('Sorry, Python < 2.7 is not supported')
 
 setup(name='workflows',
-      description='Supervised data processing in distributed environments',
+      description='Data processing in distributed environments',
+      long_description='Workflows enables light-weight services to process tasks in a message-oriented environment.',
       url='https://github.com/DiamondLightSource/python-workflows',
       author='Markus Gerstel',
       author_email='scientificsoftware@diamond.ac.uk',
@@ -56,7 +57,7 @@ setup(name='workflows',
                      'pytest'],
       zip_safe=False,
       classifiers = [
-        'Development Status :: 4 - Beta',
+        'Development Status :: 5 - Production/Stable',
         'License :: OSI Approved :: BSD License',
         'Programming Language :: Python :: 2',
         'Programming Language :: Python :: 2.7',
