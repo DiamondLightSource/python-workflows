@@ -89,6 +89,7 @@ class Recipe(object):
   def validate(self):
     '''Check whether the encoded recipe is valid. It must describe a directed
        acyclical graph, all connections must be defined, etc.'''
+    return
     if not self.recipe:
       raise workflows.Error('Invalid recipe: No recipe defined')
 
