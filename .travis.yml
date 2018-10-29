@@ -17,7 +17,7 @@ addons:
   sonarqube:
     organization: "anthchirp-github"
     token:
-      secure: "W77DpqnebG/pDBMWJ5eeX1B2r0xIqOgbiZDYcFD7Mpso+PeGtDBpUZ9gLxHbnWwoFSmITJFESHGs2zNRsBq1GmnkD4nEDV/E1zIse6Cq/xHzzg3cO5vyzM7dlnUteYeZEHNRXqyukCtvneYcr4wJpAPGM+hcY4TDeIwkvyNYbbT3zBfVnBmh6/M6RDhiyYLUmCmu8j+p76wbMVbb6YSkX0Xq0RCa6tY4uXI9bDMbgcWgRzGMa1VZvsjWY3zPwhKLeUj3twX6Q76zbt9xpqsLX+7++2XXEBfylwgGXEacLWHqO6NGNZC4iZEqwCanurUopje3Ti9wEqQ6cOjrULSK6QDubIhWa8YB8fMPPcP0UZV/IYmyqS3620Z6YNZcCB0nb8J+jE2z33ETJg+2Lq/MccUjZTCAJbVGdSnrsbHZ5RIbbvJAoB+lYPCVWoG0VVac/M4+IJeRWJD5HyBZlNM8HnqT/TQCaOyyUqwZh0vDcPzzRHXuKQ+5CjSYvkOn7Q9mrf3tLT0qJA6I5O0dHNfNJ/4vh9g7Y+wBe8Yx1qpNVpcc1/fdZ5glKXhw6LdqoAPSmVT/SUi2E/TCyhfFFGz9w6DOqSGxrCDbqw0WHBss/E81jw01XrHaJzTfuMEu7O4F86ljVMLPlf1pBFFubKlbtnMxd0wzfdYaZXdbIZVyLLY="
+      secure: W77DpqnebG/pDBMWJ5eeX1B2r0xIqOgbiZDYcFD7Mpso+PeGtDBpUZ9gLxHbnWwoFSmITJFESHGs2zNRsBq1GmnkD4nEDV/E1zIse6Cq/xHzzg3cO5vyzM7dlnUteYeZEHNRXqyukCtvneYcr4wJpAPGM+hcY4TDeIwkvyNYbbT3zBfVnBmh6/M6RDhiyYLUmCmu8j+p76wbMVbb6YSkX0Xq0RCa6tY4uXI9bDMbgcWgRzGMa1VZvsjWY3zPwhKLeUj3twX6Q76zbt9xpqsLX+7++2XXEBfylwgGXEacLWHqO6NGNZC4iZEqwCanurUopje3Ti9wEqQ6cOjrULSK6QDubIhWa8YB8fMPPcP0UZV/IYmyqS3620Z6YNZcCB0nb8J+jE2z33ETJg+2Lq/MccUjZTCAJbVGdSnrsbHZ5RIbbvJAoB+lYPCVWoG0VVac/M4+IJeRWJD5HyBZlNM8HnqT/TQCaOyyUqwZh0vDcPzzRHXuKQ+5CjSYvkOn7Q9mrf3tLT0qJA6I5O0dHNfNJ/4vh9g7Y+wBe8Yx1qpNVpcc1/fdZ5glKXhw6LdqoAPSmVT/SUi2E/TCyhfFFGz9w6DOqSGxrCDbqw0WHBss/E81jw01XrHaJzTfuMEu7O4F86ljVMLPlf1pBFFubKlbtnMxd0wzfdYaZXdbIZVyLLY=
 jdk:
   - oraclejdk8
 install:
@@ -31,3 +31,18 @@ after_success:
 cache:
   directories:
     - '$HOME/.sonar/cache'
+
+# Assuming you have installed the travis-ci CLI tool, after you
+# create the Github repo and add it to Travis, run the
+# following command to finish PyPI deployment setup:
+# $ travis encrypt --add deploy.password
+deploy:
+  provider: pypi
+  distributions: sdist bdist_wheel
+  user: mgerstel
+  password:
+    secure: NULlNoAVRpUzqYJhs1g/P57Y98bcXsntxhv7KlGXKsVEIlcP14bzlirh3+kWVsyu197/PX6spHjWi6BQHzIDKPXoI1bCwMApLE+7Z4gZYp6lZ0zI86B0WQoYc3r1Dzth8mBl6Uy2sGG1SaPqbC8CxAdGKOt/fnP9PCJWmkHZzB0WGID5NIjZLaGiciZ7pHugrwg6MeAX/F71oSXNN4RpH1owZWeyesEdc+3SKuSltynHqinL5mcP3xLyzBs8JlUL89GTnEATrqIEBMLU7NXzdoFZjdgYyTpuT6xp7Q2/iHNUa6j9oXVJcxDMJuuPuRcTw0GiU0chtUB/+IFBXbVv8SpKotoaflm1kjqGjlFn2YzeZLJS4hcGMUSYXxvFX1kr92o7cRTVKwkknkJE52gU2bug6DRMYUgs7C+Dty2scEAKudB0DC0KJrJ5S5g9886NGkAQ8UW6UmhhbFr+4p7xQjYQ/cqcULdgwBPOfR///eu78DwfrtUl98/lsWQDwjrue5o7iTQsFx0Tkf3AC7nCKX2vpKG8aHWrfMXRjiVclttwV4DidUX88GQEHSIqTRhOZfgAjN80nQHueCoCQYIv/WC5UXU5R+BAi5aGJaKRgXOGG5qZXncCaSNtPytBC5/IDbfWIgIOMzG7H3FVsOw5XusiURraon6dxOIbOl9pEZg=
+  on:
+    tags: true
+    repo: DiamondLightSource/python-workflows
+    python: 3.7
