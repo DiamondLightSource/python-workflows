@@ -60,7 +60,7 @@ def test_wrapping_a_subscription(rw_mock):
   '''Test queue subscription with recipe wrapper.'''
   transport, recipient = mock.Mock(), mock.Mock()
 
-  workflows.recipe.wrap_subscribe(transport, mock.sentinel.channel, recipient,
+  sid = workflows.recipe.wrap_subscribe(transport, mock.sentinel.channel, recipient,
       mock.sentinel.irrelevant_extra_arg, keyword=mock.sentinel.keyword_arg)
 
   # Channel and any extra arguments must be passed on to transport layer.
@@ -69,6 +69,7 @@ def test_wrapping_a_subscription(rw_mock):
       mock.sentinel.irrelevant_extra_arg, keyword=mock.sentinel.keyword_arg)
   callback = transport.subscribe.call_args[0][1]
   assert callback != recipient
+  assert sid == transport.subscribe.return_value
 
   # Part II: Message handling via unwrapper
   check_message_handling_via_unwrapper(callback, recipient, transport, rw_mock, False)
@@ -78,12 +79,13 @@ def test_wrapping_a_subscription_allowing_non_recipe_messages(rw_mock):
   '''Test queue subscription with recipe wrapper allowing non-recipe messages to pass through.'''
   transport, recipient = mock.Mock(), mock.Mock()
 
-  workflows.recipe.wrap_subscribe(transport, mock.sentinel.channel, recipient,
+  sid = workflows.recipe.wrap_subscribe(transport, mock.sentinel.channel, recipient,
       mock.sentinel.irrelevant_extra_arg, keyword=mock.sentinel.keyword_arg,
       allow_non_recipe_messages=True)
 
   transport.subscribe.assert_called_once()
   callback = transport.subscribe.call_args[0][1]
+  assert sid == transport.subscribe.return_value
 
   # Part II: Message handling via unwrapper
   check_message_handling_via_unwrapper(callback, recipient, transport, rw_mock, True)
@@ -93,7 +95,7 @@ def test_wrapping_a_broadcast_subscription(rw_mock):
   '''Test topic subscription with recipe wrapper.'''
   transport, recipient = mock.Mock(), mock.Mock()
 
-  workflows.recipe.wrap_subscribe_broadcast(transport, mock.sentinel.channel, recipient,
+  sid = workflows.recipe.wrap_subscribe_broadcast(transport, mock.sentinel.channel, recipient,
       mock.sentinel.irrelevant_extra_arg, keyword=mock.sentinel.keyword_arg)
 
   # Channel and any extra arguments must be passed on to transport layer.
@@ -102,6 +104,7 @@ def test_wrapping_a_broadcast_subscription(rw_mock):
       mock.sentinel.irrelevant_extra_arg, keyword=mock.sentinel.keyword_arg)
   callback = transport.subscribe_broadcast.call_args[0][1]
   assert callback != recipient
+  assert sid == transport.subscribe_broadcast.return_value
 
   # Part II: Message handling via unwrapper
   check_message_handling_via_unwrapper(callback, recipient, transport, rw_mock, False)
@@ -124,7 +127,7 @@ def test_wrapping_a_subscription_with_log_extension():
     lext.exit.assert_not_called()
     lext.recipient()
 
-  workflows.recipe.wrap_subscribe(transport, mock.sentinel.channel, recipient,
+  sid = workflows.recipe.wrap_subscribe(transport, mock.sentinel.channel, recipient,
       log_extender=lext)
 
   # Channel and any extra arguments must be passed on to transport layer.
@@ -132,6 +135,7 @@ def test_wrapping_a_subscription_with_log_extension():
   transport.subscribe.assert_called_once_with(mock.sentinel.channel, mock.ANY)
   callback = transport.subscribe.call_args[0][1]
   assert callback != recipient
+  assert sid == transport.subscribe.return_value
 
   # Part II: Message handling
 

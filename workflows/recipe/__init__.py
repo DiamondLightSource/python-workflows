@@ -25,6 +25,7 @@ def _wrap_subscription(transport_layer, subscription_call, channel, callback,
                         to connect all messages originating from the same
                         recipe, then the information will be passed to this
                         function, which must be a context manager factory.
+       :return:         Return value of call to subscription_call.
   '''
 
   allow_non_recipe_messages = kwargs.pop('allow_non_recipe_messages', False)
@@ -53,7 +54,7 @@ def _wrap_subscription(transport_layer, subscription_call, channel, callback,
 #                    str(header)[:1000], str(message)[:1000])
     transport_layer.nack(header)
 
-  subscription_call(channel, unwrap_recipe, *args, **kwargs)
+  return subscription_call(channel, unwrap_recipe, *args, **kwargs)
 
 def wrap_subscribe(transport_layer, channel, callback, *args, **kwargs):
   '''Listen to a queue on the transport layer, similar to the subscribe call in
@@ -66,10 +67,11 @@ def wrap_subscribe(transport_layer, channel, callback, *args, **kwargs):
                         The callback will pass three arguments,
                         a RecipeWrapper object (details below), the header as
                         a dictionary structure, and the message.
+       :return: A unique subscription ID
   '''
 
-  _wrap_subscription(transport_layer, transport_layer.subscribe,
-                     channel, callback, *args, **kwargs)
+  return _wrap_subscription(transport_layer, transport_layer.subscribe,
+                            channel, callback, *args, **kwargs)
 
 def wrap_subscribe_broadcast(transport_layer, channel, callback, *args, **kwargs):
   '''Listen to a topic on the transport layer, similar to the
@@ -82,7 +84,13 @@ def wrap_subscribe_broadcast(transport_layer, channel, callback, *args, **kwargs
                         The callback will pass three arguments,
                         a RecipeWrapper object (details below), the header as
                         a dictionary structure, and the message.
+       :return: A unique subscription ID
   '''
 
-  _wrap_subscription(transport_layer, transport_layer.subscribe_broadcast,
-                     channel, callback, *args, **kwargs)
+  return _wrap_subscription(
+      transport_layer,
+      transport_layer.subscribe_broadcast,
+      channel,
+      callback,
+      *args, **kwargs
+  )
