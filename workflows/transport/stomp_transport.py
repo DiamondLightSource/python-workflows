@@ -259,7 +259,7 @@ class StompTransport(CommonTransport):
     if delay:
       # The 'delay' mechanism is only supported when
       # schedulerSupport is enabled on the broker.
-      headers['AMQ_SCHEDULED_DELAY'] = 1000 * delay
+      headers['AMQ_SCHEDULED_DELAY'] = int(1000 * delay)
     if expiration:
       headers['expires'] = int((time.time() + expiration) * 1000)
     if kwargs.get('ignore_namespace'):
