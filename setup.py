@@ -17,7 +17,7 @@ setup(name='workflows',
       author='Markus Gerstel',
       author_email='scientificsoftware@diamond.ac.uk',
       download_url="https://github.com/DiamondLightSource/python-workflows/releases",
-      version='1.0',
+      version='1.0.1',
       install_requires=[
           'enum-compat',
           'six',
