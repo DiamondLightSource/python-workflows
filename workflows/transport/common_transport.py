@@ -177,6 +177,20 @@ class CommonTransport(object):
     message = self._mangle_for_sending(message)
     self._send(destination, message, **kwargs)
 
+  def raw_send(self, destination, message, **kwargs):
+    '''Send a raw (unmangled) message to a queue.
+       This may cause errors if the receiver expects a mangled message.
+       :param destination: Queue name to send to
+       :param message: Either a string or a serializable object to be sent
+       :param **kwargs: Further parameters for the transport layer. For example
+              delay: Delay transport of message by this many seconds
+              headers: Optional dictionary of header entries
+              expiration: Optional expiration time, relative to sending time
+              transaction: Transaction ID if message should be part of a
+                           transaction
+    '''
+    self._send(destination, message, **kwargs)
+
   def broadcast(self, destination, message, **kwargs):
     '''Broadcast a message.
        :param destination: Topic name to send to
@@ -189,6 +203,20 @@ class CommonTransport(object):
                            transaction
     '''
     message = self._mangle_for_sending(message)
+    self._broadcast(destination, message, **kwargs)
+
+  def raw_broadcast(self, destination, message, **kwargs):
+    '''Broadcast a raw (unmangled) message.
+       This may cause errors if the receiver expects a mangled message.
+       :param destination: Topic name to send to
+       :param message: Either a string or a serializable object to be sent
+       :param **kwargs: Further parameters for the transport layer. For example
+              delay: Delay transport of message by this many seconds
+              headers: Optional dictionary of header entries
+              expiration: Optional expiration time, relative to sending time
+              transaction: Transaction ID if message should be part of a
+                           transaction
+    '''
     self._broadcast(destination, message, **kwargs)
 
   def ack(self, message, subscription_id=None, **kwargs):

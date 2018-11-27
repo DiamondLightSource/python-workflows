@@ -322,6 +322,31 @@ def test_messages_are_serialized_for_transport(mockstomp):
     stomp.send(str(mock.sentinel.channel), mock.sentinel.unserializable)
 
 @mock.patch('workflows.transport.stomp_transport.stomp')
+def test_messages_are_not_serialized_for_raw_transport(mockstomp):
+  '''Test the raw sending methods.'''
+  banana = '{"entry": [0, "banana"]}'
+  stomp = StompTransport()
+  stomp.connect()
+  mockconn = mockstomp.Connection.return_value
+
+  stomp.raw_send(str(mock.sentinel.channel1), banana)
+  mockconn.send.assert_called_once()
+  args, kwargs = mockconn.send.call_args
+  assert args == ('/queue/' + str(mock.sentinel.channel1), banana)
+
+  mockconn.send.reset_mock()
+  stomp.raw_broadcast(str(mock.sentinel.channel2), banana)
+  mockconn.send.assert_called_once()
+  args, kwargs = mockconn.send.call_args
+  assert args == ('/topic/' + str(mock.sentinel.channel2), banana)
+
+  mockconn.send.reset_mock()
+  stomp.raw_send(str(mock.sentinel.channel), mock.sentinel.unserializable)
+  mockconn.send.assert_called_once()
+  args, kwargs = mockconn.send.call_args
+  assert args == ('/queue/' + str(mock.sentinel.channel), mock.sentinel.unserializable)
+
+@mock.patch('workflows.transport.stomp_transport.stomp')
 def test_messages_are_deserialized_after_transport(mockstomp):
   '''Test the message serialization.'''
   banana = { 'entry': [ 0, 'banana' ] }
