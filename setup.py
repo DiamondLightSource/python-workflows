@@ -19,7 +19,7 @@ setup(name='workflows',
       download_url="https://github.com/DiamondLightSource/python-workflows/releases",
       version='1.1',
       install_requires=[
-          'enum-compat',
+          'enum34;python_version<"3.4"',
           'six',
           'stomp.py',
       ],
