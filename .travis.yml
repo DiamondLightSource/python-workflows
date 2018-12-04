@@ -1,5 +1,4 @@
 dist: trusty
-sudo: required
 
 language: python
 
@@ -20,6 +19,8 @@ addons:
       secure: W77DpqnebG/pDBMWJ5eeX1B2r0xIqOgbiZDYcFD7Mpso+PeGtDBpUZ9gLxHbnWwoFSmITJFESHGs2zNRsBq1GmnkD4nEDV/E1zIse6Cq/xHzzg3cO5vyzM7dlnUteYeZEHNRXqyukCtvneYcr4wJpAPGM+hcY4TDeIwkvyNYbbT3zBfVnBmh6/M6RDhiyYLUmCmu8j+p76wbMVbb6YSkX0Xq0RCa6tY4uXI9bDMbgcWgRzGMa1VZvsjWY3zPwhKLeUj3twX6Q76zbt9xpqsLX+7++2XXEBfylwgGXEacLWHqO6NGNZC4iZEqwCanurUopje3Ti9wEqQ6cOjrULSK6QDubIhWa8YB8fMPPcP0UZV/IYmyqS3620Z6YNZcCB0nb8J+jE2z33ETJg+2Lq/MccUjZTCAJbVGdSnrsbHZ5RIbbvJAoB+lYPCVWoG0VVac/M4+IJeRWJD5HyBZlNM8HnqT/TQCaOyyUqwZh0vDcPzzRHXuKQ+5CjSYvkOn7Q9mrf3tLT0qJA6I5O0dHNfNJ/4vh9g7Y+wBe8Yx1qpNVpcc1/fdZ5glKXhw6LdqoAPSmVT/SUi2E/TCyhfFFGz9w6DOqSGxrCDbqw0WHBss/E81jw01XrHaJzTfuMEu7O4F86ljVMLPlf1pBFFubKlbtnMxd0wzfdYaZXdbIZVyLLY=
 jdk:
   - oraclejdk8
+before_install:
+  - ./.travis-update-setuptools
 install:
   - pip install .
   - pip install 'pytest>=3.6' pytest-cov pytest-timeout coveralls
