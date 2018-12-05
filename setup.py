@@ -20,6 +20,7 @@ setup(name='workflows',
       version='1.2.1',
       install_requires=[
           'enum34;python_version<"3.4"',
+          'setuptools',
           'six',
           'stomp.py',
       ],
