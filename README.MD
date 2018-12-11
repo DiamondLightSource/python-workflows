@@ -1,4 +1,5 @@
 [![PYPI release](https://img.shields.io/pypi/v/workflows.svg)](https://pypi.python.org/pypi/workflows)
+[![Conda Version](https://img.shields.io/conda/vn/conda-forge/workflows.svg)](https://anaconda.org/conda-forge/workflows)
 [![Build Status](https://travis-ci.org/DiamondLightSource/python-workflows.svg?branch=master)](https://travis-ci.org/DiamondLightSource/python-workflows)
 [![Coverage Status](https://coveralls.io/repos/github/DiamondLightSource/python-workflows/badge.svg?branch=master)](https://coveralls.io/github/DiamondLightSource/python-workflows?branch=master)
 
