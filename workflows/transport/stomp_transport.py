@@ -42,13 +42,6 @@ class StompTransport(CommonTransport):
     return self._namespace
 
   @classmethod
-  def _set_parameter(cls, option, opt, value, parser):
-    '''callback function for optionparser'''
-    cls.config[opt] = value
-    if opt == '--stomp-conf':
-      cls.load_configuration_file(value)
-
-  @classmethod
   def load_configuration_file(cls, filename):
     cfgparser = configparser.ConfigParser(allow_no_value=True)
     if not cfgparser.read(filename):
@@ -66,38 +59,94 @@ class StompTransport(CommonTransport):
         pass
 
   @classmethod
-  def add_command_line_options(cls, optparser):
+  def add_command_line_options(cls, parser):
     '''function to inject command line parameters'''
+    if 'add_argument' in dir(parser):
+      return cls.add_command_line_options_argparse(parser)
+    else:
+      return cls.add_command_line_options_optparse(parser)
+
+  @classmethod
+  def add_command_line_options_argparse(cls, argparser):
+    '''function to inject command line parameters into
+       a Python ArgumentParser.'''
+    import argparse
+    class SetParameter(argparse.Action):
+      '''callback object for ArgumentParser'''
+      def __call__(self, parser, namespace, value, option_string=None):
+        cls.config[option_string] = value
+        if option_string == '--stomp-conf':
+          cls.load_configuration_file(value)
+    argparser.add_argument('--stomp-host', metavar='HOST',
+      default=cls.defaults.get('--stomp-host'),
+      help="Stomp broker address, default '%(default)s'",
+      type=str,
+      action=SetParameter)
+    argparser.add_argument('--stomp-port', metavar='PORT',
+      default=cls.defaults.get('--stomp-port'),
+      help="Stomp broker port, default '%(default)s'",
+      type=int,
+      action=SetParameter)
+    argparser.add_argument('--stomp-user', metavar='USER',
+      default=cls.defaults.get('--stomp-user'),
+      help="Stomp user, default '%(default)s'",
+      type=str,
+      action=SetParameter)
+    argparser.add_argument('--stomp-pass', metavar='PASS',
+      default=cls.defaults.get('--stomp-pass'),
+      help="Stomp password",
+      type=str,
+      action=SetParameter)
+    argparser.add_argument('--stomp-prfx', metavar='PRE',
+      default=cls.defaults.get('--stomp-prfx'),
+      help="Stomp namespace prefix, default '%(default)s'",
+      type=str,
+      action=SetParameter)
+    argparser.add_argument('--stomp-conf', metavar='CNF',
+      default=cls.defaults.get('--stomp-conf'),
+      help='Stomp configuration file containing connection information, disables default values',
+      type=str,
+      action=SetParameter)
+
+  @classmethod
+  def add_command_line_options_optparse(cls, optparser):
+    '''function to inject command line parameters into
+       a Python OptionParser.'''
+    def set_parameter(option, opt, value, parser):
+      '''callback function for OptionParser'''
+      cls.config[opt] = value
+      if opt == '--stomp-conf':
+        cls.load_configuration_file(value)
     optparser.add_option('--stomp-host', metavar='HOST',
       default=cls.defaults.get('--stomp-host'),
       help="Stomp broker address, default '%default'",
       type='string', nargs=1,
-      action='callback', callback=cls._set_parameter)
+      action='callback', callback=set_parameter)
     optparser.add_option('--stomp-port', metavar='PORT',
       default=cls.defaults.get('--stomp-port'),
       help="Stomp broker port, default '%default'",
       type='int', nargs=1,
-      action='callback', callback=cls._set_parameter)
+      action='callback', callback=set_parameter)
     optparser.add_option('--stomp-user', metavar='USER',
       default=cls.defaults.get('--stomp-user'),
       help="Stomp user, default '%default'",
       type='string', nargs=1,
-      action='callback', callback=cls._set_parameter)
+      action='callback', callback=set_parameter)
     optparser.add_option('--stomp-pass', metavar='PASS',
       default=cls.defaults.get('--stomp-pass'),
       help="Stomp password",
       type='string', nargs=1,
-      action='callback', callback=cls._set_parameter)
+      action='callback', callback=set_parameter)
     optparser.add_option('--stomp-prfx', metavar='PRE',
       default=cls.defaults.get('--stomp-prfx'),
       help="Stomp namespace prefix, default '%default'",
       type='string', nargs=1,
-      action='callback', callback=cls._set_parameter)
+      action='callback', callback=set_parameter)
     optparser.add_option('--stomp-conf', metavar='CNF',
       default=cls.defaults.get('--stomp-conf'),
       help='Stomp configuration file containing connection information, disables default values',
       type='string', nargs=1,
-      action='callback', callback=cls._set_parameter)
+      action='callback', callback=set_parameter)
 
   def connect(self):
     with self._lock:

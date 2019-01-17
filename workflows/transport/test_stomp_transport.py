@@ -1,5 +1,7 @@
 from __future__ import absolute_import, division, print_function
 
+import argparse
+import inspect
 import json
 import optparse
 import os
@@ -20,16 +22,42 @@ def test_lookup_and_initialize_stomp_transport_layer():
   assert stomp == StompTransport
   stomp()
 
-def test_add_command_line_help():
+def test_add_command_line_help_optparse():
   '''Check that command line parameters are registered in the parser.'''
   parser = mock.MagicMock()
 
   StompTransport().add_command_line_options(parser)
 
+  parser.add_argument.assert_not_called()
   parser.add_option.assert_called()
   assert parser.add_option.call_count > 4
   for call in parser.add_option.call_args_list:
     assert call[1]['action'] == 'callback'
+
+def test_add_command_line_help_argparse():
+  '''Check that command line parameters are registered in the parser.'''
+  parser = mock.MagicMock()
+  parser.add_argument = mock.Mock()
+
+  StompTransport().add_command_line_options(parser)
+
+  parser.add_argument.assert_called()
+  parser.add_option.assert_not_called()
+  assert parser.add_argument.call_count > 4
+  for call in parser.add_argument.call_args_list:
+    assert inspect.isclass(call[1]['action'])
+
+def test_adding_arguments_to_argparser():
+  '''Check that command line parameters can be added to the parser.'''
+  parser = argparse.ArgumentParser()
+
+  StompTransport().add_command_line_options(parser)
+
+  result = parser.parse_args([])
+  assert result.stomp_host
+  assert result.stomp_port
+  assert result.stomp_user
+  assert result.stomp_pass
 
 @mock.patch('workflows.transport.stomp_transport.stomp')
 def test_check_config_file_behaviour(mockstomp):
