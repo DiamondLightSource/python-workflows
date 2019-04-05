@@ -173,6 +173,5 @@ class Monitor(): # pragma: no cover
           curses.doupdate()
         time.sleep(0.2)
     except KeyboardInterrupt:
-      '''User pressed CTRL+C'''
-      pass
+      pass  # User pressed CTRL+C
     self._transport.disconnect()
