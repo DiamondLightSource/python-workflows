@@ -2,6 +2,8 @@
 [![Conda Version](https://img.shields.io/conda/vn/conda-forge/workflows.svg)](https://anaconda.org/conda-forge/workflows)
 [![Build Status](https://travis-ci.org/DiamondLightSource/python-workflows.svg?branch=master)](https://travis-ci.org/DiamondLightSource/python-workflows)
 [![Coverage Status](https://coveralls.io/repos/github/DiamondLightSource/python-workflows/badge.svg?branch=master)](https://coveralls.io/github/DiamondLightSource/python-workflows?branch=master)
+[![Language grade: Python](https://img.shields.io/lgtm/grade/python/g/DiamondLightSource/python-workflows.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/DiamondLightSource/python-workflows/context:python)
+[![Total alerts](https://img.shields.io/lgtm/alerts/g/DiamondLightSource/python-workflows.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/DiamondLightSource/python-workflows/alerts/)
 
 
 Data processing in distributed environments
