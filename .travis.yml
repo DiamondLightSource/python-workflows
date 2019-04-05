@@ -12,8 +12,6 @@ matrix:
       dist: xenial
       sudo: true
 
-jdk:
-  - oraclejdk8
 before_install:
   - ./.travis-update-setuptools
 install:
