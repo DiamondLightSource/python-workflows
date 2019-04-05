@@ -166,11 +166,9 @@ class StompTransport(CommonTransport):
       password = self.config.get('--stomp-pass',
                                  self.defaults.get('--stomp-pass'))
       timeout = time.time() + 30
-      connection_failure = False
-      def disconnect_handler():
-        connection_failure = True
+      connection_failure = threading.Event()
       handler_old = self._stomp_listener.on_disconnected
-      self._stomp_listener.on_disconnected = disconnect_handler
+      self._stomp_listener.on_disconnected = lambda : connection_failure.set()
       try:
         if username or password:
           self._conn.connect(username, password, wait=False)
@@ -178,10 +176,10 @@ class StompTransport(CommonTransport):
           self._conn.connect(wait=False)
       except stomp.exception.ConnectFailedException:
         raise workflows.AuthenticationFailed('Could not connect to stomp host: Authentication error')
-      while time.time() < timeout and not self._conn.is_connected() and not connection_failure:
+      while time.time() < timeout and not self._conn.is_connected() and not connection_failure.is_set():
         time.sleep(0.02)
       self._stomp_listener.on_disconnected = handler_old
-      if connection_failure:
+      if connection_failure.is_set():
         raise workflows.Disconnected('Could not initiate connection to stomp host - disconnected')
       if not self._conn.is_connected():
         raise workflows.Disconnected('Could not initiate connection to stomp host')
