@@ -18,6 +18,7 @@ class RecipeWrapper(object):
       self.recipe_step = self.recipe[self.recipe_pointer]
       self.recipe_path = message.get('recipe-path', [])
       self.environment = message.get('environment', {})
+      self.payload = message.get('payload')
     elif recipe:
       if isinstance(recipe, workflows.recipe.Recipe):
         self.recipe = recipe
@@ -27,6 +28,7 @@ class RecipeWrapper(object):
       self.recipe_step = None
       self.recipe_path = []
       self.environment = {}
+      self.payload = None
     else:
       raise ValueError('A message or recipe is required to create ' \
                        'a RecipeWrapper object.')

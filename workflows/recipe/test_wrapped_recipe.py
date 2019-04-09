@@ -57,6 +57,7 @@ def test_recipe_wrapper_instantiated_from_message():
   assert rw.recipe_step == m['recipe'][m['recipe-pointer']]
   assert rw.recipe_path == m['recipe-path']
   assert rw.environment == m['environment']
+  assert rw.payload == mock.sentinel.payload
 
 def test_recipe_wrapper_instantiated_from_message_with_string_conversion():
   '''A RecipeWrapper built from a message must be able to parse numeric strings.'''
@@ -95,6 +96,7 @@ def test_recipe_wrapper_instantiated_from_recipe():
   assert rw.recipe_step is None
   assert rw.recipe_path == []
   assert rw.environment == {}
+  assert rw.payload is None
 
   # Constructor can also accept Recipe objects
 
@@ -106,6 +108,7 @@ def test_recipe_wrapper_instantiated_from_recipe():
   assert rw.recipe_step is None
   assert rw.recipe_path == []
   assert rw.environment == {}
+  assert rw.payload is None
 
 def test_recipe_wrapper_empty_constructor_fails():
   '''A RecipeWrapper must be built from either a recipe or a message containing
@@ -333,3 +336,4 @@ def test_parameter_replacement_in_recipe_wrapper():
   assert rw.recipe_step != m['recipe'][m['recipe-pointer']]
   assert rw.recipe_path == m['recipe-path']
   assert rw.environment == m['environment']
+  assert rw.payload == mock.sentinel.payload
