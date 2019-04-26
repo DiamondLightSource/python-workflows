@@ -4,7 +4,7 @@
 [![Coverage Status](https://coveralls.io/repos/github/DiamondLightSource/python-workflows/badge.svg?branch=master)](https://coveralls.io/github/DiamondLightSource/python-workflows?branch=master)
 [![Language grade: Python](https://img.shields.io/lgtm/grade/python/g/DiamondLightSource/python-workflows.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/DiamondLightSource/python-workflows/context:python)
 [![Total alerts](https://img.shields.io/lgtm/alerts/g/DiamondLightSource/python-workflows.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/DiamondLightSource/python-workflows/alerts/)
-
+![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)
 
 Data processing in distributed environments
 ===========================================
