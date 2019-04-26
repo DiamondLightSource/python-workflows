@@ -25,7 +25,7 @@ def test_obtain_exception_source():
         assert fp == __file__
         assert os.path.basename(fp) == fn
         assert name == "crashfunction"
-        assert line_number == 16  # this will break if line number in this file changes
+        assert line_number == 17  # this will break if line number in this file changes
         assert line == "print(everything / nothing)"
 
 
