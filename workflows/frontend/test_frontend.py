@@ -20,10 +20,9 @@ class ServiceCrashingOnInit(CommonService):
 
 class MockPipe(object):
   '''An object that behaves like a pipe.'''
-  def __init__(self, contents, on_empty=None):
-    '''Load up contents into pipe. Set up an optional callback function.'''
-    self.contents = contents
-    self.on_empty = on_empty
+  def __init__(self, contents):
+        """Load up contents into pipe."""
+        self.contents = contents
 
   @staticmethod
   def poll(time=None):
@@ -32,21 +31,22 @@ class MockPipe(object):
     return True
 
   def recv(self):
-    '''Return first item off the list or raise exception.
-       Call callback function if defined and pipe is emptied.'''
-    if not self.contents:
-      raise EOFError('Pipe is empty')
-    if len(self.contents) == 1 and self.on_empty:
-      self.on_empty()
-    return self.contents.pop(0)
+        """Return first item off the list or raise exception.
+        Call callback function if defined and pipe is emptied."""
+        if not self.contents:
+            raise EOFError("Pipe is empty")
+        return_value = self.contents.pop(0)
+        if isinstance(return_value, Exception):
+            raise return_value
+        return return_value
 
   @staticmethod
   def close():
     '''This pipe can't be written to anyway. Ignore call.'''
 
   def assert_empty(self):
-    '''Pipe must have been read out completely.'''
-    assert not self.contents
+        """Pipe must not contain any valid messages. Exceptions may remain."""
+        assert all(isinstance(m, Exception) for m in self.contents)
 
 def assert_single_call_only(target):
   def wrapper(*args, **kwargs):
@@ -236,6 +236,44 @@ def test_frontend_parses_status_updates(mock_mp):
                          CommonService.SERVICE_STATUS_END, # Following updates caused by frontend
                          CommonService.SERVICE_STATUS_END,
                          CommonService.SERVICE_STATUS_TEARDOWN]
+
+@mock.patch('workflows.frontend.multiprocessing')
+def test_frontend_parses_termination_requests(mock_mp):
+    """The frontend should observe termination requests from the server."""
+    transport = mock.Mock()
+    service_process = mock.Mock()
+    mock_mp.Process.return_value = service_process
+
+    dummy_pipe = MockPipe([
+        {'band': 'status_update', 'statuscode': CommonService.SERVICE_STATUS_NEW},
+        {'band': 'status_update', 'statuscode': CommonService.SERVICE_STATUS_STARTING},
+        {'band': 'status_update', 'statuscode': CommonService.SERVICE_STATUS_PROCESSING},
+        {'band': 'request_termination'},
+        RuntimeError("Service termination request not observed")
+    ])
+    mock_mp.Pipe.return_value = (dummy_pipe, dummy_pipe)
+
+    fe = workflows.frontend.Frontend(transport=transport, service=mock.Mock())
+
+    # intercept status code updates
+    status_list = []
+    original_status_update_fn = fe.update_status
+    def intercept(*args, **kwargs):
+        if "status_code" in kwargs:
+            status_list.append(kwargs["status_code"])
+        return original_status_update_fn(*args, **kwargs)
+    fe.update_status = intercept
+
+    fe.run()
+
+    dummy_pipe.assert_empty()
+    assert status_list == [
+        CommonService.SERVICE_STATUS_NEW,
+        CommonService.SERVICE_STATUS_STARTING,
+        CommonService.SERVICE_STATUS_PROCESSING,
+        CommonService.SERVICE_STATUS_END,
+        CommonService.SERVICE_STATUS_TEARDOWN,
+    ]
 
 @mock.patch('workflows.frontend.time')
 @mock.patch('workflows.frontend.multiprocessing')

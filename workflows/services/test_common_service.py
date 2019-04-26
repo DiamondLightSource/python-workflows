@@ -383,6 +383,24 @@ def test_service_can_change_name_and_shut_itself_down():
   # Service should have shut down cleanly
   fe_pipe.send.assert_any_call({ 'band': 'status_update', 'statuscode': service.SERVICE_STATUS_END })
 
+
+def test_service_can_mark_itself_as_unstable():
+    """A termination request should be passed to the frontend."""
+    fe_pipe = mock.Mock()
+
+    class UnstableService(CommonService):
+        """Helper class to test self-termination requests."""
+        def initializing(self):
+            """Change name."""
+            self._request_termination()
+    service = UnstableService()
+    service.connect(frontend=fe_pipe)
+    service.start()
+
+    # Check for service name update
+    fe_pipe.send.assert_any_call({ "band": "request_termination" })
+
+
 def test_can_pass_environment_to_service():
   '''Test that environment dictionaries can be passed to the service on construction and are available during runtime.'''
   fe_pipe = mock.Mock()

@@ -270,6 +270,15 @@ class Frontend():
                     str(message),
                     str(hasattr(message.get('payload'), '__dict__') and message['payload'].__dict__))
 
+
+  def parse_band_request_termination(self, message):
+        """Service declares it should be terminated."""
+        self.log.debug("Service requests termination")
+        self._terminate_service()
+        if not self.restart_service:
+            self.shutdown = True
+
+
   def parse_band_set_name(self, message):
     '''Process incoming message indicating service name change.'''
     if message.get('name'):

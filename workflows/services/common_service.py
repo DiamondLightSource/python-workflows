@@ -300,9 +300,13 @@ class CommonService(object):
     self._service_name = name
     self.__send_to_frontend({ 'band': 'set_name', 'name': self._service_name })
 
+  def _request_termination(self):
+        """Terminate the service from the frontend side"""
+        self.__send_to_frontend({"band": "request_termination"})
+
   def _shutdown(self):
-    '''Terminate the service.'''
-    self.__shutdown = True
+        """Terminate the service from the service side."""
+        self.__shutdown = True
 
   def initialize_logging(self):
     '''Reset the logging for the service process. All logged messages are
