@@ -1,16 +1,18 @@
 from __future__ import absolute_import, division, print_function
 
 import sys
-
 from setuptools import find_packages, setup
 
 if sys.version_info < (2, 7):
     sys.exit("Sorry, Python < 2.7 is not supported")
 
+with open("README.rst") as readme_file:
+    readme = readme_file.read()
+
 setup(
     name="workflows",
     description="Data processing in distributed environments",
-    long_description="Workflows enables light-weight services to process tasks in a message-oriented environment.",
+    long_description=readme,
     url="https://github.com/DiamondLightSource/python-workflows",
     author="Markus Gerstel",
     author_email="scientificsoftware@diamond.ac.uk",
