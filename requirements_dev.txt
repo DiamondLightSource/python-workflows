@@ -1,0 +1,9 @@
+coveralls
+mock
+pip
+pytest>=3.6
+pytest-cov
+pytest-timeout
+setuptools
+six
+stomp.py

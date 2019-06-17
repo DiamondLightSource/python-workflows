@@ -1,5 +1,0 @@
-#!/bin/bash
-
-[ "$TRAVIS_PYTHON_VERSION" == "3.4" ] && pip install --upgrade setuptools
-
-exit 0
