@@ -20,6 +20,7 @@ setup(
     packages=find_packages(),
     license="BSD",
     entry_points={
+        "libtbx.precommit": ["workflows = workflows"],
         "workflows.services": [
             "SampleConsumer = workflows.services.sample_consumer:SampleConsumer",
             "SampleProducer = workflows.services.sample_producer:SampleProducer",
