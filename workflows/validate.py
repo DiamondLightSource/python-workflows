@@ -22,7 +22,7 @@ import sys
 import json
 
 
-def validate(json_filename: str):
+def validate(json_filename):
     """Reads a json file, tries to turn it into a recipe and then validates it.
     Exits on exception with non-zero error"""
 
@@ -31,22 +31,28 @@ def validate(json_filename: str):
         with open(json_filename) as f:
             recipe_text = f.read()
     except Exception:
-        logging.exception(f"Could not recipe from {json_filename}")
+        logging.exception("Could not recipe from {0}".format(json_filename))
         sys.exit(1)
 
     # Turn it into a recipe and validate
     try:
         recipe = workflows.recipe.Recipe(recipe_text).validate()
     except json.decoder.JSONDecodeError as e:
-        logging.error(f"JSON error in recipe {json_filename}, please address this")
-        logging.error(f"{e.msg} at line {e.lineno} col {e.colno}")
+        logging.error(
+            "JSON error in recipe {0}, please address this".format(json_filename)
+        )
+        logging.error("{0} at line {1} col {1}".format(e.msg, e.lineno, e.colno))
         sys.exit(1)
     except workflows.Error as e:
-        logging.error(f"JSON error in recipe {json_filename}, please address this")
-        logging.error(f"{e}")
+        logging.error(
+            "JSON error in recipe {0}, please address this".format(json_filename)
+        )
+        logging.error("{0}".format(e))
         sys.exit(1)
     except Exception:
-        logging.exception(f"Problem in recipe {json_filename}, please address this")
+        logging.exception(
+            "Problem in recipe {0} please address this".format(json_filename)
+        )
         sys.exit(1)
 
 
