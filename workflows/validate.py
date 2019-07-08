@@ -36,12 +36,13 @@ def validate(json_filename):
 
     # Turn it into a recipe and validate
     try:
-        recipe = workflows.recipe.Recipe(recipe_text).validate()
+        # Create a recipe object and validate it
+        workflows.recipe.Recipe(recipe_text).validate()
     except json.decoder.JSONDecodeError as e:
         logging.error(
             "JSON error in recipe {0}, please address this".format(json_filename)
         )
-        logging.error("{0} at line {1} col {1}".format(e.msg, e.lineno, e.colno))
+        logging.error("{0} at line {1} col {2}".format(e.msg, e.lineno, e.colno))
         sys.exit(1)
     except workflows.Error as e:
         logging.error(
