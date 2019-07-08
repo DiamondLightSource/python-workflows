@@ -20,9 +20,10 @@ import workflows.recipe
 import workflows
 import sys
 import json
+import argparse
 
 
-def validate(json_filename):
+def validate_recipe(json_filename):
     """Reads a json file, tries to turn it into a recipe and then validates it.
     Exits on exception with non-zero error"""
 
@@ -30,9 +31,9 @@ def validate(json_filename):
     try:
         with open(json_filename) as f:
             recipe_text = f.read()
-    except Exception:
-        logging.exception("Could not recipe from {0}".format(json_filename))
-        sys.exit(1)
+    except Exception as e:
+        logging.exception("Could not read recipe from {0}".format(json_filename))
+        raise e
 
     # Turn it into a recipe and validate
     try:
@@ -43,25 +44,35 @@ def validate(json_filename):
             "JSON error in recipe {0}, please address this".format(json_filename)
         )
         logging.error("{0} at line {1} col {2}".format(e.msg, e.lineno, e.colno))
-        sys.exit(1)
+        raise e
     except workflows.Error as e:
         logging.error(
-            "JSON error in recipe {0}, please address this".format(json_filename)
+            "Problem in error in recipe {0}, please address this".format(json_filename)
         )
         logging.error("{0}".format(e))
-        sys.exit(1)
-    except Exception:
-        logging.exception(
-            "Problem in recipe {0} please address this".format(json_filename)
-        )
-        sys.exit(1)
+        raise e
+    except Exception as e:
+        logging.error("Problem in recipe {0} please address this".format(json_filename))
+        logging.error("{0}".format(e))
+        raise e
 
 
 def main():
     """Run the program from entry point"""
-    validate(sys.argv[1])
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "files", nargs="+", help="file or list of files to be validated"
+    )
+    args = parser.parse_args()
+
+    # Validate each file in turn
+    for file in args.files:
+        try:
+            validate_recipe(file)
+        except Exception:
+            sys.exit(1)
 
 
 if __name__ == "__main__":
 
-    validate(sys.argv[1])
+    main()
