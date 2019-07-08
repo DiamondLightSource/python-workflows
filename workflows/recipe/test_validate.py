@@ -1,18 +1,14 @@
 """
 Tests the functionality of validate.py with several different recipes which should raise different errors
 """
+from __future__ import absolute_import, division, print_function
 
 import pytest
 import mock
-import workflows
-from workflows.recipe.validate import validate_recipe, main
 import sys
 
-# Python 2 and 3 compatibility
-if sys.version_info[0] == 3:
-    builtins_open = "builtins.open"
-else:
-    builtins_open = "__builtins__.open"
+import workflows
+from workflows.recipe.validate import validate_recipe, main
 
 
 def test_validate_returns_type_error_when_called_without_parameters():
@@ -20,7 +16,7 @@ def test_validate_returns_type_error_when_called_without_parameters():
         validate_recipe()
 
 
-def test_no_errors_when_validating_healthy_recipe():
+def test_no_errors_when_validating_healthy_recipe(tmpdir):
     healthy_recipe = """
         {
           "1": {
@@ -38,15 +34,13 @@ def test_no_errors_when_validating_healthy_recipe():
           ]
         }
     """
+    recipe_file = tmpdir.join("recipe.json")
+    recipe_file.write(healthy_recipe)
 
-    # Run validate with mock open, expect no exceptions
-    with mock.patch(
-        builtins_open, mock.mock_open(read_data=healthy_recipe), create=True
-    ) as mock_file:
-        validate_recipe("/path/to/open")
+    validate_recipe(recipe_file.strpath)
 
 
-def test_value_error_when_validating_bad_json():
+def test_value_error_when_validating_bad_json(tmpdir):
     bad_json = """
         {
           "1": {
@@ -64,16 +58,15 @@ def test_value_error_when_validating_bad_json():
           ]
         }
     """
+    recipe_file = tmpdir.join("recipe.json")
+    recipe_file.write(bad_json)
 
     # Run validate with mock open, expect JSON error (only available from python 3.5)
     with pytest.raises(ValueError):
-        with mock.patch(
-            builtins_open, mock.mock_open(read_data=bad_json), create=True
-        ) as mock_file:
-            validate_recipe("/path/to/open")
+        validate_recipe(recipe_file.strpath)
 
 
-def test_workflows_error_when_validating_incorrect_workflows_recipe():
+def test_workflows_error_when_validating_incorrect_workflows_recipe(tmpdir):
     bad_recipe = """
         {
           "1": {
@@ -88,13 +81,12 @@ def test_workflows_error_when_validating_incorrect_workflows_recipe():
           }
         }
     """
+    recipe_file = tmpdir.join("recipe.json")
+    recipe_file.write(bad_recipe)
 
     # Run validate with mock open, expect JSON error
     with pytest.raises(workflows.Error):
-        with mock.patch(
-            builtins_open, mock.mock_open(read_data=bad_recipe), create=True
-        ) as mock_file:
-            validate_recipe("/path/to/open")
+        validate_recipe(recipe_file.strpath)
 
 
 # Create a mock of the validate call

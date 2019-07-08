@@ -43,19 +43,16 @@ def validate_recipe(json_filename):
     except ValueError as e:
         # json.JSONDecodeError only available from python 3.5.x
         logging.error(
-            "JSON error in recipe {0}, please address this".format(json_filename)
+            "JSON error in recipe {0}:\n{1} at line {2} col {3}".format(
+                json_filename, e.msg, e.lineno, e.colno
+            )
         )
-        logging.error("{0} at line {1} col {2}".format(e.msg, e.lineno, e.colno))
         raise e
     except workflows.Error as e:
-        logging.error(
-            "Problem in recipe {0}, please address this".format(json_filename)
-        )
-        logging.error("{0}".format(e))
+        logging.error("Problem in recipe {0}:\n{1}".format(json_filename, e))
         raise e
     except Exception as e:
-        logging.error("Problem in recipe {0} please address this".format(json_filename))
-        logging.error("{0}".format(e))
+        logging.error("Problem in recipe {0}: {1}".format(json_filename, e))
         raise e
 
 
@@ -67,12 +64,19 @@ def main():
     )
     args = parser.parse_args()
 
-    # Validate each file in turn
+    # Validate every file provided, keep list of fails
+    failed_files = []
     for input_file in args.files:
         try:
             validate_recipe(input_file)
         except Exception:
-            sys.exit(1)
+            failed_files.append(input_file)
+
+    # Let the user know which files had errors (summary of previous output)
+    # Otherwise exit silently
+    if failed_files:
+        print("Errors found in the following recipes: {0}".format(failed_files))
+        sys.exit(1)
 
 
 if __name__ == "__main__":
