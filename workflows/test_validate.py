@@ -9,6 +9,12 @@ from workflows.validate import validate_recipe, main
 import json
 import sys
 
+# Python 2 and 3 compatibility
+if sys.version_info[0] == 3:
+    builtins_open = "builtins.open"
+else:
+    builtins_open = "__builtins__.open"
+
 
 def test_no_file():
     """Test that validate returns an error when it returns with no file"""
@@ -38,7 +44,7 @@ def test_healthy_recipe():
 
     # Run validate with mock open, expect no exceptions
     with mock.patch(
-        "builtins.open", mock.mock_open(read_data=healthy_recipe), create=True
+        builtins_open, mock.mock_open(read_data=healthy_recipe), create=True
     ) as mock_file:
         validate_recipe("/path/to/open")
 
@@ -66,7 +72,7 @@ def test_bad_json():
     # Run validate with mock open, expect JSON error
     with pytest.raises(json.decoder.JSONDecodeError):
         with mock.patch(
-            "builtins.open", mock.mock_open(read_data=bad_json), create=True
+            builtins_open, mock.mock_open(read_data=bad_json), create=True
         ) as mock_file:
             validate_recipe("/path/to/open")
 
@@ -91,7 +97,7 @@ def test_bad_recipe():
     # Run validate with mock open, expect JSON error
     with pytest.raises(workflows.Error):
         with mock.patch(
-            "builtins.open", mock.mock_open(read_data=bad_recipe), create=True
+            builtins_open, mock.mock_open(read_data=bad_recipe), create=True
         ) as mock_file:
             validate_recipe("/path/to/open")
 
@@ -128,3 +134,14 @@ def test_main_multiple(mock_requests):
     mock_requests.has_calls(
         [mock.call("file1"), mock.call("file2"), mock.call("file3")]
     )
+
+
+@mock.patch("workflows.validate.validate_recipe")
+def test_exit_on_bad_recipe(mock_requests):
+    """Test that main exits when validate_recipe finds an error"""
+    mock_requests.get.side_effect = Exception
+    # Create fake arguments to test on
+    test_args = ["validate.py"]
+    with pytest.raises(SystemExit):
+        with mock.patch.object(sys, "argv", test_args):
+            main()

@@ -19,7 +19,6 @@ import logging
 import workflows.recipe
 import workflows
 import sys
-import json
 import argparse
 
 
@@ -39,7 +38,8 @@ def validate_recipe(json_filename):
     try:
         # Create a recipe object and validate it
         workflows.recipe.Recipe(recipe_text).validate()
-    except json.decoder.JSONDecodeError as e:
+    except ValueError as e:
+        # json.JSONDecodeError only available from python 3.5.x
         logging.error(
             "JSON error in recipe {0}, please address this".format(json_filename)
         )
