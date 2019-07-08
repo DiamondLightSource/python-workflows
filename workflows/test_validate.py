@@ -6,7 +6,6 @@ import pytest
 import mock
 import workflows
 from workflows.validate import validate_recipe, main
-import json
 import sys
 
 # Python 2 and 3 compatibility
@@ -16,14 +15,12 @@ else:
     builtins_open = "__builtins__.open"
 
 
-def test_no_file():
-    """Test that validate returns an error when it returns with no file"""
-    with pytest.raises(Exception):
+def test_validate_returns_type_error_when_called_without_parameters():
+    with pytest.raises(TypeError):
         validate_recipe()
 
 
-def test_healthy_recipe():
-    """Test that no errors are raised when given a healthy recipe"""
+def test_no_errors_when_validating_healthy_recipe():
     healthy_recipe = """
         {
           "1": {
@@ -49,8 +46,7 @@ def test_healthy_recipe():
         validate_recipe("/path/to/open")
 
 
-def test_bad_json():
-    """Test that no errors are raised when given a bad json recipe"""
+def test_value_error_when_validating_bad_json():
     bad_json = """
         {
           "1": {
@@ -69,16 +65,15 @@ def test_bad_json():
         }
     """
 
-    # Run validate with mock open, expect JSON error
-    with pytest.raises(json.decoder.JSONDecodeError):
+    # Run validate with mock open, expect JSON error (only available from python 3.5)
+    with pytest.raises(ValueError):
         with mock.patch(
             builtins_open, mock.mock_open(read_data=bad_json), create=True
         ) as mock_file:
             validate_recipe("/path/to/open")
 
 
-def test_bad_recipe():
-    """Test that no errors are raised when given a bad zocalo recipe"""
+def test_workflows_error_when_validating_incorrect_workflows_recipe():
     bad_recipe = """
         {
           "1": {
@@ -104,18 +99,15 @@ def test_bad_recipe():
 
 # Create a mock of the validate call
 @mock.patch("workflows.validate.validate_recipe")
-def test_main(mock_requests):
-    """Test that the main function call works with one inputs"""
+def test_command_line_validation_one_argument(mock_requests):
     # Create fake arguments to test on
     test_args = ["validate.py", "file1"]
     with mock.patch.object(sys, "argv", test_args):
         main()
-    mock_requests.assert_called_once()
-    mock_requests.assert_called_with("file1")
+    mock_requests.assert_called_once_with("file1")
 
 
-def test_main():
-    """Test that the main function exits with no inputs (prompted by argparse)"""
+def test_exit_when_command_line_validation_given_no_arguments():
     # Create fake arguments to test on
     test_args = ["validate.py"]
     with pytest.raises(SystemExit):
@@ -125,20 +117,19 @@ def test_main():
 
 # Create a mock of the validate call
 @mock.patch("workflows.validate.validate_recipe")
-def test_main_multiple(mock_requests):
-    """Test that the main function call works with a number of inputs"""
+def test_command_line_validation_multiple_arguments(mock_requests):
     # Create fake arguments to test on
     test_args = ["validate.py", "file1", "file2", "file3"]
     with mock.patch.object(sys, "argv", test_args):
         main()
-    mock_requests.has_calls(
+    mock_requests.assert_has_calls(
         [mock.call("file1"), mock.call("file2"), mock.call("file3")]
     )
+    assert mock_requests.call_count == 3
 
 
 @mock.patch("workflows.validate.validate_recipe")
-def test_exit_on_bad_recipe(mock_requests):
-    """Test that main exits when validate_recipe finds an error"""
+def test_system_exit_when_error_raised_from_command_line_validation(mock_requests):
     mock_requests.get.side_effect = Exception
     # Create fake arguments to test on
     test_args = ["validate.py"]

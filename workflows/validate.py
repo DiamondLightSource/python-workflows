@@ -11,15 +11,17 @@ Example of how this could be used in a .pre-commit-config.yaml file:
     id: recipe-validation
     language: python
     files: ^recipes/
-    entry: workflows-recipe-validate
+    entry: workflows.validate-recipe
 ```
 """
+from __future__ import absolute_import, division, print_function
 
+import argparse
 import logging
+import sys
+
 import workflows.recipe
 import workflows
-import sys
-import argparse
 
 
 def validate_recipe(json_filename):
@@ -30,9 +32,9 @@ def validate_recipe(json_filename):
     try:
         with open(json_filename) as f:
             recipe_text = f.read()
-    except Exception as e:
+    except Exception:
         logging.exception("Could not read recipe from {0}".format(json_filename))
-        raise e
+        raise
 
     # Turn it into a recipe and validate
     try:
@@ -47,7 +49,7 @@ def validate_recipe(json_filename):
         raise e
     except workflows.Error as e:
         logging.error(
-            "Problem in error in recipe {0}, please address this".format(json_filename)
+            "Problem in recipe {0}, please address this".format(json_filename)
         )
         logging.error("{0}".format(e))
         raise e
@@ -66,9 +68,9 @@ def main():
     args = parser.parse_args()
 
     # Validate each file in turn
-    for file in args.files:
+    for input_file in args.files:
         try:
-            validate_recipe(file)
+            validate_recipe(input_file)
         except Exception:
             sys.exit(1)
 
