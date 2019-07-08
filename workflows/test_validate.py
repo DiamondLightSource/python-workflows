@@ -3,7 +3,7 @@ Tests the functionality of validate.py with several different recipes which shou
 """
 
 import pytest
-import unittest.mock as mock
+import mock
 import workflows
 from workflows.validate import validate_recipe, main
 import json
