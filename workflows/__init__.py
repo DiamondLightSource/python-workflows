@@ -2,9 +2,6 @@ from __future__ import absolute_import, division, print_function
 
 __version__ = "1.6"
 
-# Import validate function
-from workflows.validate import validate_recipe
-
 
 def version():
     """Returns the version number of the installed workflows package."""
