@@ -42,11 +42,7 @@ def validate_recipe(json_filename):
         workflows.recipe.Recipe(recipe_text).validate()
     except ValueError as e:
         # json.JSONDecodeError only available from python 3.5.x
-        logging.error(
-            "JSON error in recipe {0}:\n{1} at line {2} col {3}".format(
-                json_filename, e.msg, e.lineno, e.colno
-            )
-        )
+        logging.error("JSON error in recipe {0}:\n{1}".format(json_filename, e))
         raise e
     except workflows.Error as e:
         logging.error("Problem in recipe {0}:\n{1}".format(json_filename, e))
