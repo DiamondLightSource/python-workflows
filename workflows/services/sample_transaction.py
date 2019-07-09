@@ -35,11 +35,11 @@ class SampleTxn(CommonService):
         print(header)
         print(message)
 
-        print("MsgID: {0}".format(header["message-id"]))
+        print("MsgID: {}".format(header["message-id"]))
         assert header["message-id"]
 
         txn = self._transport.transaction_begin()
-        print(" 1. Txn: {0}".format(str(txn)))
+        print(" 1. Txn: {}".format(str(txn)))
         if self.crashpoint():
             self._transport.transaction_abort(txn)
             print("---  Abort  ---")

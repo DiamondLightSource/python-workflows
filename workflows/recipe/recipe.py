@@ -129,7 +129,7 @@ class Recipe(object):
             raise workflows.Error('Invalid recipe: Node "%s" is not numeric' % nodes[0])
 
         # Detect cycles
-        touched_nodes = set(["start", "error"])
+        touched_nodes = {"start", "error"}
 
         def flatten_links(struct):
             """Take an output/error link object, list or dictionary and return flat list of linked nodes."""
