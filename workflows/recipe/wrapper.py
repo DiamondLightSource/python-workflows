@@ -8,7 +8,9 @@ class RecipeWrapper(object):
     life easier for recipe users.
     """
 
-    def __init__(self, message=None, transport=None, recipe=None, **kwargs):
+    def __init__(
+        self, message=None, transport=None, recipe=None, environment=None, **kwargs
+    ):
         """Create a RecipeWrapper object from a wrapped message.
         References to the transport layer are required to send directly to
         connected downstream processes.
@@ -18,7 +20,10 @@ class RecipeWrapper(object):
             self.recipe_pointer = int(message["recipe-pointer"])
             self.recipe_step = self.recipe[self.recipe_pointer]
             self.recipe_path = message.get("recipe-path", [])
-            self.environment = message.get("environment", {})
+            if environment is None:
+                self.environment = message.get("environment", {})
+            else:
+                self.environment = environment
             self.payload = message.get("payload")
         elif recipe:
             if isinstance(recipe, workflows.recipe.Recipe):
@@ -28,11 +33,11 @@ class RecipeWrapper(object):
             self.recipe_pointer = None
             self.recipe_step = None
             self.recipe_path = []
-            self.environment = {}
+            self.environment = environment or {}
             self.payload = None
         else:
             raise ValueError(
-                "A message or recipe is required to create " "a RecipeWrapper object."
+                "A message or recipe is required to create a RecipeWrapper object."
             )
         self.default_channel = None
         self.transport = transport
