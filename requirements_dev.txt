@@ -1,7 +1,7 @@
 coveralls
 mock
 pip
-pytest>=3.6
+pytest==4.5.0 # pyup: <5.0 # for Python 2.7 support
 pytest-cov
 pytest-timeout
 setuptools
