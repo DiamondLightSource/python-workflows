@@ -1,0 +1,7 @@
+- id: workflows-recipe-validation
+  name: Workflows Recipe Validation
+  description: Ensure recipes designed to work with python-workflows are compliant
+  entry: workflows.validate_recipe
+  language: python
+  #files: ^recipes/
+  types: [json]

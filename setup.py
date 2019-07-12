@@ -22,6 +22,12 @@ setup(
     packages=find_packages(),
     license="BSD",
     entry_points={
+        "console_scripts": [
+            "workflows.validate_recipe = workflows.recipe.validate:main"
+        ],
+        "libtbx.dispatcher.script": [
+            "workflows.validate_recipe = workflows.validate_recipe"
+        ],
         "libtbx.precommit": ["workflows = workflows"],
         "workflows.services": [
             "SampleConsumer = workflows.services.sample_consumer:SampleConsumer",
