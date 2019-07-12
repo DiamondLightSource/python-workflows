@@ -118,7 +118,7 @@ class CommonService(object):
 
     # Number to short string conversion
 
-    human_readable_state = {e.intval: e.description for e in Status}
+    human_readable_state = {e.intval: e.description for e in Status}  # lgtm
 
     # Default logging level for log messages from this service
 
