@@ -17,7 +17,7 @@ setup(
     author="Markus Gerstel",
     author_email="scientificsoftware@diamond.ac.uk",
     download_url="https://github.com/DiamondLightSource/python-workflows/releases",
-    version="1.7.1",
+    version="1.7.2",
     install_requires=['enum34;python_version<"3.4"', "setuptools", "six", "stomp.py<5"],
     packages=find_packages(),
     license="BSD",
