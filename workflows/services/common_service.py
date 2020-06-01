@@ -2,8 +2,8 @@ import contextlib
 import enum
 import itertools
 import logging
+import queue
 import threading
-from six.moves import queue
 
 import workflows
 import workflows.logging

@@ -1,3 +1,4 @@
+import configparser
 import json
 import threading
 import time
@@ -5,7 +6,6 @@ import time
 import stomp
 import workflows
 from workflows.transport.common_transport import CommonTransport
-from six.moves import configparser
 
 
 class StompTransport(CommonTransport):

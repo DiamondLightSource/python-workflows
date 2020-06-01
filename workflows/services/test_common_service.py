@@ -1,4 +1,4 @@
-from six.moves import queue
+import queue
 from multiprocessing import Pipe
 
 import mock
