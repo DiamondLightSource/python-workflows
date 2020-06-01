@@ -1,5 +1,3 @@
-from __future__ import absolute_import, division, print_function
-
 import copy
 import json
 import string
@@ -12,7 +10,7 @@ except NameError:
     basestring = (str, bytes)
 
 
-class Recipe(object):
+class Recipe:
     """Object containing a processing recipe that can be passed to services.
     A recipe describes how all involved services are connected together, how
     data should be passed and how errors should be handled."""
@@ -213,7 +211,7 @@ class Recipe(object):
            => { 'x': [ 1, 2 ] }
         """
 
-        class SafeString(object):
+        class SafeString:
             def __init__(self, s):
                 self.string = s
 

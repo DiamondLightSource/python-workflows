@@ -1,11 +1,9 @@
-from __future__ import absolute_import, division, print_function
-
 import logging
 
 import workflows
 
 
-class CommonTransport(object):
+class CommonTransport:
     """A common transport class, containing e.g. the logic to manage
     subscriptions and transactions."""
 

@@ -1,5 +1,3 @@
-from __future__ import absolute_import, division, print_function
-
 import linecache
 import logging
 import os.path
@@ -32,7 +30,7 @@ class CallbackHandler(logging.Handler):
 
     def __init__(self, callback):
         """Set up a handler instance, record the callback function."""
-        super(CallbackHandler, self).__init__()
+        super().__init__()
         self._callback = callback
 
     def prepare(self, record):

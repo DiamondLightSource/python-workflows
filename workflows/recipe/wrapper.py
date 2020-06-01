@@ -1,9 +1,7 @@
-from __future__ import absolute_import, division, print_function
-
 import workflows.recipe
 
 
-class RecipeWrapper(object):
+class RecipeWrapper:
     """A wrapper object which contains a recipe and a number of functions to make
     life easier for recipe users.
     """

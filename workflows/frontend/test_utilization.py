@@ -1,5 +1,3 @@
-from __future__ import absolute_import, division, print_function
-
 import mock
 import workflows.frontend.utilization
 from workflows.services.common_service import Status
@@ -24,7 +22,7 @@ def about(value, tolerance):
             return not self.__eq__(other)
 
         def __repr__(self):
-            return "<%s +- %s>" % (str(value), str(tolerance))
+            return "<{} +- {}>".format(str(value), str(tolerance))
 
     return Comparator()
 

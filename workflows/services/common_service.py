@@ -1,5 +1,3 @@
-from __future__ import absolute_import, division, print_function
-
 import contextlib
 import enum
 import itertools
@@ -68,7 +66,7 @@ class Priority(enum.IntEnum):
     IDLE = 4
 
 
-class CommonService(object):
+class CommonService:
     """
     Base class for workflow services. A service is a piece of software that runs
     in an isolated environment, communicating only via pipes with the outside
@@ -439,9 +437,13 @@ class CommonService(object):
         # Add information about the actual exception to the log message
         # This includes the file, line and piece of code causing the exception.
         # exc_info=True adds the full stack trace to the log message.
-        exc_file_fullpath, exc_file, exc_lineno, exc_func, exc_line = (
-            workflows.logging.get_exception_source()
-        )
+        (
+            exc_file_fullpath,
+            exc_file,
+            exc_lineno,
+            exc_func,
+            exc_line,
+        ) = workflows.logging.get_exception_source()
         added_information = {
             "workflows_exc_lineno": exc_lineno,
             "workflows_exc_funcName": exc_func,

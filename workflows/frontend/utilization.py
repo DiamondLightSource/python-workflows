@@ -1,11 +1,9 @@
-from __future__ import absolute_import, division, print_function
-
 import time
 
 from workflows.services.common_service import CommonService
 
 
-class UtilizationStatistics(object):
+class UtilizationStatistics:
     """Generate statistics about the percentage of time spent in different
     statuses over a fixed time slice. This class is not thread-safe."""
 

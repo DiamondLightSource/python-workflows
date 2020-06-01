@@ -1,5 +1,3 @@
-from __future__ import absolute_import, division, print_function
-
 import multiprocessing
 
 import mock
@@ -21,7 +19,7 @@ class ServiceCrashingOnInit(CommonService):
         assert False  # pragma: no cover
 
 
-class MockPipe(object):
+class MockPipe:
     """An object that behaves like a pipe."""
 
     def __init__(self, contents):

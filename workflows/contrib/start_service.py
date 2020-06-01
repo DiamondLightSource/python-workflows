@@ -1,5 +1,3 @@
-from __future__ import absolute_import, division, print_function
-
 from optparse import SUPPRESS_HELP, OptionParser
 
 import workflows
@@ -8,7 +6,7 @@ import workflows.services
 import workflows.transport
 
 
-class ServiceStarter(object):
+class ServiceStarter:
     """A helper class to start a workflows service from the command line.
     A number of hooks are provided so that this class can be subclassed and
     used in a number of scenarios."""

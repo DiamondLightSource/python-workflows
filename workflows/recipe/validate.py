@@ -14,7 +14,6 @@ Example of how this could be used in a .pre-commit-config.yaml file:
     entry: workflows.validate-recipe
 ```
 """
-from __future__ import absolute_import, division, print_function
 
 import argparse
 import logging
@@ -33,7 +32,7 @@ def validate_recipe(json_filename):
         with open(json_filename) as f:
             recipe_text = f.read()
     except Exception:
-        logging.exception("Could not read recipe from {0}".format(json_filename))
+        logging.exception("Could not read recipe from {}".format(json_filename))
         raise
 
     # Turn it into a recipe and validate
@@ -42,13 +41,13 @@ def validate_recipe(json_filename):
         workflows.recipe.Recipe(recipe_text).validate()
     except ValueError as e:
         # json.JSONDecodeError only available from python 3.5.x
-        logging.error("JSON error in recipe {0}:\n{1}".format(json_filename, e))
+        logging.error("JSON error in recipe {}:\n{}".format(json_filename, e))
         raise e
     except workflows.Error as e:
-        logging.error("Problem in recipe {0}:\n{1}".format(json_filename, e))
+        logging.error("Problem in recipe {}:\n{}".format(json_filename, e))
         raise e
     except Exception as e:
-        logging.error("Problem in recipe {0}: {1}".format(json_filename, e))
+        logging.error("Problem in recipe {}: {}".format(json_filename, e))
         raise e
 
 
@@ -71,7 +70,7 @@ def main():
     # Let the user know which files had errors (summary of previous output)
     # Otherwise exit silently
     if failed_files:
-        print("Errors found in the following recipes: {0}".format(failed_files))
+        print("Errors found in the following recipes: {}".format(failed_files))
         sys.exit(1)
 
 

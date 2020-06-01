@@ -1,5 +1,3 @@
-from __future__ import absolute_import, division, print_function
-
 import json
 import threading
 import time
@@ -494,5 +492,5 @@ class StompTransport(CommonTransport):
             target_function(headers, body)
         else:
             raise workflows.Error(
-                "Unhandled message %s %s" % (repr(headers), repr(body))
+                "Unhandled message {} {}".format(repr(headers), repr(body))
             )

@@ -1,7 +1,6 @@
 """
 Tests the functionality of validate.py with several different recipes which should raise different errors
 """
-from __future__ import absolute_import, division, print_function
 
 import pytest
 import mock
