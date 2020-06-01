@@ -1,10 +1,6 @@
 from __future__ import absolute_import, division, print_function
 
-import sys
 from setuptools import find_packages, setup
-
-if sys.version_info < (2, 7):
-    sys.exit("Sorry, Python < 2.7 is not supported")
 
 with open("README.rst") as readme_file:
     readme = readme_file.read()
@@ -18,7 +14,8 @@ setup(
     author_email="scientificsoftware@diamond.ac.uk",
     download_url="https://github.com/DiamondLightSource/python-workflows/releases",
     version="1.7.2",
-    install_requires=['enum34;python_version<"3.4"', "setuptools", "six", "stomp.py<5"],
+    install_requires=["setuptools", "six", "stomp.py<5"],
+    python_requires=">=3.5",
     packages=find_packages(),
     license="BSD",
     entry_points={
@@ -44,8 +41,6 @@ setup(
     classifiers=[
         "Development Status :: 5 - Production/Stable",
         "License :: OSI Approved :: BSD License",
-        "Programming Language :: Python :: 2",
-        "Programming Language :: Python :: 2.7",
         "Programming Language :: Python :: 3",
         "Programming Language :: Python :: 3.5",
         "Programming Language :: Python :: 3.6",
