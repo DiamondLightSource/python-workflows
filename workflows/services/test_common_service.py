@@ -1,5 +1,4 @@
 from six.moves import queue
-import time
 from multiprocessing import Pipe
 
 import mock
@@ -127,7 +126,7 @@ def test_log_message_fieldvalue_pairs_are_attached_to_unhandled_exceptions_and_l
 
     try:
         with service.extend_log("something", "otherthing"):
-            nonsense = 7 / 0
+            nonsense = 7 / 0  # noqa
         assert False  # Getting to this point means something went horribly wrong.
     except ZeroDivisionError as e:
         assert getattr(e, "workflows_log_something", None) == "otherthing"
@@ -172,7 +171,7 @@ def test_receive_frontend_commands(mock_thread):
     # Check that thread would be started
     service._CommonService__start_command_queue_listener()
     mock_thread.start.assert_called_once()
-    assert mock_thread.daemon == True
+    assert mock_thread.daemon is True
     # Can't make assertions about the run() method, limitations of mocking
 
     # Now start listener in main thread
@@ -553,7 +552,7 @@ def test_commands_are_processed_from_main_queue_before_transport():
     service.start()
 
     # Service should terminate before processing the transport callback
-    assert mock_low_priority_callback.called == False
+    assert mock_low_priority_callback.called is False
 
     # Check startup/shutdown sequence
     start_cmd_queue_listener.assert_called_once_with()

@@ -1,5 +1,3 @@
-import multiprocessing
-
 import mock
 import pytest
 import workflows.frontend
@@ -102,31 +100,31 @@ def test_frontend_subscribes_to_command_channel(mock_transport):
         transport.subscribe_broadcast.call_args[0][1]({}, message)
         return fe
 
-    assert frontend_with_message({}).shutdown == False
-    assert frontend_with_message({"command": "shutdown"}).shutdown == False
+    assert frontend_with_message({}).shutdown is False
+    assert frontend_with_message({"command": "shutdown"}).shutdown is False
     assert (
         frontend_with_message(
             {"command": "shutdown", "host": fe.get_host_id()}
         ).shutdown
-        == True
+        is True
     )
     assert (
         frontend_with_message(
             {"command": "shutdown", "host": mock.sentinel.different_host}
         ).shutdown
-        == False
+        is False
     )
     assert (
         frontend_with_message(
             {"command": "shutdown", "service": fe.get_status()["serviceclass"]}
         ).shutdown
-        == True
+        is True
     )
     assert (
         frontend_with_message(
             {"command": "shutdown", "service": mock.sentinel.different_service}
         ).shutdown
-        == False
+        is False
     )
 
 
@@ -466,7 +464,6 @@ def test_frontend_does_not_restart_nonrestartable_service_on_segfault(mock_mp):
 @mock.patch("workflows.frontend.multiprocessing")
 def test_frontend_does_not_restart_nonrestartable_service_on_error(mock_mp):
     """When the frontend is constructed with restart_service=False failing services must not be restarted."""
-    transport = mock.Mock()
     service_instances = [mock.Mock()]
     service_factory = mock.Mock()
     service_factory.side_effect = service_instances + [
@@ -552,7 +549,6 @@ def test_frontend_does_restart_restartable_service_on_segfault(mock_mp):
 @mock.patch("workflows.frontend.multiprocessing")
 def test_frontend_does_restart_restartable_service_on_error(mock_mp):
     """When the frontend is constructed with restart_service=True failing services must be restarted."""
-    transport = mock.Mock()
     sentinel_exception = Exception("break loop")
     service_instances = [mock.Mock(), mock.Mock()]
     service_factory = mock.Mock()

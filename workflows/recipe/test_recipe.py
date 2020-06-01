@@ -317,8 +317,8 @@ def test_replacing_parameters_in_recipe_with_datastructures():
     assert (
         A.recipe[2]["deep-dictionary"] is not replacements["nested"]["some-dictionary"]
     )
-    assert A.recipe[2]["undefined"] == None
-    assert A.recipe[2]["undefined-deep-dictionary"] == None
+    assert A.recipe[2]["undefined"] is None
+    assert A.recipe[2]["undefined-deep-dictionary"] is None
 
 
 def test_merging_recipes():

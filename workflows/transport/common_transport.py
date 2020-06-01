@@ -58,7 +58,7 @@ class CommonTransport:
 
         if "disable_mangling" in kwargs:
             if kwargs["disable_mangling"]:
-                mangled_callback = callback
+                mangled_callback = callback  # noqa:F811
             del kwargs["disable_mangling"]
         self.__subscriptions[self.__subscription_id] = {
             "channel": channel,
@@ -126,7 +126,7 @@ class CommonTransport:
 
         if "disable_mangling" in kwargs:
             if kwargs["disable_mangling"]:
-                mangled_callback = callback
+                mangled_callback = callback  # noqa:F811
             del kwargs["disable_mangling"]
         self.__subscriptions[self.__subscription_id] = {
             "channel": channel,
