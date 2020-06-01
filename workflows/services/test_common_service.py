@@ -289,7 +289,7 @@ def test_callbacks_are_routed_correctly():
     cmd_pipe.recv.side_effect = [
         {"band": mock.sentinel.band, "payload": mock.sentinel.payload},
         {"band": "command", "payload": Commands.SHUTDOWN},
-        AssertionError("Not observing commands"),
+        AssertionError("Stop queue reading thread"),
     ]
     fe_pipe, _ = Pipe()
     callback = mock.Mock()

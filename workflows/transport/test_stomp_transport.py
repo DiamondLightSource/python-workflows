@@ -152,21 +152,18 @@ def test_instantiate_link_and_connect_to_broker(mockstomp):
     stomp.connect()
 
     mockstomp.Connection.assert_called_once()
-    mockconn.start.assert_called_once()
     mockconn.connect.assert_called_once()
     assert stomp.is_connected()
 
     stomp.connect()
 
     mockstomp.Connection.assert_called_once()
-    mockconn.start.assert_called_once()
     mockconn.connect.assert_called_once()
     assert stomp.is_connected()
 
     stomp.disconnect()
 
     mockstomp.Connection.assert_called_once()
-    mockconn.start.assert_called_once()
     mockconn.connect.assert_called_once()
     mockconn.disconnect.assert_called_once()
     assert not stomp.is_connected()
@@ -174,7 +171,6 @@ def test_instantiate_link_and_connect_to_broker(mockstomp):
     stomp.disconnect()
 
     mockstomp.Connection.assert_called_once()
-    mockconn.start.assert_called_once()
     mockconn.connect.assert_called_once()
     mockconn.disconnect.assert_called_once()
     assert not stomp.is_connected()
@@ -185,18 +181,12 @@ def test_error_handling_when_connecting_to_broker(mockstomp):
     """Test the Stomp connection routine."""
     stomp = StompTransport()
     mockconn = mockstomp.Connection.return_value
-    mockconn.start.side_effect = stomppy.exception.ConnectFailedException()
-    mockstomp.exception = stomppy.exception
+    mockconn.connect.side_effect = stomppy.exception.ConnectFailedException()
+    mockstomp.exception.ConnectFailedException = (
+        stomppy.exception.ConnectFailedException
+    )
 
     with pytest.raises(workflows.Disconnected):
-        stomp.connect()
-
-    assert not stomp.is_connected()
-
-    mockconn.start.side_effect = None
-    mockconn.connect.side_effect = stomppy.exception.ConnectFailedException()
-
-    with pytest.raises(workflows.AuthenticationFailed):
         stomp.connect()
 
     assert not stomp.is_connected()
