@@ -14,13 +14,3 @@ class Error(Exception):
 
 class Disconnected(Error):
     """Indicates the connection could not be established or has been lost."""
-
-
-class AuthenticationFailed(Error):
-    """Indicates the connection could not be established due to incorrect credentials."""
-
-
-# Legacy error names, 20180319
-WorkflowsError = Error
-DisconnectedError = Disconnected
-AuthenticationError = AuthenticationFailed
