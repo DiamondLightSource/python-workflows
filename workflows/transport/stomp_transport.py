@@ -223,12 +223,6 @@ class StompTransport(CommonTransport):
                 ]
             )
             self._conn.set_listener("", self._stomp_listener)
-            try:
-                self._conn.start()
-            except stomp.exception.ConnectFailedException:
-                raise workflows.Disconnected(
-                    "Could not initiate connection to stomp host"
-                )
             username = self.config.get(
                 "--stomp-user", self.defaults.get("--stomp-user")
             )
@@ -245,8 +239,8 @@ class StompTransport(CommonTransport):
                 else:  # anonymous access
                     self._conn.connect(wait=False)
             except stomp.exception.ConnectFailedException:
-                raise workflows.AuthenticationFailed(
-                    "Could not connect to stomp host: Authentication error"
+                raise workflows.Disconnected(
+                    "Could not initiate connection to stomp host"
                 )
             while (
                 time.time() < timeout
@@ -255,11 +249,7 @@ class StompTransport(CommonTransport):
             ):
                 time.sleep(0.02)
             self._stomp_listener.on_disconnected = handler_old
-            if connection_failure.is_set():
-                raise workflows.Disconnected(
-                    "Could not initiate connection to stomp host - disconnected"
-                )
-            if not self._conn.is_connected():
+            if connection_failure.is_set() or not self._conn.is_connected():
                 raise workflows.Disconnected(
                     "Could not initiate connection to stomp host"
                 )
