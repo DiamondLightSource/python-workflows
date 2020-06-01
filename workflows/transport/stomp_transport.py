@@ -312,7 +312,7 @@ class StompTransport(CommonTransport):
         if kwargs.get("selector"):
             headers["selector"] = kwargs["selector"]
         if kwargs.get("transformation"):
-            if kwargs["transformation"] == True:
+            if kwargs["transformation"] is True:
                 headers["transformation"] = "jms-object-json"
             else:
                 headers["transformation"] = kwargs["transformation"]
@@ -342,7 +342,7 @@ class StompTransport(CommonTransport):
         if kwargs.get("retroactive"):
             headers["activemq.retroactive"] = "true"
         if kwargs.get("transformation"):
-            if kwargs["transformation"] == True:
+            if kwargs["transformation"] is True:
                 headers["transformation"] = "jms-object-json"
             else:
                 headers["transformation"] = kwargs["transformation"]
