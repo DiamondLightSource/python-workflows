@@ -4,10 +4,7 @@ import string
 
 import workflows
 
-try:  # Python3 compatibility
-    basestring = basestring
-except NameError:
-    basestring = (str, bytes)
+basestring = (str, bytes)
 
 
 class Recipe:

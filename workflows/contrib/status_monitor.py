@@ -5,10 +5,7 @@ import time
 import workflows.transport
 from workflows.services.common_service import CommonService
 
-try:  # Python3 compatibility
-    basestring = basestring
-except NameError:
-    basestring = (str, bytes)
+basestring = (str, bytes)
 
 
 class Monitor:  # pragma: no cover

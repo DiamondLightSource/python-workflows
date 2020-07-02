@@ -10,10 +10,7 @@ import workflows.transport
 import workflows.util
 from workflows.services.common_service import CommonService
 
-try:  # Python3 compatibility
-    basestring = basestring
-except NameError:
-    basestring = (str, bytes)
+basestring = (str, bytes)
 
 
 class Frontend:
