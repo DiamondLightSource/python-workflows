@@ -22,10 +22,6 @@ Workflows
         :target: https://pypi.org/project/workflows/
         :alt: Supported Python versions
 
-.. image:: https://pyup.io/repos/github/DiamondLightSource/python-workflows/shield.svg
-        :target: https://pyup.io/repos/github/DiamondLightSource/python-workflows/
-        :alt: Updates
-
 .. image:: https://img.shields.io/badge/code%20style-black-000000.svg
         :target: https://github.com/ambv/black
         :alt: Code style: black
