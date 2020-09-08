@@ -4,5 +4,5 @@ pip==20.2.3
 pytest==6.0.1
 pytest-cov==2.10.1
 pytest-timeout==1.4.2
-setuptools==49.6.0
+setuptools==50.3.0
 stomp.py==4.1.23
