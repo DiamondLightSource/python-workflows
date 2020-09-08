@@ -13,7 +13,7 @@ setup(
     download_url="https://github.com/DiamondLightSource/python-workflows/releases",
     version="2.1",
     install_requires=["setuptools", "stomp.py"],
-    python_requires=">=3.5",
+    python_requires=">=3.6",
     packages=find_packages(),
     license="BSD",
     entry_points={
@@ -40,7 +40,6 @@ setup(
         "Development Status :: 5 - Production/Stable",
         "License :: OSI Approved :: BSD License",
         "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.5",
         "Programming Language :: Python :: 3.6",
         "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",

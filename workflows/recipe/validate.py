@@ -33,7 +33,7 @@ def validate_recipe(json_filename):
         with open(json_filename) as f:
             recipe_text = f.read()
     except Exception:
-        logging.exception("Could not read recipe from {}".format(json_filename))
+        logging.exception(f"Could not read recipe from {json_filename}")
         raise
 
     # Turn it into a recipe and validate
@@ -41,13 +41,13 @@ def validate_recipe(json_filename):
         # Create a recipe object and validate it
         workflows.recipe.Recipe(recipe_text).validate()
     except json.JSONDecodeError as e:
-        logging.error("JSON error in recipe {}:\n{}".format(json_filename, e))
+        logging.error(f"JSON error in recipe {json_filename}:\n{e}")
         raise e
     except workflows.Error as e:
-        logging.error("Problem in recipe {}:\n{}".format(json_filename, e))
+        logging.error(f"Problem in recipe {json_filename}:\n{e}")
         raise e
     except Exception as e:
-        logging.error("Problem in recipe {}: {}".format(json_filename, e))
+        logging.error(f"Problem in recipe {json_filename}: {e}")
         raise e
 
 
@@ -70,7 +70,7 @@ def main():
     # Let the user know which files had errors (summary of previous output)
     # Otherwise exit silently
     if failed_files:
-        print("Errors found in the following recipes: {}".format(failed_files))
+        print(f"Errors found in the following recipes: {failed_files}")
         sys.exit(1)
 
 

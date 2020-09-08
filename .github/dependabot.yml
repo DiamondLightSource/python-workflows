@@ -9,10 +9,3 @@ updates:
     directory: "/" # Location of package manifests
     schedule:
       interval: "monthly"
-    ignore:
-      - dependency-name: "mock"
-        # mock 4 requires Python 3.6+
-        versions: [">=4"]
-      - dependency-name: "stomp.py"
-        # stomp.py 6 requires Python 3.6+
-        versions: [">=6"]
