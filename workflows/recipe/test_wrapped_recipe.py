@@ -61,21 +61,6 @@ def test_recipe_wrapper_instantiated_from_message_with_string_conversion():
     assert rw.recipe_step == m["recipe"][original_pointer]
 
 
-def test_recipe_wrapper_instantiated_from_message_with_unicode_conversion():
-    """A RecipeWrapper built from a message must be able to parse numeric strings."""
-    m = generate_recipe_message()
-    original_pointer = m["recipe-pointer"]
-    try:
-        m["recipe-pointer"] = unicode(original_pointer)
-    except NameError:
-        pytest.skip("Test skipped on Python 3")
-
-    rw = RecipeWrapper(message=m)
-
-    assert rw.recipe_pointer == original_pointer
-    assert rw.recipe_step == m["recipe"][original_pointer]
-
-
 def test_recipe_wrapper_instantiated_from_recipe():
     """A RecipeWrapper built from a recipe will contain the recipe, but no
     pointers."""
