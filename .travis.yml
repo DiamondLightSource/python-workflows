@@ -18,13 +18,13 @@ after_success:
 # Assuming you have installed the travis-ci CLI tool, after you
 # create the Github repo and add it to Travis, run the
 # following command to finish PyPI deployment setup:
-# $ travis encrypt --add deploy.password
+# $ travis encrypt --add deploy.password --pro
 deploy:
   provider: pypi
   distributions: sdist bdist_wheel
   user: mgerstel
   password:
-    secure: NULlNoAVRpUzqYJhs1g/P57Y98bcXsntxhv7KlGXKsVEIlcP14bzlirh3+kWVsyu197/PX6spHjWi6BQHzIDKPXoI1bCwMApLE+7Z4gZYp6lZ0zI86B0WQoYc3r1Dzth8mBl6Uy2sGG1SaPqbC8CxAdGKOt/fnP9PCJWmkHZzB0WGID5NIjZLaGiciZ7pHugrwg6MeAX/F71oSXNN4RpH1owZWeyesEdc+3SKuSltynHqinL5mcP3xLyzBs8JlUL89GTnEATrqIEBMLU7NXzdoFZjdgYyTpuT6xp7Q2/iHNUa6j9oXVJcxDMJuuPuRcTw0GiU0chtUB/+IFBXbVv8SpKotoaflm1kjqGjlFn2YzeZLJS4hcGMUSYXxvFX1kr92o7cRTVKwkknkJE52gU2bug6DRMYUgs7C+Dty2scEAKudB0DC0KJrJ5S5g9886NGkAQ8UW6UmhhbFr+4p7xQjYQ/cqcULdgwBPOfR///eu78DwfrtUl98/lsWQDwjrue5o7iTQsFx0Tkf3AC7nCKX2vpKG8aHWrfMXRjiVclttwV4DidUX88GQEHSIqTRhOZfgAjN80nQHueCoCQYIv/WC5UXU5R+BAi5aGJaKRgXOGG5qZXncCaSNtPytBC5/IDbfWIgIOMzG7H3FVsOw5XusiURraon6dxOIbOl9pEZg=
+    secure: DG9W01GpzBDs80rOsHCXyrOBLSc2f2sOco5UekMN8Xa7J2yDjHQsMLjCn69gw2v/kPHkqq+/ttBf8ToMLrzs1QqS3BMIF4FmDKuD6e2Yd7FDDk1QstvnwCimq4DasbrHVYIPt09iZajfqidnPSjqZapcYmiaCrE/PKHClSDLriixybU+SaizDBm9Uu+1mw5QqUwUYwKUcd3o/3vpmrGQqr9na9XEUQyTHEwmAGl4mAPrZoiJSIWP8hWDHAR/Ysb0DMK+2GnNRgXPedMW/ms/EBNwSEhi9xCFo3iiZmrYAkvmENUYl4F61DFC6IeMyNMfIIm5rCRHeroxf5bHchVXvoBzSUmTdfmJ98bRgOE2ShXmckiMXz3qvcCL5HlXPwd4+NZ8W7WcSAbGKr7w0lCLX999d+y84ujhCtQf+qzqHlJx1AV7+4V6lUeC8onHnNVOB6N6ijsmo5kZZMfma3Vo6UKMxzyH40lpc0g+LL/uJKyU6muNYpM5tPjn3bYOGjBMNSwX8VmgVBXg8ShEWwB4n+l0RHg3oKpEidbaRdgRDHHvvjRNbqYB9J1CxX1eaX5a2vXAVM//gJgV1JhAQqlAvbMp3CFr06isHzn9NjhpCjSETW2j80JUcOzt/u9fnnRnWVt3zRvwATDxFRbMqFc8xFCAh6IzlU4mbPU8W6RkKL4=
   on:
     tags: true
     repo: DiamondLightSource/python-workflows
