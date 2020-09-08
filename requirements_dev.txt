@@ -1,8 +1,8 @@
-coveralls
-mock
-pip
-pytest==4.5.0
-pytest-cov
-pytest-timeout
-setuptools
-stomp.py
+coveralls==2.1.2
+mock==3.0.5
+pip==20.2.3
+pytest==6.0.1
+pytest-cov==2.10.1
+pytest-timeout==1.4.2
+setuptools==49.6.0
+stomp.py==4.1.23
