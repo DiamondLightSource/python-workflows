@@ -16,6 +16,7 @@ Example of how this could be used in a .pre-commit-config.yaml file:
 """
 
 import argparse
+import json
 import logging
 import sys
 
@@ -39,8 +40,7 @@ def validate_recipe(json_filename):
     try:
         # Create a recipe object and validate it
         workflows.recipe.Recipe(recipe_text).validate()
-    except ValueError as e:
-        # json.JSONDecodeError only available from python 3.5.x
+    except json.JSONDecodeError as e:
         logging.error("JSON error in recipe {}:\n{}".format(json_filename, e))
         raise e
     except workflows.Error as e:

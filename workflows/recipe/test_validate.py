@@ -2,10 +2,11 @@
 Tests the functionality of validate.py with several different recipes which should raise different errors
 """
 
-import pytest
-import mock
+import json
 import sys
 
+import mock
+import pytest
 import workflows
 from workflows.recipe.validate import validate_recipe, main
 
@@ -60,8 +61,8 @@ def test_value_error_when_validating_bad_json(tmpdir):
     recipe_file = tmpdir.join("recipe.json")
     recipe_file.write(bad_json)
 
-    # Run validate with mock open, expect JSON error (only available from python 3.5)
-    with pytest.raises(ValueError):
+    # Run validate with mock open, expect JSON error
+    with pytest.raises(json.JSONDecodeError):
         validate_recipe(recipe_file.strpath)
 
 
