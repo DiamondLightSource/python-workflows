@@ -385,7 +385,11 @@ class CommonService:
                 else:
                     try:
                         task = self.__queue.get(True, self._idle_time)
+                        run_idle_task = False
                     except queue.Empty:
+                        run_idle_task = True
+                    if run_idle_task:
+                        # run this outside the 'except' to avoid exception chaining
                         self.__update_service_status(self.SERVICE_STATUS_TIMER)
                         if self._idle_callback:
                             self._idle_callback()
