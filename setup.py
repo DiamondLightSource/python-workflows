@@ -34,7 +34,7 @@ setup(
             "StompTransport = workflows.transport.stomp_transport:StompTransport"
         ],
     },
-    tests_require=["mock", "pytest"],
+    tests_require=["pytest"],
     zip_safe=False,
     classifiers=[
         "Development Status :: 5 - Production/Stable",

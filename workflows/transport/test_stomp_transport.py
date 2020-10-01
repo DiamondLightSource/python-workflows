@@ -5,8 +5,8 @@ import optparse
 import os
 import tempfile
 from imp import reload
+from unittest import mock
 
-import mock
 import pytest
 import stomp as stomppy
 import workflows
