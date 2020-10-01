@@ -1,6 +1,6 @@
-import mock
 import pytest
 import workflows.contrib.start_service
+from unittest import mock
 
 
 def test_get_command_line_help(capsys):

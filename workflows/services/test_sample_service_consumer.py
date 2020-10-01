@@ -1,4 +1,5 @@
-import mock
+from unittest import mock
+
 import workflows.services
 import workflows.services.sample_consumer
 

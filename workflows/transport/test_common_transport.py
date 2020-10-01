@@ -1,4 +1,5 @@
-import mock
+from unittest import mock
+
 import pytest
 import workflows
 from workflows.transport.common_transport import CommonTransport

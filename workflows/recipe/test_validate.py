@@ -4,8 +4,8 @@ Tests the functionality of validate.py with several different recipes which shou
 
 import json
 import sys
+from unittest import mock
 
-import mock
 import pytest
 import workflows
 from workflows.recipe.validate import validate_recipe, main

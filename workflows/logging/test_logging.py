@@ -1,7 +1,7 @@
 import logging
 import os
+from unittest import mock
 
-import mock
 import workflows.logging
 
 
