@@ -1,6 +1,6 @@
 coveralls==2.1.2
 pip==20.2.3
-pytest==6.1.0
+pytest==6.1.2
 pytest-cov==2.10.1
 pytest-timeout==1.4.2
 setuptools==50.3.0
