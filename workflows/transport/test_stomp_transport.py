@@ -1,10 +1,10 @@
 import argparse
+import importlib
 import inspect
 import json
 import optparse
 import os
 import tempfile
-from imp import reload
 from unittest import mock
 
 import pytest
@@ -101,7 +101,7 @@ prefix = namespace
         stomp.connect()
 
         # Reset configuration for subsequent tests by reloading StompTransport
-        reload(workflows.transport.stomp_transport)
+        importlib.reload(workflows.transport.stomp_transport)
         globals()["StompTransport"] = workflows.transport.stomp_transport.StompTransport
 
         mockstomp.Connection.assert_called_once_with([("localhost", 1234)])
@@ -135,7 +135,7 @@ def test_anonymous_connection(mockstomp):
     stomp.connect()
 
     # Reset configuration for subsequent tests by reloading StompTransport
-    reload(workflows.transport.stomp_transport)
+    importlib.reload(workflows.transport.stomp_transport)
     globals()["StompTransport"] = workflows.transport.stomp_transport.StompTransport
 
     mockconn.connect.assert_called_once_with(wait=False)
