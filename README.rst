@@ -14,10 +14,6 @@ Workflows
         :target: https://pypi.python.org/pypi/workflows
         :alt: BSD license
 
-.. image:: https://img.shields.io/travis/DiamondLightSource/python-workflows.svg
-        :target: https://travis-ci.org/DiamondLightSource/python-workflows
-        :alt: Build status
-
 .. image:: https://img.shields.io/pypi/pyversions/workflows.svg
         :target: https://pypi.org/project/workflows/
         :alt: Supported Python versions
