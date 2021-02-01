@@ -43,4 +43,4 @@ To achieve more complex workflows services can be interconnected using
 `recipes`_ whereby the output of one service can be directed
 onwards to other services.
 
-.. _recipes: https://github.com/DiamondLightSource/python-workflows/tree/master/workflows/recipe/README.MD
+.. _recipes: https://github.com/DiamondLightSource/python-workflows/tree/main/workflows/recipe/README.MD
