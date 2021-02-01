@@ -1,0 +1,38 @@
+steps:
+- checkout: none
+
+- task: UsePythonVersion@0
+  inputs:
+    versionSpec: '$(PYTHON_VERSION)'
+  displayName: 'Use Python $(PYTHON_VERSION)'
+
+- task: DownloadBuildArtifacts@0
+  displayName: Get pre-built package
+  inputs:
+    buildType: 'current'
+    downloadType: 'single'
+    artifactName: 'package'
+    downloadPath: '$(System.ArtifactsDirectory)'
+
+- task: ExtractFiles@1
+  displayName: Checkout sources
+  inputs:
+    archiveFilePatterns: "$(System.ArtifactsDirectory)/package/repo-source.tar.gz"
+    destinationFolder: "$(Pipeline.Workspace)/src"
+
+- script: |
+    pip install -U pip
+    pip install -r "$(Pipeline.Workspace)/src/requirements_dev.txt"
+    pip install "$(Pipeline.Workspace)/src"
+  displayName: Install package
+
+- script: |
+    PYTHONDEVMODE=1 pytest -ra --cov=workflows --cov-report=xml --cov-branch
+  displayName: Run tests
+  workingDirectory: $(Pipeline.Workspace)/src
+
+- bash: bash <(curl -s https://codecov.io/bash) -n "Python $(PYTHON_VERSION) $(Agent.OS)"
+  displayName: 'Publish coverage stats'
+  continueOnError: True
+  workingDirectory: $(Pipeline.Workspace)/src
+  timeoutInMinutes: 2
