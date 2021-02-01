@@ -10,6 +10,10 @@ Workflows
         :target: https://anaconda.org/conda-forge/workflows
         :alt: Conda version
 
+.. image:: https://dev.azure.com/zocalo/python-zocalo/_apis/build/status/DiamondLightSource.python-workflows?branchName=main
+        :target: https://dev.azure.com/zocalo/python-zocalo/_build/latest?definitionId=3&branchName=main
+        :alt: Build status
+
 .. image:: https://img.shields.io/pypi/l/workflows.svg
         :target: https://pypi.python.org/pypi/workflows
         :alt: BSD license
