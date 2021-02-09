@@ -185,10 +185,7 @@ class Frontend:
                             handler = None
                             self.log.warning("Unknown band %s", str(message["band"]))
                         if handler:
-                            #              try:
                             handler(message)
-                    #              except Exception:
-                    #                print('Uh oh. What to do.')
                     else:
                         self.log.warning("Invalid message received %s", str(message))
                 except EOFError:
@@ -290,16 +287,10 @@ class Frontend:
 
     def parse_band_log(self, message):
         """Process incoming logging messages from the service."""
-        if "payload" in message and hasattr(message["payload"], "name"):
+        try:
             record = message["payload"]
-            for k in dir(record):
-                if k.startswith("workflows_exc_"):
-                    setattr(record, k[14:], getattr(record, k))
-                    delattr(record, k)
-            for k, v in self.get_status().items():
-                setattr(record, "workflows_" + k, v)
-            logging.getLogger(record.name).handle(record)
-        else:
+            record_name = record.name
+        except (AttributeError, KeyError, TypeError):
             self.log.warning(
                 "Received broken record on log band\n" + "Message: %s\nRecord: %s",
                 str(message),
@@ -308,6 +299,14 @@ class Frontend:
                     and message["payload"].__dict__
                 ),
             )
+            return
+        for k in dir(record):
+            if k.startswith("workflows_exc_"):
+                setattr(record, k[14:], getattr(record, k))
+                delattr(record, k)
+        for k, v in self.get_status().items():
+            setattr(record, "workflows_" + k, v)
+        logging.getLogger(record_name).handle(record)
 
     def parse_band_request_termination(self, message):
         """Service declares it should be terminated."""
