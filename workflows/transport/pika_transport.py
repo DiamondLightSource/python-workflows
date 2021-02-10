@@ -1,4 +1,3 @@
-import workflows
 from workflows.transport.common_transport import CommonTransport
 
 class PikaTransport(CommonTransport):
