@@ -377,7 +377,7 @@ class CommonService:
         # Allow service to accept arguments
         parser = argparse.ArgumentParser()
         self.on_parser_preparation(parser)
-        args = parser.parse_args(self.start_kwargs.get("service_args"))
+        args = parser.parse_args(self.start_kwargs.get("service_args", []))
         args = self.on_parsing(args) or args
 
         try:
