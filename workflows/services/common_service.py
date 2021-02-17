@@ -4,6 +4,7 @@ import itertools
 import logging
 import queue
 import threading
+import argparse
 
 import workflows
 import workflows.logging
@@ -149,6 +150,18 @@ class CommonService:
 
         # Logger will be overwritten in start() function
         self.log = logging.getLogger(self._logger_name)
+
+    @staticmethod
+    def on_parser_preparation(parser):
+        """Plugin hook to manipulate the argparse object before command line
+        parsing. If a value is returned here it will replace the OptionParser
+        object."""
+
+    @staticmethod
+    def on_parsing(args):
+        """Plugin hook to manipulate the command line parsing results.
+        A tuple of values can be returned, which will replace (args).
+        """
 
     def __send_to_frontend(self, data_structure):
         """Put a message in the pipe for the frontend."""
@@ -360,6 +373,13 @@ class CommonService:
 
         # Keep a copy of keyword arguments for use in subclasses
         self.start_kwargs.update(kwargs)
+
+        # Allow service to accept arguments
+        parser = argparse.ArgumentParser()
+        self.on_parser_preparation(parser)
+        args = parser.parse_args(self.start_kwargs.get("service_args"))
+        args = self.on_parsing(args) or args
+
         try:
             self.initialize_logging()
 

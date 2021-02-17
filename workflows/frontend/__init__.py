@@ -28,6 +28,7 @@ class Frontend:
         restart_service=False,
         verbose_service=False,
         environment=None,
+        service_args={},
     ):
         """Create a frontend instance. Connect to the transport layer, start any
         requested service, begin broadcasting status information and listen
@@ -57,6 +58,7 @@ class Frontend:
         self._service_name = None
         self._service_starttime = None
         self._service_rapidstarts = None
+        self._service_args = service_args
         self._pipe_commands = None  # frontend -> service
         self._pipe_service = None  # frontend <- service
         self._service_status = CommonService.SERVICE_STATUS_NONE
@@ -404,7 +406,10 @@ class Frontend:
             self._service = multiprocessing.Process(
                 target=service_instance.start,
                 args=(),
-                kwargs={"verbose_log": self._verbose_service},
+                kwargs={
+                    "verbose_log": self._verbose_service,
+                    "service_args": self._service_args,
+                },
             )
             self._service_name = service_instance.get_name()
             self._service_class_name = service_instance.__class__.__name__

@@ -1,4 +1,4 @@
-from optparse import SUPPRESS_HELP, OptionParser
+import argparse
 
 import workflows
 import workflows.frontend
@@ -18,9 +18,9 @@ class ServiceStarter:
         object."""
 
     @staticmethod
-    def on_parsing(options, args):
+    def on_parsing(args, unknown):
         """Plugin hook to manipulate the command line parsing results.
-        A tuple of values can be returned, which will replace (options, args).
+        A tuple of values can be returned, which will replace (args, unknown).
         """
 
     @staticmethod
@@ -61,11 +61,10 @@ class ServiceStarter:
         known_services = workflows.services.get_known_services()
 
         # Set up parser
-        parser = OptionParser(
-            usage=program_name + " [options]" if program_name else None, version=version
-        )
-        parser.add_option("-?", action="help", help=SUPPRESS_HELP)
-        parser.add_option(
+        parser = argparse.ArgumentParser()
+        parser.add_argument("--version", action="version", version=version)
+        parser.add_argument("-?", action="help", default=argparse.SUPPRESS)
+        parser.add_argument(
             "-s",
             "--service",
             dest="service",
@@ -74,7 +73,7 @@ class ServiceStarter:
             help="Name of the service to start. Known services: "
             + ", ".join(known_services),
         )
-        parser.add_option(
+        parser.add_argument(
             "-t",
             "--transport",
             dest="transport",
@@ -82,7 +81,7 @@ class ServiceStarter:
             default="StompTransport",
             help="Transport mechanism. Known mechanisms: "
             + ", ".join(workflows.transport.get_known_transports())
-            + " (default: %default)",
+            + " (default: %(default)s)",
         )
         workflows.transport.add_command_line_options(parser)
 
@@ -90,13 +89,13 @@ class ServiceStarter:
         parser = self.on_parser_preparation(parser) or parser
 
         # Parse command line options
-        (options, args) = parser.parse_args(cmdline_args)
+        (args, unknown) = parser.parse_known_args(cmdline_args)
 
         # Call on_parsing hook
-        (options, args) = self.on_parsing(options, args) or (options, args)
+        (args, unknown) = self.on_parsing(args, unknown) or (args, unknown)
 
         # Create Transport factory
-        transport_factory = workflows.transport.lookup(options.transport)
+        transport_factory = workflows.transport.lookup(args.transport)
 
         # Call on_transport_factory_preparation hook
         transport_factory = (
@@ -114,18 +113,24 @@ class ServiceStarter:
         transport_factory.__call__ = on_transport_preparation_hook
 
         # When service name is specified, check if service exists or can be derived
-        if options.service and options.service not in known_services:
-            matching = [s for s in known_services if s.startswith(options.service)]
+        if args.service and args.service not in known_services:
+            matching = [s for s in known_services if s.startswith(args.service)]
             if not matching:
                 matching = [
                     s
                     for s in known_services
-                    if s.lower().startswith(options.service.lower())
+                    if s.lower().startswith(args.service.lower())
                 ]
             if matching and len(matching) == 1:
-                options.service = matching[0]
+                args.service = matching[0]
 
-        kwargs.update({"service": options.service, "transport": transport_factory})
+        kwargs.update(
+            {
+                "service": args.service,
+                "transport": transport_factory,
+                "service_args": unknown,
+            }
+        )
 
         # Call before_frontend_construction hook
         kwargs = self.before_frontend_construction(kwargs) or kwargs
