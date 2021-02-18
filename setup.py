@@ -31,7 +31,8 @@ setup(
             "SampleTxnProducer = workflows.services.sample_transaction:SampleTxnProducer",
         ],
         "workflows.transport": [
-            "StompTransport = workflows.transport.stomp_transport:StompTransport"
+            "StompTransport = workflows.transport.stomp_transport:StompTransport",
+            "PikaTransport = workflows.transport.pika_transport:PikaTransport",
         ],
     },
     tests_require=["pytest"],
