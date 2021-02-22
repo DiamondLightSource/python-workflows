@@ -266,7 +266,7 @@ class PikaTransport(CommonTransport):
     def _broadcast(self, destination, message, headers=None, delay=None, expiration=None, **kwargs):
 
         properties = pika.BasicProperties(headers=None,
-                                          delivery_mode=2,
+                                          delivery_mode=2)
                                           #user_id=self.username)
 
         if not headers:
