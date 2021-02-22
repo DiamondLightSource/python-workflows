@@ -1,7 +1,7 @@
 import argparse
-import importlib
-import inspect
-import json
+#import importlib
+#import inspect
+#import json
 import optparse
 import os
 import tempfile
@@ -156,7 +156,7 @@ def test_instantiate_link_and_connect_to_broker(mockpika):
     mockpika.BlockingConnection.assert_called_once()
     #mockconn.channel.assert_called_once()
     #mockchannel.connect.assert_called_once() #not connect method
-    #assert pika.is_connected()
+    assert pika.is_connected()
 
     pika.connect()
 
@@ -193,7 +193,8 @@ def test_error_handling_when_connecting_to_broker(mockpika):
     mockpika.exceptions.AMQPConnectionError = (
         pikapy.exceptions.AMQPConnectionError
     )
-
+    
+    # with pytest.raises(workflows.Disconnected)
     with pytest.raises(Exception):
         pika.connect()
 
@@ -210,40 +211,43 @@ def test_broadcast_status(mockpika, mocktime):
     pika.connect()
     mockconn = mockpika.BlockingConnection
     mockchannel = mockconn.return_value.channel.return_value
+    mockproperties = mockpika.BasicProperties
     #channel lower case
 
     pika.broadcast_status({"status": str(mock.sentinel.status)})
 
     mockchannel.basic_publish.assert_called_once()
     args, kwargs = mockchannel.basic_publish.call_args
-    #no args, kwargs, all is in kwargs
-    #() {'exchange': 'transient.status', 'routing_key': '', 'body': '{"status": "sentinel.status"}', 'properties': <MagicMock name='pika.BasicProperti
-    # KeyError: 'headers'#
-    exchange, routing_key, message, properties = kwargs
+    properties = mockproperties.call_args[1]
+    headers = properties.get('headers')
+    expiration = headers.get('x-message-ttl')
+    #delay = headers.get('x-delay')
 
-    #assert int (kwargs["headers"]["expires"]) == 1000 * (2000 + 15)
-    #assert destination.startswith("/topic/transient.status"
-    #statusdict = json.loads(message)
-    #print(statusdict)
-    #assert statusdict["status"] = str(mock.sentinel.status)
+    assert int(expiration) == 1000 * (20000 + 15)
+    destination = kwargs.get('exchange')
+    message = kwargs.get('body')
+    # assert destination.startswith("/topic/transient.status")
+    assert destination.startswith("transient.status")
+    statusdict = json.loads(message)
+    assert statusdict["status"] == str(mock.sentinel.status)
 
 @mock.patch("workflows.transport.pika_transport.pika")
 #@mock.patch("transport.pika_transport.pika")
 def test_send_message(mockpika):
-    """Test the message sending function"""
+        """Test the message sending function"""
     pika = PikaTransport()
     pika.connect()
-    #no return_value at the end
     mockconn = mockpika.BlockingConnection
     mockchannel = mockconn.return_value.channel.return_value
+    mockproperties = mockpika.BasicProperties
 
     pika._send(str(mock.sentinel.exchange), mock.sentinel.message)
 
     mockchannel.basic_publish.assert_called_once()
     args, kwargs = mockchannel.basic_publish.call_args
-    #print(kwargs.get("headers"))
-    #assert args == ("/queue/" + str(mock.sentinel.channel), mock.sentinel.message)
-    #assert kwargs.get("headers") == {"persistent": "true"}
+    # assert args == ("/queue/" + str(mock.sentinel.channel), mock.sentinel.message)
+    # keep persistent in headers?
+    # assert kwargs.get("headers") == {"persistent": "true"}
 
     # only destination setup, difference between exchange and queue
     pika._send(
@@ -256,11 +260,32 @@ def test_send_message(mockpika):
 
     assert mockchannel.basic_publish.call_count == 2
     args, kwargs = mockchannel.basic_publish.call_args
-    #headers are in properties
-    #print(kwargs.get("properties"))
-    #assert kwargs == ("", mock.sentinel.queue, mock.sentinel.message)
+    #assert args == ("/queue/ + str(mock.sentinel.channel), mock.sentinel.message)
+    #asserting kwargs MagicMock properties?
+    #check x-delay is in headers
 
-    #Function test_sending_message_with_expiration
+@mock.patch("workflows.transport.pika_transport.pika")
+@mock.patch("workflows.transport.pika_transport.time")
+def test_sending_message_with_expiration(time, mockpika):
+    """Test sending a message that expires some time in the future."""
+    system_time = 1234567.1234567
+    message_lifetime = 120
+    expiration_time = int((system_time + message_lifetime) * 1000)
+    time.time.return_value = system_time
+
+    pika = PikaTransport()
+    pika.connect()
+    mockconn = mockpika.BlockingConnection
+    mockchannel = mockconn.return_value.channel.return_value
+    mockproperties = mockpika.BasicProperties
+
+    pika._send(str(mock.sentinel.channel), mock.sentinel.message, expiration=120)
+
+    mockchannel.basic_publish.assert_called_once()
+    args, kwargs = mockchannel.basic_publish.call_args
+    #assert args == ("/queue/" + str(mock.sentinel.channel), mock.sentinel.message)
+    properties = mockproperties.call_args[1]
+    assert properties.get('headers') == {"x-message-ttl": expiration_time}
 
 @mock.patch("workflows.transport.pika_transport.pika")
 ##@mock.patch("transport.pika_transport.pika")
@@ -290,28 +315,32 @@ def test_send_broadcast(mockpika):
     pika.connect()
     mockconn = mockpika.BlockingConnection
     mockchannel = mockconn.return_value.channel.return_value
+    mockproperties = mockpika.BasicProperties
 
     pika._broadcast(str(mock.sentinel.channel), mock.sentinel.message)
 
     mockchannel.basic_publish.assert_called_once()
     args, kwargs = mockchannel.basic_publish.call_args
-    #assert args == ("/topic/" + str(mock.sentinel.channel), mock.sentinel.message)
-    #assert kwargs.get("headers") in (None, {})
+    properties = mockproperties.call_args[1]
+    # assert args == ("/topic/" + str(mock.sentinel.channel), mock.sentinel.message)
+    assert properties.get('headers') in (None, {})
 
     pika._broadcast(
-        str(mock.sentinel.channel), mock.sentinel.message, headers=mock.sentinel.headers
-    )
+        str(mock.sentinel.channel), mock.sentinel.message, headers=mock.sentinel.headers)
 
     assert mockchannel.basic_publish.call_count == 2
     args, kwargs = mockchannel.basic_publish.call_args
     #assert args == ("/topic/" + str(mock.sentinel.channel), mock.sentinel.message)
+    properties = mockproperties.call_args[1]
+    assert properties == {"headers": mock.sentinel.headers, 'delivery_mode': 2}
     #assert kwargs == {"headers": mock.sentinel.headers}
 
     pika._broadcast(str(mock.sentinel.channel), mock.sentinel.message, delay=123)
     assert mockchannel.basic_publish.call_count == 3
     args, kwargs = mockchannel.basic_publish.call_args
     #assert args == ("/topic/" + str(mock.sentinel.channel), mock.sentinel.message)
-    #assert kwargs["headers"].get("AMQ_SCHEDULED_DELAY") == 123000
+    properties = mockproperties.call_args[1]
+    assert properties.get("headers").get("x-delay") == 123000
 
 @mock.patch("workflows.transport.pika_transport.pika")
 @mock.patch("workflows.transport.pika_transport.time")
@@ -329,12 +358,16 @@ def test_broadcasting_message_with_expiration(time, mockpika):
 
     mockconn = mockpika.BlockingConnection
     mockchannel = mockconn.return_value.channel.return_value
+    mockproperties = mockpika.BasicProperties
 
     pika._broadcast(str(mock.sentinel.channel), mock.sentinel.message, expiration=120)
 
     mockchannel.basic_publish.assert_called_once()
     args, kwargs = mockchannel.basic_publish.call_args
     #assert args == ("/topic/" + str(mock.sentinel.channel), mock.sentinel.message)
+    properties = mockproperties.call_args[1]
+    assert properties.get("headers").get("x-message-ttl") == expiration_time
+    assert properties.get("headers") == {"x-message-ttl": expiration_time}
     #assert kwargs.get("headers") == {"expires": expiration_time}
 
 @mock.patch("workflows.transport.pika_transport.pika")

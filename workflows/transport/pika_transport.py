@@ -59,7 +59,7 @@ class PikaTransport(CommonTransport):
             return cls.add_command_line_options_argparse(parser)
         else:
             return cls.add_command_line_options_optparse(parser)
-    
+
     @classmethod
     def add_command_line_options_argparse(cls, argparser):
         """Function to inject command line parameters into
@@ -73,7 +73,7 @@ class PikaTransport(CommonTransport):
                 cls.config[option_string] = value
                 if option_string == "--rabbit-conf":
                     cls.load_configuration_file(value)
-            
+
             argparser.add_argument(
                 "--rabbit-host",
                 metavar="HOST",
@@ -114,7 +114,7 @@ class PikaTransport(CommonTransport):
                 default=cls.defaults.get("--rabbit-conf"),
                 help="Rabbit configuration file containing connection information, disables default values",
                 type=str,
-                action=SetParamter,
+                action=SetParameter,
             )
 
     @classmethod
@@ -246,8 +246,16 @@ class PikaTransport(CommonTransport):
 
 
     def _send(self, destination, message, headers=None, delay=None, expiration=None, **kwargs):
+        
+        if not headers:
+            headers = {}
+        if delay:
+            headers = ["x-delay"] = 1000 * delay
+        if expiration:
+            headers = ["x-message-ttl"] = int((time.time() + expiration) * 1000)
 
-        properties = pika.BasicProperties(headers=None,
+        #delivery_mode=2 always persistent
+        properties = pika.BasicProperties(headers=headers,
                                           delivery_mode=2)
                                           #user_id=self.username)
         try:
@@ -265,14 +273,31 @@ class PikaTransport(CommonTransport):
 
     def _broadcast(self, destination, message, headers=None, delay=None, expiration=None, **kwargs):
 
-        properties = pika.BasicProperties(headers=None,
-                                          delivery_mode=2)
-                                          #user_id=self.username)
+        """Broadcast a message.
+        :param destination: Topic name to send to
+        :param message: A string to be broadcast
+        :param **kwargs: Further parameters for the transport layer. For example
+          delay:            Delay transport of message by this many seconds
+          expiration:       Optional expiration time, relative to sending time
+          headers:          Optional dictionary of header entries
+          ignore_namespace: Do not apply namespace to the destination name
+          transaction:      Transaction ID if message should be part of a
+                            transaction
+        """
 
         if not headers:
             headers = {}
+        if delay:
+            headers["x-delay"] = 1000 * delay
         if expiration:
-            headers["expires"] = int((time.time() + expiration) * 1000)
+            headers["x-message-ttl"] = int((time.time() + expiration) * 1000)
+            #expiration_time = int((time.time() + expiration) * 1000)
+
+        #user_id, message_id (auto-generated), timestamp, expiration
+
+        properties = pika.BasicProperties(headers=headers,
+                                        delivery_mode=2)
+                                        #user_id=self.username)
 
         try:
             self._channel.basic_publish(exchange=destination,
