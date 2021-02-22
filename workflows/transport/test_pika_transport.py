@@ -234,7 +234,7 @@ def test_broadcast_status(mockpika, mocktime):
 @mock.patch("workflows.transport.pika_transport.pika")
 #@mock.patch("transport.pika_transport.pika")
 def test_send_message(mockpika):
-        """Test the message sending function"""
+    """Test the message sending function"""
     pika = PikaTransport()
     pika.connect()
     mockconn = mockpika.BlockingConnection
