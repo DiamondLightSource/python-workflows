@@ -7,6 +7,7 @@ import pika
 import workflows
 from workflows.transport.common_transport import CommonTransport
 
+
 class PikaTransport(CommonTransport):
     """Abstraction layer for messaging infrastructure. Here we are using Pika"""
 
@@ -74,48 +75,49 @@ class PikaTransport(CommonTransport):
                 if option_string == "--rabbit-conf":
                     cls.load_configuration_file(value)
 
-            argparser.add_argument(
-                "--rabbit-host",
-                metavar="HOST",
-                default=cls.defaults.get("--rabbit-host"),
-                help="Rabbit broker address, default '%(default)s'",
-                type=str,
-                action=SetParameter,
-            )
+        argparser.add_argument(
+            "--rabbit-host",
+            metavar="HOST",
+            default=cls.defaults.get("--rabbit-host"),
+            help="Rabbit broker address, default '%(default)s'",
+            type=str,
+            action=SetParameter,
+        )
 
-            argparser.add_argument(
-                "--rabbit-port",
-                metavar="PORT",
-                default=cls.defaults.get("--rabbit-port"),
-                help="Rabbit broker port, default '%(default)s",
-                type=int,
-                action=SetParameter,
-            )
-            argparser.add_argument(
-                "--rabbit-user",
-                metavar="USER",
-                default=cls.defaults.get("--rabbit-user"),
-                help="Rabbit user, default '%(default)s'",
-                type=str,
-                action=SetParameter,
-            )
-            argparser.add_argument(
-                "--rabbit-pass",
-                metavar="PRE",
-                default=cls.defaults.get("--rabbit-pass"),
-                help="Rabbit password",
-                type=str,
-                action=SetParameter,
-            )
-            # prefix
-            argparser.add_argument(
-                "--rabbit-conf",
-                metavar="CNF",
-                default=cls.defaults.get("--rabbit-conf"),
-                help="Rabbit configuration file containing connection information, disables default values",
-                type=str,
-                action=SetParameter,
-            )
+        argparser.add_argument(
+            "--rabbit-port",
+            metavar="PORT",
+            default=cls.defaults.get("--rabbit-port"),
+            help="Rabbit broker port, default '%(default)s",
+            type=int,
+            action=SetParameter,
+        )
+
+        argparser.add_argument(
+            "--rabbit-user",
+            metavar="USER",
+            default=cls.defaults.get("--rabbit-user"),
+            help="Rabbit user, default '%(default)s'",
+            type=str,
+            action=SetParameter,
+        )
+        argparser.add_argument(
+            "--rabbit-pass",
+            metavar="PRE",
+            default=cls.defaults.get("--rabbit-pass"),
+            help="Rabbit password",
+            type=str,
+            action=SetParameter,
+        )
+        # prefix
+        argparser.add_argument(
+            "--rabbit-conf",
+            metavar="CNF",
+            default=cls.defaults.get("--rabbit-conf"),
+            help="Rabbit configuration file containing connection information, disables default values",
+            type=str,
+            action=SetParameter,
+        )
 
     @classmethod
     def add_command_line_options_optparse(cls, optparser):
@@ -185,19 +187,28 @@ class PikaTransport(CommonTransport):
         with self._lock:
             if self._connected:
                 return True
-            username = self.config.get("--rabbit-user", self.defaults.get("--rabbit-user"))
-            password = self.config.get("--rabbit-pass", self.defaults.get("--rabbit-pass"))
+            username = self.config.get(
+                "--rabbit-user", self.defaults.get("--rabbit-user")
+            )
+            password = self.config.get(
+                "--rabbit-pass", self.defaults.get("--rabbit-pass")
+            )
             host = self.config.get("--rabbit-host", self.defaults.get("--rabbit-host"))
-            port = int(self.config.get("--rabbit-port", self.defaults.get("--rabbit-port")))
+            port = int(
+                self.config.get("--rabbit-port", self.defaults.get("--rabbit-port"))
+            )
             credentials = pika.PlainCredentials(username, password)
-            self._conn = pika.BlockingConnection(pika.ConnectionParameters(host=host,
-             port=port, credentials=credentials))
+            self._conn = pika.BlockingConnection(
+                pika.ConnectionParameters(host=host, port=port, credentials=credentials)
+            )
             self._channel = self._conn.channel()
             self._connected = True
         return True
-    
+
     def is_connected(self):
-        self._connected = self._connected and self._conn.is_open() and self._channel.is_open()
+        self._connected = (
+            self._connected and self._conn.is_open() and self._channel.is_open()
+        )
         return self._connected
 
     def disconnect(self):
@@ -205,22 +216,15 @@ class PikaTransport(CommonTransport):
             self._connected = False
             self._channel.close()
             self._conn.close()
-    
+
     def broadcast_status(self, status):
         self._broadcast(
             "transient.status",
             json.dumps(status),
-            headers= {"expires": str(int(15 + time.time()) * 1000)}
+            headers={"expires": str(int(15 + time.time()) * 1000)},
         )
 
     def _subscribe(self, consumer_tag, queue, callback, **kwargs):
-        headers = {}
-        if kwargs.get("exclusive"):
-            headers["rabbitmq.exclusive"] = "true"
-        if kwargs.get("acknowledgement"):
-            ack = "client-individual"
-        else:
-            ack = "auto"
 
         exclusive = kwargs.get("exclusive")
         auto_ack = not kwargs.get("acknowledgement")
@@ -229,40 +233,43 @@ class PikaTransport(CommonTransport):
             # callback({"message-id": method.delivery_tag}, body.decode())
             if not auto_ack:
                 self._ack()
-        
-        self._channel.basic_qos(prefetch_count=1)
-        self._channel.basic_consume(queue=queue,
-                                    on_message_callback=_redirect_callback,
-                                    auto_ack=auto_ack,
-                                    exclusive=exclusive,
-                                    consumer_tag=consumer_tag,
-                                    arguments=None)
 
-    
+        self._channel.basic_qos(prefetch_count=1)
+        self._channel.basic_consume(
+            queue=queue,
+            on_message_callback=_redirect_callback,
+            auto_ack=auto_ack,
+            exclusive=exclusive,
+            consumer_tag=consumer_tag,
+            arguments=None,
+        )
+
     def _unsubscribe(self, consumer_tag):
 
         self._channel.basic_cancel(consumer_tag=consumer_tag, callback=None)
         # Callback reference is kept as further messages may already have been received
 
+    def _send(
+        self, destination, message, headers=None, delay=None, expiration=None, **kwargs
+    ):
 
-    def _send(self, destination, message, headers=None, delay=None, expiration=None, **kwargs):
-        
         if not headers:
             headers = {}
         if delay:
-            headers = ["x-delay"] = 1000 * delay
+            headers["x-delay"] = 1000 * delay
         if expiration:
-            headers = ["x-message-ttl"] = int((time.time() + expiration) * 1000)
+            headers["x-message-ttl"] = int((time.time() + expiration) * 1000)
 
-        #delivery_mode=2 always persistent
-        properties = pika.BasicProperties(headers=headers,
-                                          delivery_mode=2)
-                                          #user_id=self.username)
+        # delivery_mode=2 always persistent
+        properties = pika.BasicProperties(headers=headers, delivery_mode=2)
+        # user_id=self.username)
         try:
-            self._channel.basic_publish(exchange='',
-                                        routing_key=destination,
-                                        body=message,
-                                        properties=properties)
+            self._channel.basic_publish(
+                exchange="",
+                routing_key=destination,
+                body=message,
+                properties=properties,
+            )
 
         except pika.exception.ChannelClosed:
             self._connected = False
@@ -271,7 +278,9 @@ class PikaTransport(CommonTransport):
             self._connected = False
             raise workflows.Disconnected("No connection to Rabbit host")
 
-    def _broadcast(self, destination, message, headers=None, delay=None, expiration=None, **kwargs):
+    def _broadcast(
+        self, destination, message, headers=None, delay=None, expiration=None, **kwargs
+    ):
 
         """Broadcast a message.
         :param destination: Topic name to send to
@@ -291,19 +300,20 @@ class PikaTransport(CommonTransport):
             headers["x-delay"] = 1000 * delay
         if expiration:
             headers["x-message-ttl"] = int((time.time() + expiration) * 1000)
-            #expiration_time = int((time.time() + expiration) * 1000)
+            # expiration_time = int((time.time() + expiration) * 1000)
 
-        #user_id, message_id (auto-generated), timestamp, expiration
+        # user_id, message_id (auto-generated), timestamp, expiration
 
-        properties = pika.BasicProperties(headers=headers,
-                                        delivery_mode=2)
-                                        #user_id=self.username)
+        properties = pika.BasicProperties(headers=headers, delivery_mode=2)
+        # user_id=self.username)
 
         try:
-            self._channel.basic_publish(exchange=destination,
-                                    routing_key="",
-                                    body=message,
-                                    properties=properties)
+            self._channel.basic_publish(
+                exchange=destination,
+                routing_key="",
+                body=message,
+                properties=properties,
+            )
 
         except pika.exception.ChannelClosed:
             self._connected = False
@@ -313,11 +323,11 @@ class PikaTransport(CommonTransport):
             raise workflows.Disconnected("No connection to Rabbit host")
 
     def _transaction_begin(self, transaction_id, **kwargs):
-        #Pika doesn't support transaction_id in transactions methods
+        # Pika doesn't support transaction_id in transactions methods
         self._channel.tx_select()
 
     def transaction_abort(self, transaction_id, **kwargs):
-        #abort a transaction and roll back all operations
+        # abort a transaction and roll back all operations
         self._channel.tx_rollback()
 
     def transaction_commit(self, transaction_id, **kwargs):
@@ -327,7 +337,7 @@ class PikaTransport(CommonTransport):
         # argument in stomp_transport: subscription_id
         # delivery_tag is the message id, no argument for subscription_id
         self._channel.basic_ack(delivery_tag=message_id)
-    
+
     def _nack(self, message_id, **kwargs):
         # argument in stomp_transport: subscription_id
         # delivery_tag is the message id, no argument for subscription_id
@@ -353,12 +363,3 @@ class PikaTransport(CommonTransport):
             return json.loads(message)
         except (TypeError, ValueError):
             return message
-
-
-
-
-
-        
-
-
-    
