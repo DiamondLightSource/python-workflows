@@ -348,10 +348,10 @@ class PikaTransport(CommonTransport):
                 body=message,
                 properties=properties,
             )
-        except pika.exception.ChannelClosed:
+        except pika.exceptions.ChannelClosed:
             self._connected = False
             raise workflows.Disconnected("No connection to channel")
-        except pika.exception.ConnectionClosed:
+        except pika.exceptions.ConnectionClosed:
             self._connected = False
             raise workflows.Disconnected("No connection to Rabbit host")
 
@@ -388,10 +388,10 @@ class PikaTransport(CommonTransport):
                 body=message,
                 properties=properties,
             )
-        except pika.exception.ChannelClosed:
+        except pika.exceptions.ChannelClosed:
             self._connected = False
             raise workflows.Disconnected("No connection to channel")
-        except pika.exception.ConnectionClosed:
+        except pika.exceptions.ConnectionClosed:
             self._connected = False
             raise workflows.Disconnected("No connection to Rabbit host")
 
