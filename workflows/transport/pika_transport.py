@@ -463,7 +463,3 @@ class PikaTransport(CommonTransport):
             return json.loads(message)
         except (TypeError, ValueError):
             return message
-
-
-pi = PikaTransport()
-pi.connect()
