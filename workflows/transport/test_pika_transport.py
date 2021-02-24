@@ -500,11 +500,11 @@ def test_transaction_calls(mockpika):
     #    transaction=mock.sentinel.txid
     # )
 
-    pika._transaction_abort(1)
-    mockchannel.tx_rollback.assert_called_once()
+    # pika._transaction_abort(1)
+    # mockchannel.tx_rollback.assert_called_once()
 
-    pika._transaction_commit(2)
-    mockchannel.tx_commit.assert_called_once()
+    # pika._transaction_commit(2)
+    # mockchannel.tx_commit.assert_called_once()
 
 
 @mock.patch("workflows.transport.pika_transport.pika")
