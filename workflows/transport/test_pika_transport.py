@@ -8,8 +8,8 @@ import os
 import tempfile
 from unittest import mock
 
-# import pytest
-# import pika as pikapy
+import pytest
+import pika as pikapy
 import workflows
 import workflows.transport
 from workflows.transport.pika_transport import PikaTransport
@@ -164,19 +164,16 @@ def test_instantiate_link_and_connect_to_broker(mockpika):
     assert not pika.is_connected()
 
 
-"""
 @mock.patch("workflows.transport.pika_transport.pika")
 def test_error_handling_when_connecting_to_broker(mockpika):
     pika = PikaTransport()
-    mockconn = mockpika.BlockingConnection.return_value
-    mockconn.BlockingConnection.side_effect = pikapy.exceptions.AMQPConnectionError()
+    mockpika.BlockingConnection.side_effect = pikapy.exceptions.AMQPConnectionError()
     mockpika.exceptions.AMQPConnectionError = pikapy.exceptions.AMQPConnectionError
 
     with pytest.raises(workflows.Disconnected):
         pika.connect()
 
     assert not pika.is_connected()
-"""
 
 
 @mock.patch("workflows.transport.pika_transport.time")
