@@ -184,6 +184,7 @@ class PikaTransport(CommonTransport):
 
     def connect(self):
         """ It opens a connection and channel"""
+        print("Connecting")
         with self._lock:
             if self._connected:
                 return True
@@ -193,15 +194,32 @@ class PikaTransport(CommonTransport):
             password = self.config.get(
                 "--rabbit-pass", self.defaults.get("--rabbit-pass")
             )
+            credentials = pika.PlainCredentials(username, password)
             host = self.config.get("--rabbit-host", self.defaults.get("--rabbit-host"))
             port = int(
                 self.config.get("--rabbit-port", self.defaults.get("--rabbit-port"))
             )
-            credentials = pika.PlainCredentials(username, password)
-            self._conn = pika.BlockingConnection(
-                pika.ConnectionParameters(host=host, port=port, credentials=credentials)
-            )
-            self._channel = self._conn.channel()
+
+            try:
+                if username or password:
+                    self._conn = pika.BlockingConnection(
+                        pika.ConnectionParameters(
+                            host=host, port=port, credentials=credentials
+                        )
+                    )
+                else:
+                    # ACCESS REFUSED
+                    self._conn = pika.BlockingConnection(
+                        pika.ConnectionParameters(host=host, port=port)
+                    )
+            except pika.exceptions.AMQPConnectionError:
+                raise workflows.Disconnected(
+                    "Could not initiate connection to rabbit host"
+                )
+            try:
+                self._channel = self._conn.channel()
+            except pika.exceptions.AMQPChannelError:
+                raise workflows.Disconnected("Could not create channel in rabbit host")
             self._connected = True
         return True
 
@@ -445,3 +463,7 @@ class PikaTransport(CommonTransport):
             return json.loads(message)
         except (TypeError, ValueError):
             return message
+
+
+pi = PikaTransport()
+pi.connect()
