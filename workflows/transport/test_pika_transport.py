@@ -13,6 +13,8 @@ import workflows
 import workflows.transport
 from workflows.transport.pika_transport import PikaTransport
 
+# from workflows.transport.stomp_transport import StompTransport
+
 
 def test_lookup_and_initialize_pika_transport_layer():
     """Find the pika transport layer via the lookup mechanism and
@@ -109,6 +111,7 @@ password = somesecret
 
 @mock.patch("workflows.transport.pika_transport.pika")
 def test_anonymous_connection(mockpika):
+    print("Checking")
     """check that a specified configuration file is read, that command line
     parameters have precedence and are passed on the pika layer"""
 
@@ -126,7 +129,6 @@ def test_anonymous_connection(mockpika):
     # Reset configuration for subsequent tests by reloading StompTransport
     importlib.reload(workflows.transport.pika_transport)
     globals()["PikaTransport"] = workflows.transport.pika_transport.PikaTransport
-
     mockpika.BlockingConnection.assert_called_once()
 
 
