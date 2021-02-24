@@ -1,25 +1,26 @@
 import argparse
 
-# import importlib
-# import inspect
-# import json
+import importlib
+import inspect
+import json
 import optparse
 import os
 import tempfile
 from unittest import mock
 import pytest
 import pika as pikapy
-from transport.pika_transport import PikaTransport
+import workflows
+import workflows.transport
+from workflows.transport.pika_transport import PikaTransport
 
 
 def test_lookup_and_initialize_pika_transport_layer():
     """Find the pika transport layer via the lookup mechanism and
     run its constructor with default settings
     """
-    # pika = workflows.transport.lookup("PikaTransport")
-    # assert pika == PikaTransport
-    # pika()
-    print("This testing is not implemented yet")
+    pika = workflows.transport.lookup("PikaTransport")
+    assert pika == PikaTransport
+    pika()
 
 
 def test_add_command_line_help_optparse():
@@ -45,10 +46,8 @@ def test_add_command_line_help_argparse():
     parser.add_argument.assert_called()
     parser.add_option.assert_not_called()
     assert parser.add_argument.call_count > 4
-
-
-#    for call in parser.add_argument.call_args_list:
-#        assert inspect.isclass(call[1]["action"])
+    for call in parser.add_argument.call_args_list:
+        assert inspect.isclass(call[1]["action"])
 
 
 def test_adding_arguments_to_argparser():
@@ -64,8 +63,7 @@ def test_adding_arguments_to_argparser():
     assert result.rabbit_pass
 
 
-# @mock.patch("workflows.transport.pika_transport.pika")
-@mock.patch("transport.pika_transport.pika")
+@mock.patch("workflows.transport.pika_transport.pika")
 def test_check_config_file_behaviour(mockpika):
     """Check that a specified configuration file is read, that command line
     parameters have precedence and are passed on to the stomp layer."""
@@ -102,35 +100,19 @@ password = somesecret
         pika.connect()
 
         # Reset configuration for subsequent tests by reloading PikaTransport
-        # importlib.reload(workflows.transport.pika_transport)
-        # globals()["PikaTransport"] = workflows.transport.pika_transport.PikaTransport
-
-        # mockpika.BlockingConnection.assert_called_once_with([("localhost", 1234)])
-        # Actual call: BlockingConnection(<MagicMock name='pika.ConnectionParameters()' id='140687855350392'>)
-
-        mockpika.BlockingConnection.assert_called_once()
-        # mockpika.BlockingConnection.assert_called_once_with(
-        #    mock.sentinel.user, "somesecret", wait=False)
-
-        # mockconn.connect.assert_called_once_with(
-        #   mock.sentinel.user, "somecret", wait=False
-        # )
-        # assert pika.get_namespace() == "namespace"
+        importlib.reload(workflows.transport.pika_transport)
+        globals()["PikaTransport"] = workflows.transport.pika_transport.PikaTransport
 
     finally:
         os.remove(cfgfile.name)
 
-    # with pytest.raises(Exception):
-    #    parser.parse_args(["--rabbit-conf", ""])
-
 
 @mock.patch("workflows.transport.pika_transport.pika")
-# @mock.patch("transport.pika_transport.pika")
 def test_anonymous_connection(mockpika):
     """check that a specified configuration file is read, that command line
     parameters have precedence and are passed on the pika layer"""
+
     mockconn = mock.Mock()
-    # maybe this not used
     mockpika.BlockingConnection.return_value = mockconn
     parser = optparse.OptionParser()
     pika = PikaTransport()
@@ -142,15 +124,13 @@ def test_anonymous_connection(mockpika):
     pika.connect()
 
     # Reset configuration for subsequent tests by reloading StompTransport
-    # importlib.reload(workflows.transport.pika_transport)
-    # globals()["PikaTransport"] = workflows.transport.pika_transport.PikaTransport
+    importlib.reload(workflows.transport.pika_transport)
+    globals()["PikaTransport"] = workflows.transport.pika_transport.PikaTransport
 
     mockpika.BlockingConnection.assert_called_once()
-    # mockconn.connect.assert_called_once_with(wait=False)
 
 
 @mock.patch("workflows.transport.pika_transport.pika")
-# @mock.patch("transport.pika_transport.pika")
 def test_instantiate_link_and_connect_to_broker(mockpika):
     """Test the pika connection routine."""
     pika = PikaTransport()
@@ -161,47 +141,35 @@ def test_instantiate_link_and_connect_to_broker(mockpika):
     pika.connect()
 
     mockpika.BlockingConnection.assert_called_once()
-    # mockconn.channel.assert_called_once()
-    # mockchannel.connect.assert_called_once() #not connect method
     assert pika.is_connected()
 
     pika.connect()
 
     mockpika.BlockingConnection.assert_called_once()
-    # mockconn.connect.assert_called_once()
     assert pika.is_connected()
 
     pika.disconnect()
 
     mockpika.BlockingConnection.assert_called_once()
     mockchannel.close.assert_called_once()
-    # closed is called by mockchannel but not mockconn
-    # mockconn.close.assert_called_once()
-    # mockconn.connect.assert_called_once()
-    # mockconn.disconnect.assert_called_once()
     assert not pika.is_connected()
 
     pika.disconnect()
 
     mockpika.BlockingConnection.assert_called_once()
     mockchannel.close.assert_called_once()
-    # mockconn.connect.assert_called_once()
-    # mockconn.disconnect.assert_called_once()
     assert not pika.is_connected()
 
 
 @mock.patch("workflows.transport.pika_transport.pika")
-# @mock.patch("transport.pika_transport.pika")
 def test_error_handling_when_connecting_to_broker(mockpika):
     """ Test the Pika connection routine"""
     pika = PikaTransport()
-    mockconn = mockpika.BlockingConnection
-    mockchannel = mockconn.return_value.channel.return_value
-    mockpika.BlockingConnection.side_effect = pikapy.exceptions.AMQPConnectionError()
+    mockconn = mockpika.BlockingConnection.return_value
+    mockconn.BlockingConnection.side_effect = pikapy.exceptions.AMQPConnectionError()
     mockpika.exceptions.AMQPConnectionError = pikapy.exceptions.AMQPConnectionError
 
-    # with pytest.raises(workflows.Disconnected)
-    with pytest.raises(Exception):
+    with pytest.raises(workflows.Disconnected):
         pika.connect()
 
     assert not pika.is_connected()
@@ -209,8 +177,6 @@ def test_error_handling_when_connecting_to_broker(mockpika):
 
 @mock.patch("workflows.transport.pika_transport.time")
 @mock.patch("workflows.transport.pika_transport.pika")
-# @mock.patch("transport.pika_transport.time")
-# @mock.patch("transport.pika_transport.pika")
 def test_broadcast_status(mockpika, mocktime):
     """Test the status broadcast function."""
     mocktime.time.return_value = 20000
@@ -219,7 +185,6 @@ def test_broadcast_status(mockpika, mocktime):
     mockconn = mockpika.BlockingConnection
     mockchannel = mockconn.return_value.channel.return_value
     mockproperties = mockpika.BasicProperties
-    # channel lower case
 
     pika.broadcast_status({"status": str(mock.sentinel.status)})
 
@@ -228,38 +193,32 @@ def test_broadcast_status(mockpika, mocktime):
     properties = mockproperties.call_args[1]
     headers = properties.get("headers")
     expiration = headers.get("x-message-ttl")
-    # delay = headers.get('x-delay')
+    # delay = headers.get("x-delay")
 
+    # expiration should be 15 seconds in the future
     assert int(expiration) == 1000 * (20000 + 15)
     destination = kwargs.get("exchange")
     message = kwargs.get("body")
-    # assert destination.startswith("/topic/transient.status")
     assert destination.startswith("transient.status")
     statusdict = json.loads(message)
     assert statusdict["status"] == str(mock.sentinel.status)
 
 
 @mock.patch("workflows.transport.pika_transport.pika")
-# @mock.patch("transport.pika_transport.pika")
 def test_send_message(mockpika):
     """Test the message sending function"""
     pika = PikaTransport()
     pika.connect()
     mockconn = mockpika.BlockingConnection
     mockchannel = mockconn.return_value.channel.return_value
-    mockproperties = mockpika.BasicProperties
+    # mockproperties = mockpika.BasicProperties
 
     pika._send(str(mock.sentinel.exchange), mock.sentinel.message)
 
     mockchannel.basic_publish.assert_called_once()
     args, kwargs = mockchannel.basic_publish.call_args
-    # assert args == ("/queue/" + str(mock.sentinel.channel), mock.sentinel.message)
-    # keep persistent in headers?
-    # assert kwargs.get("headers") == {"persistent": "true"}
 
-    # only destination setup, difference between exchange and queue
     pika._send(
-        # str(mock.sentinel.exchange),
         str(mock.sentinel.queue),
         mock.sentinel.message,
         headers={"hdr": mock.sentinel.header},
@@ -268,9 +227,6 @@ def test_send_message(mockpika):
 
     assert mockchannel.basic_publish.call_count == 2
     args, kwargs = mockchannel.basic_publish.call_args
-    # assert args == ("/queue/ + str(mock.sentinel.channel), mock.sentinel.message)
-    # asserting kwargs MagicMock properties?
-    # check x-delay is in headers
 
 
 @mock.patch("workflows.transport.pika_transport.pika")
@@ -292,30 +248,23 @@ def test_sending_message_with_expiration(time, mockpika):
 
     mockchannel.basic_publish.assert_called_once()
     args, kwargs = mockchannel.basic_publish.call_args
-    # assert args == ("/queue/" + str(mock.sentinel.channel), mock.sentinel.message)
     properties = mockproperties.call_args[1]
     assert properties.get("headers") == {"x-message-ttl": expiration_time}
 
 
 @mock.patch("workflows.transport.pika_transport.pika")
-##@mock.patch("transport.pika_transport.pika")
 def test_error_handling_on_send(mockpika):
     """Unrecoverable errors during sending should mark the connection as disconnected"""
     pika = PikaTransport()
     pika.connect()
     mockconn = mockpika.BlockingConnection
     mockchannel = mockconn.return_value.channel.return_value
-
-    # AMQPConnectionError
-    # ChannelClosed
-    # ConnectionClosed
-    mockchannel.basic_publish.side_effect = pikapy.exceptions.AMQPConnectionError
+    mockchannel.basic_publish.side_effect = pikapy.exceptions.AMQPConnectionError()
     mockpika.exception = pikapy.exceptions
 
     with pytest.raises(Exception):
         pika._send(str(mock.sentinel.queue), mock.sentinel.message)
-
-    # assert not pika.is_connected()
+    assert not pika.is_connected()
 
 
 @mock.patch("workflows.transport.pika_transport.pika")
@@ -357,8 +306,6 @@ def test_send_broadcast(mockpika):
 
 @mock.patch("workflows.transport.pika_transport.pika")
 @mock.patch("workflows.transport.pika_transport.time")
-# @mock.patch("transport.pika_transport.pika")
-# @mock.patch("transport.pika_transport.time")
 def test_broadcasting_message_with_expiration(time, mockpika):
     """Test sending a message that expires some time in the future"""
     system_time = 1234567.1234567
@@ -377,11 +324,10 @@ def test_broadcasting_message_with_expiration(time, mockpika):
 
     mockchannel.basic_publish.assert_called_once()
     args, kwargs = mockchannel.basic_publish.call_args
-    # assert args == ("/topic/" + str(mock.sentinel.channel), mock.sentinel.message)
+
     properties = mockproperties.call_args[1]
     assert properties.get("headers").get("x-message-ttl") == expiration_time
     assert properties.get("headers") == {"x-message-ttl": expiration_time}
-    # assert kwargs.get("headers") == {"expires": expiration_time}
 
 
 @mock.patch("workflows.transport.pika_transport.pika")
@@ -392,18 +338,15 @@ def test_error_handling_on_broadcast(mockpika):
     pika.connect()
     mockconn = mockpika.BlockingConnection
     mockchannel = mockconn.return_value.channel.return_value
-    mockchannel.basic_publish.side_effect = pikapy.exceptions.ChannelClosed(
-        404, "Channel closed"
-    )
+    mockchannel.basic_publish.side_effect = pikapy.exceptions.AMQPConnectionError()
     mockpika.exception = pikapy.exceptions
 
-    # with pytest.raises(pikapy.exceptions.ChannelClosed):
-    #    pika._broadcast(str(mock.sentinel.channel), mock.sentinel.message)
-    # assert not stomp.is_connected()
+    with pytest.raises(pikapy.exceptions.AMQPConnectionError):
+        pika._broadcast(str(mock.sentinel.channel), mock.sentinel.message)
+    assert not pika.is_connected()
 
 
 @mock.patch("workflows.transport.pika_transport.pika")
-# @mock.patch("transport.pika_transport.pika")
 def test_messages_are_serialized_for_transport(mockpika):
     banana = {"entry": [0, "banana"]}
     banana_str = "{'entry': [0, 'banana']}"
@@ -416,8 +359,7 @@ def test_messages_are_serialized_for_transport(mockpika):
 
     mockchannel.basic_publish.assert_called_once()
     args, kwargs = mockchannel.basic_publish.call_args
-    message = kwargs.get("body")
-    # assert message == banana_str
+    assert str(kwargs.get("body")) == banana_str
     # assert args == ("/queue/" + str(mock.sentinel.channel1), banana_str)
 
     # pika.broadcast(str(mock.sentinel.channel2), banana)
@@ -428,12 +370,44 @@ def test_messages_are_serialized_for_transport(mockpika):
     #    pika.send(str(mock.sentinel.channel), mock.sentinel.unserializable)
 
 
-# test_messages_are_not_serialized_for_raw_transport
+@mock.patch("transport.pika_transport.pika")
+def test_messages_are_not_serialized_for_raw_transport(mockpika):
+    """Test the raw sending methods"""
+    banana = {"entry": [0, "banana"]}
+    pika = PikaTransport()
+    pika.connect()
+    mockconn = mockpika.BlockingConnection
+    mockchannel = mockconn.return_value.channel.return_value
+
+    # exchange or queue?
+    pika.raw_send(str(mock.sentinel.queue1), banana)
+    mockchannel.basic_publish.assert_called_once()
+    args, kwargs = mockchannel.basic_publish.call_args
+    # assert args == ("/queue/" + str(mock.sentinel.channel1), banana)
+    assert kwargs.get("body") == banana
+
+    mockchannel.basic_publish.reset_mock()
+    pika.raw_send(str(mock.sentinel.queue2), banana)
+    mockchannel.basic_publish.assert_called_once()
+    args, kwargs = mockchannel.basic_publish.call_args
+    # assert args == ("/topic/" + str(mock.sentinel.channel1), banana)
+
+    mockchannel.basic_publish.reset_mock()
+    pika.raw_send(str(mock.sentinel.queue), mock.sentinel.unserializable)
+    mockchannel.basic_publish.assert_called_once()
+    args, kwargs = mockchannel.basic_publish.call_args
+    # assert args == (
+    #    "/queue/" + str(mock.sentinel.channel),
+    #    mock.sentinel.unserializable,
+    # )
+
+
+# Function to implement:
 # test_messages_are_deserialized_after_transport
 
 
+# Function to implement:
 @mock.patch("workflows.transport.pika_transport.pika")
-# @mock.patch("transport.pika_transport.pika")
 def test_subscribe_to_queue(mockpika):
     """Test subscribing to a queue (producer-consumer), callback functions and unsubscribe"""
     mock_cb1 = mock.Mock()
@@ -484,28 +458,6 @@ def test_subscribe_to_queue(mockpika):
     )
 
     assert mockchannel.basic_consume.call_count == 2
-    args, kwargs = mockchannel.basic_consume.call_args
-    """
-    assert args == ("/queue/" + str(mock.sentinel.channel2), 2)
-    assert kwargs == {
-        "headers": {
-            "activemq.retroactive": "true",
-            "selector": mock.sentinel.selector,
-            "activemq.exclusive": "true",
-            "transformation": "jms-object-json",
-            "activemq.priority": 42,
-        },
-        "ack": "auto",
-    }
-    """
-
-    assert mock_cb1.call_count == 0
-    # listener.on_message({"subscription": 1}, mock.sentinel.message1)
-    # mock_cb1.assert_called_once_with({"subscription": 1}, mock.sentinel.message)
-
-    assert mock_cb2.call_count == 0
-    # listener.on_message({"subscription": 2}, mock.sentinel.message2)
-    # mock_cb2.assert_called_once_with({"subscription": 2}, mock.sentinel.message2)
 
     pika._subscribe(3, str(mock.sentinel.queue3), mock_cb2, acknowledgement=True)
     assert mockchannel.basic_consume.call_count == 3
@@ -520,37 +472,33 @@ def test_subscribe_to_queue(mockpika):
     mockchannel.basic_cancel.assert_called_with(callback=None, consumer_tag=2)
 
 
-# subscribe_to_broadcasts
+# Function to implement
+# test_subscribe_to_broadcast
 
-"""
-Error when calling this function
-#mock.patch("workflows.transport.pika_transport.pika")
-@mock.patch("transport.pika_transport.pika")
+
+@mock.patch("workflows.transport.pika_transport.pika")
 def test_transaction_calls(mockpika):
     pika = PikaTransport()
     pika.connect()
     mockconn = mockpika.BlockingConnection
     mockchannel = mockconn.return_value.channel.return_value
 
-    #txid not in argument?
-    #select vs begin?
     pika._transaction_begin()
     mockchannel.tx_select.assert_called_once()
 
-    #pika._send("destination", mock.sentinel.message, transaction=mock.sentinel.txid)
-    #mockchannel.basic_publish.assert_called_once_with(
+    # pika._send("destination", mock.sentinel.message, transaction=mock.sentinel.txid)
+    # mockchannel.basic_publish.assert_called_once_with(
     #    'destination',
     #    mock.sentinel.message,
     #    headers={"persistent": "true"},
     #    transaction=mock.sentinel.txid
-    #)
+    # )
 
     pika._transaction_abort()
     mockchannel.tx_rollback.assert_called_once()
 
     pika._transaction_commit()
     mockchannel.tx_commit.assert_called_once()
-"""
 
 
 @mock.patch("workflows.transport.pika_transport.pika")
@@ -562,13 +510,7 @@ def test_ack_message(mockpika):
     mockconn = mockpika.BlockingConnection
     mockchannel = mockconn.return_value.channel.return_value
 
-    consumer_tag = pika._subscribe(
-        1, str(mock.sentinel.channel3), None, acknowledgement=True
-    )
-    # consumer_tag unused
     pika._ack(mock.sentinel.messageid)
-    # basic_ack(delivery_tag=0, multiple=False)
-    # no possible arguments for transaction or consumer_tag
     mockchannel.basic_ack.assert_called_once_with(delivery_tag=mock.sentinel.messageid)
 
 
@@ -581,11 +523,5 @@ def test_nack_message(mockpika):
     mockconn = mockpika.BlockingConnection
     mockchannel = mockconn.return_value.channel.return_value
 
-    consumer_tag = pika._subscribe(
-        1, str(mock.sentinel.channel3), None, acknowledgement=True
-    )
-    # consumer_tag unused
-    pika._nack(mock.sentinel.messageid)
-    # basic_ack(delivery_tag=0, multiple=False)
-    # no possible arguments for transaction or consumer_tag
+    pika._ack(mock.sentinel.messageid)
     mockchannel.basic_nack.assert_called_once_with(delivery_tag=mock.sentinel.messageid)

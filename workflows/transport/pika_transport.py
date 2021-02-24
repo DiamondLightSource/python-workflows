@@ -206,28 +206,48 @@ class PikaTransport(CommonTransport):
         return True
 
     def is_connected(self):
+        """Return connection status."""
         self._connected = (
             self._connected and self._conn.is_open() and self._channel.is_open()
         )
         return self._connected
 
     def disconnect(self):
+        """Gracefully close connection to pika server"""
         if self._connected:
             self._connected = False
             self._channel.close()
             self._conn.close()
 
     def broadcast_status(self, status):
+        """Broadcast transient status information to all listeners"""
         self._broadcast(
             "transient.status",
             json.dumps(status),
-            headers={"expires": str(int(15 + time.time()) * 1000)},
+            headers={"x-message-ttl": str(int(15 + time.time()) * 1000)},
         )
 
     def _subscribe(self, consumer_tag, queue, callback, **kwargs):
+        """Listen to a queue, notify via callback function.
+        :param consumer_tag: ID for this subscription in the transport layer
+        :param queue: Queue name to subscribe to
+        :param callback: Function to be called when messages are received
+        :param **kwargs: Further parameters for the transport layer. For example
+          acknowledgement:  If true receipt of each message needs to be
+                            acknowledged.
+          exclusive:        Attempt to become exclusive subscriber to the queue.
+          ignore_namespace: Do not apply namespace to the destination name
+          priority:         Consumer priority, messages are sent to higher
+                            priority consumers whenever possible.
+          selector:         Only receive messages filtered by a selector. See
+                            https://activemq.apache.org/activemq-message-properties.html
+                            for potential filter criteria. Uses SQL 92 syntax.
+          transformation:   Transform messages into different format. If set
+                            to True, will use 'jms-object-json' formatting.
+        """
 
-        exclusive = kwargs.get("exclusive")
         auto_ack = not kwargs.get("acknowledgement")
+        exclusive = kwargs.get("exclusive")
 
         def _redirect_callback(ch, method, properties, body):
             # callback({"message-id": method.delivery_tag}, body.decode())
@@ -244,15 +264,53 @@ class PikaTransport(CommonTransport):
             arguments=None,
         )
 
-    def _unsubscribe(self, consumer_tag):
+    def _subscribe_broadcast(self, consumer_tag, queue, callback, **kwargs):
+        """Listen to a queue, notify via callback function.
+        :param consumer_tag: ID for this subscription in the transport layer
+        :param queue: Queue name to subscribe to. Queue is bind to exchange
+        :param callback: Function to be called when messages are received
+        :param **kwargs: Further parameters for the transport layer. For example
+          ignore_namespace: Do not apply namespace to the destination name
+          retroactive:      Ask broker to send old messages if possible
+          transformation:   Transform messages into different format. If set
+                            to True, will use 'jms-object-json' formatting.
+        """
 
+        def _redirect_callback(ch, method, properties, body):
+            print("No acknowledgement")
+
+        self._channel.basic_qos(prefetch_count=1)
+        self._channel.basic_consume(
+            queue=queue,
+            on_message_callback=_redirect_callback,
+            auto_ack=True,
+            exclusive=False,
+            consumer_tag=consumer_tag,
+            arguments=None,
+        )
+
+    def _unsubscribe(self, consumer_tag):
+        """Stop listening to a queue
+        :param consumer_tag: Consumer Tag to cancel
+        """
         self._channel.basic_cancel(consumer_tag=consumer_tag, callback=None)
         # Callback reference is kept as further messages may already have been received
 
     def _send(
         self, destination, message, headers=None, delay=None, expiration=None, **kwargs
     ):
-
+        """Send a message to a queue.
+        :param destination: Queue name to send to
+        :param message: A string to be sent
+        :param **kwargs: Further parameters for the transport layer. For example
+          delay:            Delay transport of message by this many seconds
+          expiration:       Optional expiration time, relative to sending time
+          headers:          Optional dictionary of header entries
+          ignore_namespace: Do not apply namespace to the destination name
+          persistent:       Whether to mark messages as persistent, to be kept
+                            between broker restarts. Default is 'true'
+          transaction:      Transaction ID if message should be part of a transaction
+        """
         if not headers:
             headers = {}
         if delay:
@@ -260,9 +318,11 @@ class PikaTransport(CommonTransport):
         if expiration:
             headers["x-message-ttl"] = int((time.time() + expiration) * 1000)
 
+        # More properties features:
+        # user_id, message_id (auto-generated), timestamp, expiration
         # delivery_mode=2 always persistent
         properties = pika.BasicProperties(headers=headers, delivery_mode=2)
-        # user_id=self.username)
+
         try:
             self._channel.basic_publish(
                 exchange="",
@@ -270,7 +330,6 @@ class PikaTransport(CommonTransport):
                 body=message,
                 properties=properties,
             )
-
         except pika.exception.ChannelClosed:
             self._connected = False
             raise workflows.Disconnected("No connection to channel")
@@ -281,7 +340,6 @@ class PikaTransport(CommonTransport):
     def _broadcast(
         self, destination, message, headers=None, delay=None, expiration=None, **kwargs
     ):
-
         """Broadcast a message.
         :param destination: Topic name to send to
         :param message: A string to be broadcast
@@ -300,12 +358,10 @@ class PikaTransport(CommonTransport):
             headers["x-delay"] = 1000 * delay
         if expiration:
             headers["x-message-ttl"] = int((time.time() + expiration) * 1000)
-            # expiration_time = int((time.time() + expiration) * 1000)
 
+        # More properties features:
         # user_id, message_id (auto-generated), timestamp, expiration
-
         properties = pika.BasicProperties(headers=headers, delivery_mode=2)
-        # user_id=self.username)
 
         try:
             self._channel.basic_publish(
@@ -314,7 +370,6 @@ class PikaTransport(CommonTransport):
                 body=message,
                 properties=properties,
             )
-
         except pika.exception.ChannelClosed:
             self._connected = False
             raise workflows.Disconnected("No connection to channel")
@@ -323,24 +378,51 @@ class PikaTransport(CommonTransport):
             raise workflows.Disconnected("No connection to Rabbit host")
 
     def _transaction_begin(self, transaction_id, **kwargs):
-        # Pika doesn't support transaction_id in transactions methods
+        """Start a new transaction.
+        Pika does not support transaction_id as argument.
+        :param transaction_id: ID for this transaction in the transport layer.
+        :param **kwargs: Further parameters for the transport layer.
+        """
         self._channel.tx_select()
 
     def transaction_abort(self, transaction_id, **kwargs):
-        # abort a transaction and roll back all operations
+        """Abort a transaction and roll back all operations.
+        Pika does not support transaction_id as argument.
+        :param transaction_id: ID of transaction to be aborted.
+        :param **kwargs: Further parameters for the transport layer.
+        """
         self._channel.tx_rollback()
 
     def transaction_commit(self, transaction_id, **kwargs):
+        """Commit a transaction.
+        Pika does not support transaction_id as argument.
+        :param transaction_id: ID of transaction to be committed.
+        :param **kwargs: Further parameters for the transport layer.
+        """
         self._channel.tx_commit()
 
     def _ack(self, message_id, **kwargs):
-        # argument in stomp_transport: subscription_id
-        # delivery_tag is the message id, no argument for subscription_id
+        """Acknowledge receipt of a message. This only makes sense when the
+        'acknowledgement' flag was set for the relevant subscription.
+        Pika does not support acknowledgment with subscription ID.
+        :param message_id: ID of the message to be acknowledged
+        :param subscription: ID of the relevant subscriptiong
+        :param **kwargs: Further parameters for the transport layer. For example
+               transaction: Transaction ID if acknowledgement should be part of
+                            a transaction
+        """
         self._channel.basic_ack(delivery_tag=message_id)
 
     def _nack(self, message_id, **kwargs):
-        # argument in stomp_transport: subscription_id
-        # delivery_tag is the message id, no argument for subscription_id
+        """Reject receipt of a message. This only makes sense when the
+        'acknowledgement' flag was set for the relevant subscription.
+        Pika does not support acknowledgment with subscription ID.
+        :param message_id: ID of the message to be rejected
+        :param subscription: ID of the relevant subscriptiong
+        :param **kwargs: Further parameters for the transport layer. For example
+               transaction: Transaction ID if rejection should be part of a
+                            transaction
+        """
         self._channel.basic_nack(delivery_tag=message_id)
 
     @staticmethod
