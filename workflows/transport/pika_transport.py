@@ -51,7 +51,6 @@ class PikaTransport(CommonTransport):
                 cls.defaults[target] = cfgparser.get("rabbit", cfgoption)
             except configparser.NoOptionError:
                 pass
-        pass
 
     @classmethod
     def add_command_line_options(cls, parser):
@@ -184,7 +183,6 @@ class PikaTransport(CommonTransport):
 
     def connect(self):
         """ It opens a connection and channel"""
-        print("Connecting")
         with self._lock:
             if self._connected:
                 return True
@@ -203,14 +201,12 @@ class PikaTransport(CommonTransport):
             try:
                 if username or password:
                     self._conn = pika.BlockingConnection(
-                        pika.ConnectionParameters(
-                            host=host, port=port, credentials=credentials
-                        )
+                        pika.ConnectionParameters(host, port, credentials=credentials)
                     )
                 else:
                     # ACCESS REFUSED
                     self._conn = pika.BlockingConnection(
-                        pika.ConnectionParameters(host=host, port=port)
+                        pika.ConnectionParameters(host, port)
                     )
             except pika.exceptions.AMQPConnectionError:
                 raise workflows.Disconnected(
@@ -403,7 +399,7 @@ class PikaTransport(CommonTransport):
         """
         self._channel.tx_select()
 
-    def transaction_abort(self, transaction_id, **kwargs):
+    def _transaction_abort(self, transaction_id, **kwargs):
         """Abort a transaction and roll back all operations.
         Pika does not support transaction_id as argument.
         :param transaction_id: ID of transaction to be aborted.
@@ -411,7 +407,7 @@ class PikaTransport(CommonTransport):
         """
         self._channel.tx_rollback()
 
-    def transaction_commit(self, transaction_id, **kwargs):
+    def _transaction_commit(self, transaction_id, **kwargs):
         """Commit a transaction.
         Pika does not support transaction_id as argument.
         :param transaction_id: ID of transaction to be committed.

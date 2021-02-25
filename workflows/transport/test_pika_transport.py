@@ -14,8 +14,6 @@ import workflows
 import workflows.transport
 from workflows.transport.pika_transport import PikaTransport
 
-# from workflows.transport.stomp_transport import StompTransport
-
 
 def test_lookup_and_initialize_pika_transport_layer():
     """Find the pika transport layer via the lookup mechanism and
@@ -85,9 +83,9 @@ def test_check_config_file_behaviour(mockpika):
 # Only lines in the [pika] block will be interpreted
 
 [rabbit]
-#host = cs04r-sc-vserv-253
+host = localhost
 port = 5672
-username = myuser
+username = someuser
 password = somesecret
 """.encode(
                 "utf-8"
@@ -102,6 +100,15 @@ password = somesecret
         pika = PikaTransport()
         pika.connect()
 
+        mockpika.BlockingConnection.assert_called_once()
+        mockpika.PlainCredentials.assert_called_once_with(
+            mock.sentinel.user, "somesecret"
+        )
+        # calling credentials
+        # mockpika.ConnectionParameters.assert_called_once_with(
+        #    "localhost", 5672, credentials=mockcredentials
+        # )
+
         # Reset configuration for subsequent tests by reloading PikaTransport
         importlib.reload(workflows.transport.pika_transport)
         globals()["PikaTransport"] = workflows.transport.pika_transport.PikaTransport
@@ -109,10 +116,12 @@ password = somesecret
     finally:
         os.remove(cfgfile.name)
 
+    with pytest.raises(workflows.Error):
+        parser.parse_args(["--rabbit-conf", ""])
+
 
 @mock.patch("workflows.transport.pika_transport.pika")
 def test_anonymous_connection(mockpika):
-    print("Checking")
     """check that a specified configuration file is read, that command line
     parameters have precedence and are passed on the pika layer"""
 
@@ -130,7 +139,9 @@ def test_anonymous_connection(mockpika):
     # Reset configuration for subsequent tests by reloading StompTransport
     importlib.reload(workflows.transport.pika_transport)
     globals()["PikaTransport"] = workflows.transport.pika_transport.PikaTransport
+
     mockpika.BlockingConnection.assert_called_once()
+    mockpika.PlainCredentials.assert_called_once_with("", "")
 
 
 @mock.patch("workflows.transport.pika_transport.pika")
@@ -144,24 +155,31 @@ def test_instantiate_link_and_connect_to_broker(mockpika):
     pika.connect()
 
     mockpika.BlockingConnection.assert_called_once()
+    mockconn.return_value.channel.assert_called_once()
     assert pika.is_connected()
 
     pika.connect()
 
     mockpika.BlockingConnection.assert_called_once()
+    mockconn.return_value.channel.assert_called_once()
     assert pika.is_connected()
 
     pika.disconnect()
 
     mockpika.BlockingConnection.assert_called_once()
+    mockpika.BlockingConnection.return_value.close.assert_called_once()
     mockchannel.close.assert_called_once()
     assert not pika.is_connected()
 
     pika.disconnect()
 
     mockpika.BlockingConnection.assert_called_once()
+    mockpika.BlockingConnection.return_value.close.assert_called_once()
     mockchannel.close.assert_called_once()
     assert not pika.is_connected()
+
+
+test_instantiate_link_and_connect_to_broker()
 
 
 @mock.patch("workflows.transport.pika_transport.pika")
@@ -505,7 +523,6 @@ def test_transaction_calls(mockpika):
 
 
 @mock.patch("workflows.transport.pika_transport.pika")
-# @mock.patch("transport.pika_transport.pika")
 def test_ack_message(mockpika):
     """Test that the _ack function is properly forwarded to pika"""
     pika = PikaTransport()
@@ -518,7 +535,6 @@ def test_ack_message(mockpika):
 
 
 @mock.patch("workflows.transport.pika_transport.pika")
-# @mock.patch("transport.pika_transport.pika")
 def test_nack_message(mockpika):
     """Test that the _ack function is properly forwarded to pika"""
     pika = PikaTransport()
