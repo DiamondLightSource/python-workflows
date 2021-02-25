@@ -185,10 +185,16 @@ def test_error_handling_when_connecting_to_broker(mockpika):
     mockpika.BlockingConnection.side_effect = pikapy.exceptions.AMQPConnectionError()
     mockpika.exceptions.AMQPConnectionError = pikapy.exceptions.AMQPConnectionError
 
+    # mockconn = mockpika.BlockingConnection
+    # mockchannel = mockconn.return_value.channel.return_value
+
     with pytest.raises(workflows.Disconnected):
         pika.connect()
 
     assert not pika.is_connected()
+
+
+test_error_handling_when_connecting_to_broker()
 
 
 @mock.patch("workflows.transport.pika_transport.time")
