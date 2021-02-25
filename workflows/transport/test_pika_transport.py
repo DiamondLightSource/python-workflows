@@ -179,9 +179,6 @@ def test_instantiate_link_and_connect_to_broker(mockpika):
     assert not pika.is_connected()
 
 
-test_instantiate_link_and_connect_to_broker()
-
-
 @mock.patch("workflows.transport.pika_transport.pika")
 def test_error_handling_when_connecting_to_broker(mockpika):
     pika = PikaTransport()
