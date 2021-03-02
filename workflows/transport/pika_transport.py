@@ -222,7 +222,7 @@ class PikaTransport(CommonTransport):
     def is_connected(self):
         """Return connection status."""
         self._connected = (
-            self._connected and self._conn.is_open() and self._channel.is_open()
+            self._connected and self._conn.is_open and self._channel.is_open
         )
         return self._connected
 
@@ -259,14 +259,19 @@ class PikaTransport(CommonTransport):
           transformation:   Transform messages into different format. If set
                             to True, will use 'jms-object-json' formatting.
         """
-
+        headers = {}
+        if kwargs.get("transformation"):
+            if kwargs["transformation"] is True:
+                headers["transformation"] = "jms-object-json"
+            else:
+                headers["transformation"] = kwargs["transformation"]
         auto_ack = not kwargs.get("acknowledgement")
         exclusive = kwargs.get("exclusive")
 
         def _redirect_callback(ch, method, properties, body):
             # callback({"message-id": method.delivery_tag}, body.decode())
             if not auto_ack:
-                self._ack()
+                self._ack(method.delivery_tag)
 
         self._channel.basic_qos(prefetch_count=1)
         self._channel.basic_consume(
@@ -274,9 +279,13 @@ class PikaTransport(CommonTransport):
             on_message_callback=_redirect_callback,
             auto_ack=auto_ack,
             exclusive=exclusive,
-            consumer_tag=consumer_tag,
-            arguments=None,
+            consumer_tag=str(consumer_tag),
+            arguments=headers,
         )
+        try:
+            self._channel.start_consuming()
+        finally:
+            self._conn.close()
 
     def _subscribe_broadcast(self, consumer_tag, queue, callback, **kwargs):
         """Listen to a queue, notify via callback function.
@@ -289,6 +298,12 @@ class PikaTransport(CommonTransport):
           transformation:   Transform messages into different format. If set
                             to True, will use 'jms-object-json' formatting.
         """
+        headers = {}
+        if kwargs.get("transformation"):
+            if kwargs["transformation"] is True:
+                headers["transformation"] = "jms-object-json"
+            else:
+                headers["transformation"] = kwargs["transformation"]
 
         def _redirect_callback(ch, method, properties, body):
             print("No acknowledgement")
@@ -299,8 +314,8 @@ class PikaTransport(CommonTransport):
             on_message_callback=_redirect_callback,
             auto_ack=True,
             exclusive=False,
-            consumer_tag=consumer_tag,
-            arguments=None,
+            consumer_tag=str(consumer_tag),
+            arguments=headers,
         )
 
     def _unsubscribe(self, consumer_tag):
