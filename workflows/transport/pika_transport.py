@@ -15,8 +15,8 @@ class PikaTransport(CommonTransport):
     defaults = {
         "--rabbit-host": "cs04r-sc-vserv-253",
         "--rabbit-port": 5672,
-        "--rabbit-user": "myuser",
-        "--rabbit-pass": "pass",
+        "--rabbit-user": "guest",
+        "--rabbit-pass": "guest",
         "--rabbit-prfx": "",
     }
 
@@ -24,14 +24,11 @@ class PikaTransport(CommonTransport):
     config = {}
 
     def __init__(self):
+        self._channel = None
+        self._conn = None
         self._connected = False
-        # self._namespace = ""
-        self._idcounter = 0
         self._lock = threading.RLock()
-        # self._stomp_listener = stomp.listener.ConnectionListener()
-        # self._stomp_listener = stomp.PrintingListener()
-        # self._stomp_listener.on_message = self._on_message
-        # self._stomp_listener.on_before_message = lambda x, y: (x, y)
+        self._vhost = "/"
 
     @classmethod
     def load_configuration_file(cls, filename):
@@ -199,15 +196,9 @@ class PikaTransport(CommonTransport):
             )
 
             try:
-                if username or password:
-                    self._conn = pika.BlockingConnection(
-                        pika.ConnectionParameters(host, port, credentials=credentials)
-                    )
-                else:
-                    # ACCESS REFUSED
-                    self._conn = pika.BlockingConnection(
-                        pika.ConnectionParameters(host, port)
-                    )
+                self._conn = pika.BlockingConnection(
+                    pika.ConnectionParameters(host, port, credentials=credentials)
+                )
             except pika.exceptions.AMQPConnectionError:
                 raise workflows.Disconnected(
                     "Could not initiate connection to rabbit host"
@@ -215,6 +206,7 @@ class PikaTransport(CommonTransport):
             try:
                 self._channel = self._conn.channel()
             except pika.exceptions.AMQPChannelError:
+                self._conn.close()
                 raise workflows.Disconnected("Could not create channel in rabbit host")
             self._connected = True
         return True
@@ -222,7 +214,11 @@ class PikaTransport(CommonTransport):
     def is_connected(self):
         """Return connection status."""
         self._connected = (
-            self._connected and self._conn.is_open and self._channel.is_open
+            self._connected
+            and self._conn
+            and self._conn.is_open
+            and self._channel
+            and self._channel.is_open
         )
         return self._connected
 
@@ -230,7 +226,9 @@ class PikaTransport(CommonTransport):
         """Gracefully close connection to pika server"""
         if self._connected:
             self._connected = False
+        if self._channel:
             self._channel.close()
+        if self._conn:
             self._conn.close()
 
     def broadcast_status(self, status):
