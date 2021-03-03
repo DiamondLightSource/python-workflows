@@ -226,9 +226,9 @@ class PikaTransport(CommonTransport):
         """Gracefully close connection to pika server"""
         if self._connected:
             self._connected = False
-        if self._channel:
+        if self._channel and self._channel.is_open:
             self._channel.close()
-        if self._conn:
+        if self._conn and self._conn.is_open:
             self._conn.close()
 
     def broadcast_status(self, status):

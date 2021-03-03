@@ -152,27 +152,29 @@ def test_instantiate_link_and_connect_to_broker(mockpika):
 
     pika.connect()
 
-    mockpika.BlockingConnection.assert_called_once()
+    mockconn.assert_called_once()
     mockconn.return_value.channel.assert_called_once()
     assert pika.is_connected()
 
     pika.connect()
 
-    mockpika.BlockingConnection.assert_called_once()
+    mockconn.assert_called_once()
     mockconn.return_value.channel.assert_called_once()
     assert pika.is_connected()
 
     pika.disconnect()
 
-    mockpika.BlockingConnection.assert_called_once()
-    mockpika.BlockingConnection.return_value.close.assert_called_once()
+    mockconn.assert_called_once()
+    mockconn.return_value.close.assert_called_once()
+    mockconn.return_value.is_open = False
     mockchannel.close.assert_called_once()
+    mockchannel.is_open = False
     assert not pika.is_connected()
 
     pika.disconnect()
 
-    mockpika.BlockingConnection.assert_called_once()
-    mockpika.BlockingConnection.return_value.close.assert_called_once()
+    mockconn.assert_called_once()
+    mockconn.return_value.close.assert_called_once()
     mockchannel.close.assert_called_once()
     assert not pika.is_connected()
 
