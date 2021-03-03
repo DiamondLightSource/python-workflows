@@ -201,13 +201,15 @@ class PikaTransport(CommonTransport):
                 )
             except pika.exceptions.AMQPConnectionError:
                 raise workflows.Disconnected(
-                    "Could not initiate connection to rabbit host"
+                    "Could not initiate connection to RabbitMQ server"
                 )
             try:
                 self._channel = self._conn.channel()
             except pika.exceptions.AMQPChannelError:
                 self._conn.close()
-                raise workflows.Disconnected("Could not create channel in rabbit host")
+                raise workflows.Disconnected(
+                    "Could not create channel in RabbitMQ connection"
+                )
             self._connected = True
         return True
 
