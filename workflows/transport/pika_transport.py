@@ -224,7 +224,10 @@ class PikaTransport(CommonTransport):
             try:
                 self._conn = pika.BlockingConnection(
                     pika.ConnectionParameters(
-                        host=host, port=port, vhost=vhost, credentials=credentials
+                        host=host,
+                        port=port,
+                        virtual_host=vhost,
+                        credentials=credentials,
                     )
                 )
             except pika.exceptions.AMQPConnectionError:
