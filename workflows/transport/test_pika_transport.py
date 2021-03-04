@@ -87,7 +87,7 @@ host = localhost
 port = 5672
 username = someuser
 password = somesecret
-prefix = namespace
+vhost = namespace
 """.encode(
                 "utf-8"
             )
@@ -106,8 +106,13 @@ prefix = namespace
             mock.sentinel.user, "somesecret"
         )
         args, kwargs = mockpika.ConnectionParameters.call_args
-        assert args == ("localhost", 5672, "namespace", mock.ANY)
-        assert not kwargs
+        assert not args
+        assert kwargs == {
+            "host": "localhost",
+            "port": 5672,
+            "vhost": "namespace",
+            "credentials": mock.ANY,
+        }
 
         importlib.reload(workflows.transport.pika_transport)
         globals()["PikaTransport"] = workflows.transport.pika_transport.PikaTransport

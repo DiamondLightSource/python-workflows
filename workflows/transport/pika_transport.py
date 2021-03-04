@@ -17,7 +17,7 @@ class PikaTransport(CommonTransport):
         "--rabbit-port": 5672,
         "--rabbit-user": "guest",
         "--rabbit-pass": "guest",
-        "--rabbit-prfx": "/",
+        "--rabbit-vhost": "/",
     }
 
     # Effective configuration
@@ -47,7 +47,7 @@ class PikaTransport(CommonTransport):
             ("port", "--rabbit-port"),
             ("password", "--rabbit-pass"),
             ("username", "--rabbit-user"),
-            ("prefix", "--rabbit-prfx"),
+            ("vhost", "--rabbit-vhost"),
         ]:
             try:
                 cls.defaults[target] = cfgparser.get("rabbit", cfgoption)
@@ -112,9 +112,9 @@ class PikaTransport(CommonTransport):
         )
 
         argparser.add_argument(
-            "--rabbit-prfx",
+            "--rabbit-vhost",
             metavar="PRE",
-            default=cls.defaults.get("--rabbit-prfx"),
+            default=cls.defaults.get("--rabbit-vhost"),
             help="Rabbit namespace prefix, default '%(default)s'",
             type=str,
             action=SetParameter,
@@ -181,9 +181,9 @@ class PikaTransport(CommonTransport):
         )
 
         optparser.add_option(
-            "--rabbit-prfx",
+            "--rabbit-vhost",
             metavar="PRE",
-            default=cls.defaults.get("--rabbit-prfx"),
+            default=cls.defaults.get("--rabbit-vhost"),
             help="Rabbit namespace prefix, default '%default'",
             type="string",
             nargs=1,
@@ -218,10 +218,14 @@ class PikaTransport(CommonTransport):
             port = int(
                 self.config.get("--rabbit-port", self.defaults.get("--rabbit-port"))
             )
-            vhost = self.config.get("--rabbit-prfx", self.defaults.get("--rabbit-prfx"))
+            vhost = self.config.get(
+                "--rabbit-vhost", self.defaults.get("--rabbit-vhost")
+            )
             try:
                 self._conn = pika.BlockingConnection(
-                    pika.ConnectionParameters(host, port, vhost, credentials)
+                    pika.ConnectionParameters(
+                        host=host, port=port, vhost=vhost, credentials=credentials
+                    )
                 )
             except pika.exceptions.AMQPConnectionError:
                 raise workflows.Disconnected(
