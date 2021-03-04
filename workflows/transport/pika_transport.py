@@ -17,7 +17,7 @@ class PikaTransport(CommonTransport):
         "--rabbit-port": 5672,
         "--rabbit-user": "guest",
         "--rabbit-pass": "guest",
-        "--rabbit-prfx": "",
+        "--rabbit-prfx": "/",
     }
 
     # Effective configuration
@@ -29,6 +29,11 @@ class PikaTransport(CommonTransport):
         self._connected = False
         self._lock = threading.RLock()
         self._vhost = "/"
+
+    def get_namespace(self):
+        if self._vhost.endswith("."):
+            return self._vhost[:-1]
+        return self._vhost
 
     @classmethod
     def load_configuration_file(cls, filename):
@@ -105,7 +110,15 @@ class PikaTransport(CommonTransport):
             type=str,
             action=SetParameter,
         )
-        # prefix
+
+        argparser.add_argument(
+            "--rabbit-prfx",
+            metavar="PRE",
+            default=cls.defaults.get("--rabbit-prfx"),
+            help="Rabbit namespace prefix, default '%(default)s'",
+            type=str,
+            action=SetParameter,
+        )
         argparser.add_argument(
             "--rabbit-conf",
             metavar="CNF",
@@ -168,6 +181,17 @@ class PikaTransport(CommonTransport):
         )
 
         optparser.add_option(
+            "--rabbit-prfx",
+            metavar="PRE",
+            default=cls.defaults.get("--rabbit-prfx"),
+            help="Rabbit namespace prefix, default '%default'",
+            type="string",
+            nargs=1,
+            action="callback",
+            callback=set_parameter,
+        )
+
+        optparser.add_option(
             "--rabbit-conf",
             metavar="CNF",
             default=cls.defaults.get("--rabbit-conf"),
@@ -194,10 +218,10 @@ class PikaTransport(CommonTransport):
             port = int(
                 self.config.get("--rabbit-port", self.defaults.get("--rabbit-port"))
             )
-
+            vhost = self.config.get("--rabbit-prfx", self.defaults.get("--rabbit-prfx"))
             try:
                 self._conn = pika.BlockingConnection(
-                    pika.ConnectionParameters(host, port, credentials=credentials)
+                    pika.ConnectionParameters(host, port, vhost, credentials)
                 )
             except pika.exceptions.AMQPConnectionError:
                 raise workflows.Disconnected(
@@ -282,10 +306,7 @@ class PikaTransport(CommonTransport):
             consumer_tag=str(consumer_tag),
             arguments=headers,
         )
-        try:
-            self._channel.start_consuming()
-        finally:
-            self._conn.close()
+        # self._channel.start_consuming()
 
     def _subscribe_broadcast(self, consumer_tag, queue, callback, **kwargs):
         """Listen to a queue, notify via callback function.
@@ -351,7 +372,7 @@ class PikaTransport(CommonTransport):
         # user_id, message_id (auto-generated), timestamp, expiration
         # delivery_mode=2 always persistent
         properties = pika.BasicProperties(headers=headers, delivery_mode=2)
-
+        self._channel.confirm_delivery()
         try:
             self._channel.basic_publish(
                 exchange="",

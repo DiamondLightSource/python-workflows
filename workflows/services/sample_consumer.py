@@ -35,7 +35,7 @@ class SampleConsumer(CommonService):
                 json.dumps(message, indent=2) + "\n" + "----------------" + "\n"
             )
 
-        print("=== Consume ====\n{header}{message}".format(**logmessage))
+        self.log.info("=== Consume ====\n{header}{message}".format(**logmessage))
         self.log.info("Received message @{time}".format(**logmessage))
         self.log.debug(
             "Received message @{time}\n{header}{message}".format(**logmessage)
