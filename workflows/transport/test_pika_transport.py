@@ -110,7 +110,7 @@ vhost = namespace
         assert kwargs == {
             "host": "localhost",
             "port": 5672,
-            "vhost": "namespace",
+            "virtual_host": "namespace",
             "credentials": mock.ANY,
         }
 

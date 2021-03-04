@@ -115,7 +115,7 @@ class PikaTransport(CommonTransport):
             "--rabbit-vhost",
             metavar="PRE",
             default=cls.defaults.get("--rabbit-vhost"),
-            help="Rabbit namespace prefix, default '%(default)s'",
+            help="Rabbit virtual host, default '%(default)s'",
             type=str,
             action=SetParameter,
         )
@@ -184,7 +184,7 @@ class PikaTransport(CommonTransport):
             "--rabbit-vhost",
             metavar="PRE",
             default=cls.defaults.get("--rabbit-vhost"),
-            help="Rabbit namespace prefix, default '%default'",
+            help="Rabbit virtual host, default '%default'",
             type="string",
             nargs=1,
             action="callback",
