@@ -12,7 +12,7 @@ setup(
     author_email="scientificsoftware@diamond.ac.uk",
     download_url="https://github.com/DiamondLightSource/python-workflows/releases",
     version="2.3",
-    install_requires=["setuptools", "stomp.py"],
+    install_requires=["pika", "setuptools", "stomp.py"],
     python_requires=">=3.6",
     packages=find_packages(),
     license="BSD",
