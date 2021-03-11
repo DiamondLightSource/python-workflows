@@ -2,6 +2,7 @@ import configparser
 import json
 import threading
 import time
+import random
 
 import pika
 import workflows
@@ -29,6 +30,7 @@ class PikaTransport(CommonTransport):
         self._connected = False
         self._lock = threading.RLock()
         self._vhost = "/"
+        self._reconnection_attempts = 0
 
     def get_namespace(self):
         if self._vhost.endswith("."):
@@ -264,6 +266,87 @@ class PikaTransport(CommonTransport):
         if self._conn and self._conn.is_open:
             self._conn.close()
 
+    def reconnect(self):
+        """ It opens a connection and channel"""
+        with self._lock:
+            if self._connected:
+                return True
+            max_reconnection_attempts = 3
+            if self._reconnection_attempts > max_reconnection_attempts:
+                return False
+            username = self.config.get(
+                "--rabbit-user", self.defaults.get("--rabbit-user")
+            )
+            password = self.config.get(
+                "--rabbit-pass", self.defaults.get("--rabbit-pass")
+            )
+            credentials = pika.PlainCredentials(username, password)
+
+            port = int(
+                self.config.get("--rabbit-port", self.defaults.get("--rabbit-port"))
+            )
+            vhost = self.config.get(
+                "--rabbit-vhost", self.defaults.get("--rabbit-vhost")
+            )
+
+            host1 = "cs04r-sc-vserv-252"
+            host2 = "cs04r-sc-vserv-253"
+            host3 = "cs04r-sc-vserv-254"
+
+            retry_delay = 5
+            connection_attempts = 1
+
+            node1 = pika.ConnectionParameters(
+                host=host1,
+                port=port,
+                virtual_host=vhost,
+                credentials=credentials,
+                retry_delay=retry_delay,
+                connection_attempts=connection_attempts,
+            )
+
+            node2 = pika.ConnectionParameters(
+                host=host2,
+                port=port,
+                virtual_host=vhost,
+                credentials=credentials,
+                retry_delay=retry_delay,
+                connection_attempts=connection_attempts,
+            )
+
+            node3 = pika.ConnectionParameters(
+                host=host3,
+                port=port,
+                virtual_host=vhost,
+                credentials=credentials,
+                retry_delay=retry_delay,
+                connection_attempts=connection_attempts,
+            )
+
+            endpoints = [node1, node2, node3]
+
+            if self._reconnection_attempts == 0:
+                random.shuffle(endpoints)
+            else:
+                endpoints.append(endpoints.pop(0))
+
+            try:
+                self._reconnection_attempts += 1
+                self._conn = pika.BlockingConnection(endpoints)
+            except pika.exceptions.AMQPConnectionError:
+                raise workflows.Disconnected(
+                    "Could not initiate connection to RabbitMQ server"
+                )
+            try:
+                self._channel = self._conn.channel()
+            except pika.exceptions.AMQPChannelError:
+                self._conn.close()
+                raise workflows.Disconnected(
+                    "Could not create channel in RabbitMQ connection"
+                )
+            self._connected = True
+        return True
+
     def broadcast_status(self, status):
         """Broadcast transient status information to all listeners"""
         self._broadcast(
@@ -280,24 +363,12 @@ class PikaTransport(CommonTransport):
         :param **kwargs: Further parameters for the transport layer. For example
           acknowledgement:  If true receipt of each message needs to be
                             acknowledged.
-          exclusive:        Attempt to become exclusive subscriber to the queue.
-          ignore_namespace: Do not apply namespace to the destination name
-          priority:         Consumer priority, messages are sent to higher
-                            priority consumers whenever possible.
           selector:         Only receive messages filtered by a selector. See
                             https://activemq.apache.org/activemq-message-properties.html
                             for potential filter criteria. Uses SQL 92 syntax.
-          transformation:   Transform messages into different format. If set
-                            to True, will use 'jms-object-json' formatting.
         """
         headers = {}
-        if kwargs.get("transformation"):
-            if kwargs["transformation"] is True:
-                headers["transformation"] = "jms-object-json"
-            else:
-                headers["transformation"] = kwargs["transformation"]
         auto_ack = not kwargs.get("acknowledgement")
-        exclusive = kwargs.get("exclusive")
 
         def _redirect_callback(ch, method, properties, body):
             # callback({"message-id": method.delivery_tag}, body.decode())
@@ -309,11 +380,17 @@ class PikaTransport(CommonTransport):
             queue=queue,
             on_message_callback=_redirect_callback,
             auto_ack=auto_ack,
-            exclusive=exclusive,
             consumer_tag=str(consumer_tag),
             arguments=headers,
         )
-        # self._channel.start_consuming()
+        try:
+            self._channel.start_consuming()
+        except pika.exceptions.AMQPChannelError as err:
+            raise workflows.Disconnected(
+                "Caught a channel error: {}, stopping".format(err)
+            )
+        except pika.exceptions.AMQPConnectionError:
+            raise workflows.Disconnected("AMQPError.")
 
     def _subscribe_broadcast(self, consumer_tag, queue, callback, **kwargs):
         """Listen to a queue, notify via callback function.
@@ -326,12 +403,8 @@ class PikaTransport(CommonTransport):
           transformation:   Transform messages into different format. If set
                             to True, will use 'jms-object-json' formatting.
         """
+
         headers = {}
-        if kwargs.get("transformation"):
-            if kwargs["transformation"] is True:
-                headers["transformation"] = "jms-object-json"
-            else:
-                headers["transformation"] = kwargs["transformation"]
 
         def _redirect_callback(ch, method, properties, body):
             print("No acknowledgement")
@@ -341,10 +414,17 @@ class PikaTransport(CommonTransport):
             queue=queue,
             on_message_callback=_redirect_callback,
             auto_ack=True,
-            exclusive=False,
             consumer_tag=str(consumer_tag),
             arguments=headers,
         )
+        try:
+            self._channel.start_consuming()
+        except pika.exceptions.AMQPChannelError as err:
+            raise workflows.Disconnected(
+                "Caught a channel error: {}, stopping".format(err)
+            )
+        except pika.exceptions.AMQPConnectionError:
+            raise workflows.Disconnected("AMQPError.")
 
     def _unsubscribe(self, consumer_tag):
         """Stop listening to a queue
@@ -375,9 +455,6 @@ class PikaTransport(CommonTransport):
         if expiration:
             headers["x-message-ttl"] = int((time.time() + expiration) * 1000)
 
-        # More properties features:
-        # user_id, message_id (auto-generated), timestamp, expiration
-        # delivery_mode=2 always persistent
         properties = pika.BasicProperties(headers=headers, delivery_mode=2)
         self._channel.confirm_delivery()
         try:
@@ -386,13 +463,22 @@ class PikaTransport(CommonTransport):
                 routing_key=destination,
                 body=message,
                 properties=properties,
+                mandatory=True,
             )
-        except pika.exceptions.ChannelClosed:
+        except pika.exceptions.AMQPChannelError as err:
             self._connected = False
-            raise workflows.Disconnected("No connection to channel")
-        except pika.exceptions.ConnectionClosed:
-            self._connected = False
-            raise workflows.Disconnected("No connection to Rabbit host")
+            raise workflows.Disconnected(
+                "Caught a channel error: {}, stopping...".format(err)
+            )
+        except pika.exceptions.AMQPConnectionError:
+            time.sleep(5)
+            if self.reconnect():
+                self._connected = False
+                self.reconnect()
+            else:
+                raise workflows.Disconnected(
+                    "Connection to RabbitMQ server was closed."
+                )
 
     def _broadcast(
         self, destination, message, headers=None, delay=None, expiration=None, **kwargs
@@ -416,10 +502,7 @@ class PikaTransport(CommonTransport):
         if expiration:
             headers["x-message-ttl"] = int((time.time() + expiration) * 1000)
 
-        # More properties features:
-        # user_id, message_id (auto-generated), timestamp, expiration
         properties = pika.BasicProperties(headers=headers, delivery_mode=2)
-
         try:
             self._channel.basic_publish(
                 exchange=destination,
@@ -427,12 +510,18 @@ class PikaTransport(CommonTransport):
                 body=message,
                 properties=properties,
             )
-        except pika.exceptions.ChannelClosed:
+        except pika.exceptions.AMQPChannelError:
             self._connected = False
-            raise workflows.Disconnected("No connection to channel")
-        except pika.exceptions.ConnectionClosed:
-            self._connected = False
-            raise workflows.Disconnected("No connection to Rabbit host")
+            raise
+        except pika.exceptions.AMQPConnectionError:
+            time.sleep(5)
+            if self.reconnect():
+                self._connected = False
+                self.reconnect()
+            else:
+                raise workflows.Disconnected(
+                    "Connection to RabbitMQ server was closed."
+                )
 
     def _transaction_begin(self, transaction_id, **kwargs):
         """Start a new transaction.
