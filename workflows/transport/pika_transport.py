@@ -86,7 +86,6 @@ class PikaTransport(CommonTransport):
             type=str,
             action=SetParameter,
         )
-
         argparser.add_argument(
             "--rabbit-port",
             metavar="PORT",
@@ -95,7 +94,6 @@ class PikaTransport(CommonTransport):
             type=int,
             action=SetParameter,
         )
-
         argparser.add_argument(
             "--rabbit-user",
             metavar="USER",
@@ -106,16 +104,15 @@ class PikaTransport(CommonTransport):
         )
         argparser.add_argument(
             "--rabbit-pass",
-            metavar="PRE",
+            metavar="PASS",
             default=cls.defaults.get("--rabbit-pass"),
             help="Rabbit password",
             type=str,
             action=SetParameter,
         )
-
         argparser.add_argument(
             "--rabbit-vhost",
-            metavar="PRE",
+            metavar="VHST",
             default=cls.defaults.get("--rabbit-vhost"),
             help="Rabbit virtual host, default '%(default)s'",
             type=str,
@@ -181,10 +178,9 @@ class PikaTransport(CommonTransport):
             action="callback",
             callback=set_parameter,
         )
-
         optparser.add_option(
             "--rabbit-vhost",
-            metavar="PRE",
+            metavar="VHST",
             default=cls.defaults.get("--rabbit-vhost"),
             help="Rabbit virtual host, default '%default'",
             type="string",
@@ -192,7 +188,6 @@ class PikaTransport(CommonTransport):
             action="callback",
             callback=set_parameter,
         )
-
         optparser.add_option(
             "--rabbit-conf",
             metavar="CNF",
