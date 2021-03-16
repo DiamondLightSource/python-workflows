@@ -233,10 +233,9 @@ class PikaTransport(CommonTransport):
                 )
             try:
                 self._channel = self._conn.channel()
-            except pika.exceptions.AMQPChannelError:
-                self._conn.close()
+            except pika.exceptions.AMQPChannelError as err:
                 raise workflows.Disconnected(
-                    "Could not create channel in RabbitMQ connection"
+                    "Caught a channel error: {}, stopping".format(err)
                 )
             self._connected = True
         return True
@@ -334,10 +333,9 @@ class PikaTransport(CommonTransport):
                 )
             try:
                 self._channel = self._conn.channel()
-            except pika.exceptions.AMQPChannelError:
-                self._conn.close()
+            except pika.exceptions.AMQPChannelError as err:
                 raise workflows.Disconnected(
-                    "Could not create channel in RabbitMQ connection"
+                    "Caught a channel error: {}, stopping".format(err)
                 )
             self._connected = True
         return True
@@ -366,7 +364,7 @@ class PikaTransport(CommonTransport):
         auto_ack = not kwargs.get("acknowledgement")
 
         def _redirect_callback(ch, method, properties, body):
-            # callback({"message-id": method.delivery_tag}, body.decode())
+            callback({"pika-method": method, "pika-properties": properties}, body)
             if not auto_ack:
                 self._ack(method.delivery_tag)
 
@@ -381,11 +379,13 @@ class PikaTransport(CommonTransport):
         try:
             self._channel.start_consuming()
         except pika.exceptions.AMQPChannelError as err:
+            self._connected = False
             raise workflows.Disconnected(
                 "Caught a channel error: {}, stopping".format(err)
             )
         except pika.exceptions.AMQPConnectionError:
-            raise workflows.Disconnected("AMQPError.")
+            self._connected = False
+            raise workflows.Disconnected("Connection to RabbitMQ server was closed.")
 
     def _subscribe_broadcast(self, consumer_tag, queue, callback, **kwargs):
         """Listen to a queue, notify via callback function.
@@ -402,7 +402,7 @@ class PikaTransport(CommonTransport):
         headers = {}
 
         def _redirect_callback(ch, method, properties, body):
-            print("No acknowledgement")
+            callback({"pika-method": method, "pika-properties": properties}, body)
 
         self._channel.basic_qos(prefetch_count=1)
         self._channel.basic_consume(
@@ -415,11 +415,13 @@ class PikaTransport(CommonTransport):
         try:
             self._channel.start_consuming()
         except pika.exceptions.AMQPChannelError as err:
+            self._connected = False
             raise workflows.Disconnected(
                 "Caught a channel error: {}, stopping".format(err)
             )
         except pika.exceptions.AMQPConnectionError:
-            raise workflows.Disconnected("AMQPError.")
+            self._connected = False
+            raise workflows.Disconnected("Connection to RabbitMQ server was closed.")
 
     def _unsubscribe(self, consumer_tag):
         """Stop listening to a queue
@@ -466,9 +468,9 @@ class PikaTransport(CommonTransport):
                 "Caught a channel error: {}, stopping...".format(err)
             )
         except pika.exceptions.AMQPConnectionError:
+            self._connected = False
             time.sleep(5)
             if self.reconnect():
-                self._connected = False
                 self.reconnect()
             else:
                 raise workflows.Disconnected(
@@ -504,14 +506,17 @@ class PikaTransport(CommonTransport):
                 routing_key="",
                 body=message,
                 properties=properties,
+                mandatory=True,
             )
-        except pika.exceptions.AMQPChannelError:
+        except pika.exceptions.AMQPChannelError as err:
             self._connected = False
-            raise
+            raise workflows.Disconnected(
+                "Caught a channel error: {}, stopping".format(err)
+            )
         except pika.exceptions.AMQPConnectionError:
             time.sleep(5)
+            self._connected = False
             if self.reconnect():
-                self._connected = False
                 self.reconnect()
             else:
                 raise workflows.Disconnected(
