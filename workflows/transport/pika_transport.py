@@ -570,7 +570,7 @@ class PikaTransport(CommonTransport):
     def _mangle_for_sending(message):
         """Function that any message will pass through before it being forwarded to
         the actual _send* functions.
-        Stomp only deals with serialized strings, so serialize message as json.
+        Pika only deals with serialized strings, so serialize message as json.
         """
         return json.dumps(message)
 
