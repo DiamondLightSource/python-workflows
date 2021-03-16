@@ -439,7 +439,7 @@ def test_error_handling_on_broadcast(mockpika):
 @mock.patch("workflows.transport.pika_transport.pika")
 def test_messages_are_serialized_for_transport(mockpika):
     banana = {"entry": [0, "banana"]}
-    # banana_str = '{"entry": [0, "banana"]}'
+    banana_str = '{"entry": [0, "banana"]}'
     pika = PikaTransport()
     pika.connect()
     mockconn = mockpika.BlockingConnection
@@ -449,14 +449,14 @@ def test_messages_are_serialized_for_transport(mockpika):
     mockchannel.basic_publish.assert_called_once()
     args, kwargs = mockchannel.basic_publish.call_args
     assert not args
-    """
     assert kwargs == {
-         'exchange': '',
-         'routing_key': str(mock.sentinel.queue1),
-         'body': banana_str,
-         'properties': mock.ANY
+        "exchange": "",
+        "routing_key": str(mock.sentinel.queue1),
+        "body": banana_str,
+        "properties": mock.ANY,
+        "mandatory": True,
     }
-    """
+
     # pika.broadcast(str(mock.sentinel.queue2), banana)
     # args, kwargs = mockchannel.basic_publish.call_args
     # assert args == ("/topic/" + str(mock.sentinel.channel2), banana_str)
