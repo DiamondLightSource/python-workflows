@@ -417,7 +417,7 @@ class StompTransport(CommonTransport):
             self._conn.send(destination, message, headers=headers, **kwargs)
         except stomp.exception.NotConnectedException:
             self._connected = False
-            raise
+            raise workflows.Disconnected("No connection to stomp host")
 
     def _transaction_begin(self, transaction_id, **kwargs):
         """Start a new transaction.

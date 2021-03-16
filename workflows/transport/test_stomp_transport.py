@@ -339,7 +339,7 @@ def test_error_handling_on_broadcast(mockstomp):
     mockconn.send.side_effect = stomppy.exception.NotConnectedException()
     mockstomp.exception = stomppy.exception
 
-    with pytest.raises(stomppy.exception.NotConnectedException):
+    with pytest.raises(workflows.Disconnected):
         stomp._broadcast(str(mock.sentinel.channel), mock.sentinel.message)
     assert not stomp.is_connected()
 
