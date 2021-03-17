@@ -480,8 +480,6 @@ class PikaTransport(CommonTransport):
                 raise workflows.Disconnected(
                     "Connection to RabbitMQ server was closed."
                 )
-            else:
-                self.reconnect()
 
     def _broadcast(
         self, destination, message, headers=None, delay=None, expiration=None, **kwargs
@@ -524,8 +522,6 @@ class PikaTransport(CommonTransport):
                 raise workflows.Disconnected(
                     "Connection to RabbitMQ server was closed."
                 )
-            else:
-                self.reconnect()
 
     def _transaction_begin(self, transaction_id, **kwargs):
         """Start a new transaction.
