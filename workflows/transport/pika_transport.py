@@ -233,10 +233,9 @@ class PikaTransport(CommonTransport):
                 )
             try:
                 self._channel = self._conn.channel()
-            except pika.exceptions.AMQPChannelError as err:
-                raise workflows.Disconnected(
-                    "Caught a channel error: {}, stopping".format(err)
-                )
+            except pika.exceptions.AMQPChannelError:
+                self.disconnect()
+                raise workflows.Disconnected("Caught a channel error")
             self._connected = True
         return True
 
@@ -288,7 +287,7 @@ class PikaTransport(CommonTransport):
             host3 = "cs04r-sc-vserv-254"
 
             retry_delay = 5
-            connection_attempts = 1
+            connection_attempts = 3
 
             node1 = pika.ConnectionParameters(
                 host=host1,
@@ -333,10 +332,9 @@ class PikaTransport(CommonTransport):
                 )
             try:
                 self._channel = self._conn.channel()
-            except pika.exceptions.AMQPChannelError as err:
-                raise workflows.Disconnected(
-                    "Caught a channel error: {}, stopping".format(err)
-                )
+            except pika.exceptions.AMQPChannelError:
+                self.disconnect()
+                raise workflows.Disconnected("Caught a channel error")
             self._connected = True
         return True
 
@@ -364,7 +362,14 @@ class PikaTransport(CommonTransport):
         auto_ack = not kwargs.get("acknowledgement")
 
         def _redirect_callback(ch, method, properties, body):
-            callback({"pika-method": method, "pika-properties": properties}, body)
+            callback(
+                {
+                    "message-id": method.delivery_tag,
+                    "pika-method": method,
+                    "pika-properties": properties,
+                },
+                body,
+            )
             if not auto_ack:
                 self._ack(method.delivery_tag)
 
@@ -378,13 +383,11 @@ class PikaTransport(CommonTransport):
         )
         try:
             self._channel.start_consuming()
-        except pika.exceptions.AMQPChannelError as err:
-            self._connected = False
-            raise workflows.Disconnected(
-                "Caught a channel error: {}, stopping".format(err)
-            )
+        except pika.exceptions.AMQPChannelError:
+            self.disconnect()
+            raise workflows.Disconnected("Caught a channel error")
         except pika.exceptions.AMQPConnectionError:
-            self._connected = False
+            self.disconnect()
             raise workflows.Disconnected("Connection to RabbitMQ server was closed.")
 
     def _subscribe_broadcast(self, consumer_tag, queue, callback, **kwargs):
@@ -402,7 +405,14 @@ class PikaTransport(CommonTransport):
         headers = {}
 
         def _redirect_callback(ch, method, properties, body):
-            callback({"pika-method": method, "pika-properties": properties}, body)
+            callback(
+                {
+                    "message-id": method.delivery_tag,
+                    "pika-method": method,
+                    "pika-properties": properties,
+                },
+                body,
+            )
 
         self._channel.basic_qos(prefetch_count=1)
         self._channel.basic_consume(
@@ -414,13 +424,11 @@ class PikaTransport(CommonTransport):
         )
         try:
             self._channel.start_consuming()
-        except pika.exceptions.AMQPChannelError as err:
-            self._connected = False
-            raise workflows.Disconnected(
-                "Caught a channel error: {}, stopping".format(err)
-            )
+        except pika.exceptions.AMQPChannelError:
+            self.disconnect()
+            raise workflows.Disconnected("Caught a channel error")
         except pika.exceptions.AMQPConnectionError:
-            self._connected = False
+            self.disconnect()
             raise workflows.Disconnected("Connection to RabbitMQ server was closed.")
 
     def _unsubscribe(self, consumer_tag):
@@ -462,20 +470,18 @@ class PikaTransport(CommonTransport):
                 properties=properties,
                 mandatory=True,
             )
-        except pika.exceptions.AMQPChannelError as err:
-            self._connected = False
-            raise workflows.Disconnected(
-                "Caught a channel error: {}, stopping...".format(err)
-            )
+        except pika.exceptions.AMQPChannelError:
+            self.disconnect()
+            raise workflows.Disconnected("Caught a channel error")
         except pika.exceptions.AMQPConnectionError:
-            self._connected = False
+            self.disconnect()
             time.sleep(5)
-            if self.reconnect():
-                self.reconnect()
-            else:
+            if not self.reconnect():
                 raise workflows.Disconnected(
                     "Connection to RabbitMQ server was closed."
                 )
+            else:
+                self.reconnect()
 
     def _broadcast(
         self, destination, message, headers=None, delay=None, expiration=None, **kwargs
@@ -508,20 +514,18 @@ class PikaTransport(CommonTransport):
                 properties=properties,
                 mandatory=True,
             )
-        except pika.exceptions.AMQPChannelError as err:
-            self._connected = False
-            raise workflows.Disconnected(
-                "Caught a channel error: {}, stopping".format(err)
-            )
+        except pika.exceptions.AMQPChannelError:
+            self.disconnect()
+            raise workflows.Disconnected("Caught a channel error")
         except pika.exceptions.AMQPConnectionError:
+            self.disconnect()
             time.sleep(5)
-            self._connected = False
-            if self.reconnect():
-                self.reconnect()
-            else:
+            if not self.reconnect():
                 raise workflows.Disconnected(
                     "Connection to RabbitMQ server was closed."
                 )
+            else:
+                self.reconnect()
 
     def _transaction_begin(self, transaction_id, **kwargs):
         """Start a new transaction.
