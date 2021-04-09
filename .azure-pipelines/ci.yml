@@ -30,6 +30,7 @@ steps:
 - script: |
     PYTHONDEVMODE=1 pytest -ra --cov=workflows --cov-report=xml --cov-branch \
         --test-run-title="Python $(PYTHON_VERSION) $(Agent.OS)" --junit-xml=junit.xml
+    pwd
     ls -la
   displayName: Run tests
   workingDirectory: $(Pipeline.Workspace)/src
