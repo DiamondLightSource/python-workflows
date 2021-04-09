@@ -447,8 +447,8 @@ class CommonTransport:
 
 
 def json_serializer(obj):
-    """A helper function for JSON serialisation, where it can be used as
-    the default= argument. This function helps the serialiser to translate
+    """A helper function for JSON serialization, where it can be used as
+    the default= argument. This function helps the serializer to translate
     objects that otherwise would not be understood. Note that this is
     one-way only - these objects are not restored on the receiving end."""
 
