@@ -1,4 +1,5 @@
 import argparse
+import decimal
 import importlib
 import inspect
 import json
@@ -347,7 +348,7 @@ def test_error_handling_on_broadcast(mockstomp):
 @mock.patch("workflows.transport.stomp_transport.stomp")
 def test_messages_are_serialized_for_transport(mockstomp):
     """Test the message serialization."""
-    banana = {"entry": [0, "banana"]}
+    banana = {"entry": [decimal.Decimal(0), "banana"]}
     banana_str = '{"entry": [0, "banana"]}'
     stomp = StompTransport()
     stomp.connect()
