@@ -5,7 +5,7 @@ import time
 
 import stomp
 import workflows
-from workflows.transport.common_transport import CommonTransport
+from workflows.transport.common_transport import CommonTransport, json_serializer
 
 
 class StompTransport(CommonTransport):
@@ -468,7 +468,7 @@ class StompTransport(CommonTransport):
         the actual _send* functions.
         Stomp only deals with serialized strings, so serialize message as json.
         """
-        return json.dumps(message)
+        return json.dumps(message, default=json_serializer)
 
     @staticmethod
     def _mangle_for_receiving(message):
