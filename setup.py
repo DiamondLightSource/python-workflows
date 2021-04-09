@@ -11,7 +11,7 @@ setup(
     author="Markus Gerstel",
     author_email="scientificsoftware@diamond.ac.uk",
     download_url="https://github.com/DiamondLightSource/python-workflows/releases",
-    version="2.5",
+    version="2.6",
     install_requires=["pika", "setuptools", "stomp.py<6.1.1"],
     python_requires=">=3.6",
     packages=find_packages(),
