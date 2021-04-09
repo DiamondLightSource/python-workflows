@@ -23,15 +23,13 @@ steps:
 - script: |
     pip install -U pip
     pip install -r "$(Pipeline.Workspace)/src/requirements_dev.txt"
+    pip install git+https://github.com/anthchirp/pytest-azurepipelines.git
     pip install "$(Pipeline.Workspace)/src"
   displayName: Install package
 
 - script: |
     PYTHONDEVMODE=1 pytest -ra --cov=workflows --cov-report=xml --cov-branch \
-        --test-run-title="Python $(PYTHON_VERSION) $(Agent.OS)" >/dev/null 2>/dev/null && {
-    echo all okay } || {
-        echo "##[error]looks like some tests failed"
-    }
+        --test-run-title="Python $(PYTHON_VERSION) $(Agent.OS)"
   displayName: Run tests
   workingDirectory: $(Pipeline.Workspace)/src
 
