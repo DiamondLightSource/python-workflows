@@ -27,7 +27,8 @@ steps:
   displayName: Install package
 
 - script: |
-    PYTHONDEVMODE=1 pytest -ra --cov=workflows --cov-report=xml --cov-branch
+    PYTHONDEVMODE=1 pytest -ra --cov=workflows --cov-report=xml --cov-branch \
+        --test-run-title="Python $(PYTHON_VERSION) $(Agent.OS)"
   displayName: Run tests
   workingDirectory: $(Pipeline.Workspace)/src
 
