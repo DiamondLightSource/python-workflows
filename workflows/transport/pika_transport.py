@@ -6,7 +6,7 @@ import random
 
 import pika
 import workflows
-from workflows.transport.common_transport import CommonTransport
+from workflows.transport.common_transport import CommonTransport, json_serializer
 
 
 class PikaTransport(CommonTransport):
@@ -577,7 +577,7 @@ class PikaTransport(CommonTransport):
         the actual _send* functions.
         Pika only deals with serialized strings, so serialize message as json.
         """
-        return json.dumps(message)
+        return json.dumps(message, default=json_serializer)
 
     @staticmethod
     def _mangle_for_receiving(message):

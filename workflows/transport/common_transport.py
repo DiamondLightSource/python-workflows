@@ -1,3 +1,4 @@
+import decimal
 import logging
 
 import workflows
@@ -443,3 +444,16 @@ class CommonTransport:
         """Function that any message will pass through before it being forwarded to
         the receiving subscribed callback functions."""
         return message
+
+
+def json_serializer(obj):
+    """A helper function for JSON serialization, where it can be used as
+    the default= argument. This function helps the serializer to translate
+    objects that otherwise would not be understood. Note that this is
+    one-way only - these objects are not restored on the receiving end."""
+
+    if isinstance(obj, decimal.Decimal):
+        # turn all Decimals into floats
+        return float(obj)
+
+    raise TypeError(repr(obj) + " is not JSON serializable")
