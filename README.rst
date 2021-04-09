@@ -37,12 +37,12 @@ Workflows
 Workflows enables light-weight services to process tasks in a message-oriented
 environment.
 
-It is comprised of a communications layer (workflows.transport) that provides a
+It is comprised of a communications layer (``workflows.transport``) that provides a
 common interface to queues and topics over different transport providers, a
-service abstraction layer (workflows.frontend) which encapsulates a service in
+service abstraction layer (``workflows.frontend``) which encapsulates a service in
 a separate process, tools for status reporting, logging and controlling
 services via a transport mechanism, and a service class skeleton alongside
-example services (workflows.services.common_service et al.).
+example services (``workflows.services.common_service`` et al.).
 To achieve more complex workflows services can be interconnected using
 `recipes`_ whereby the output of one service can be directed
 onwards to other services.
