@@ -21,18 +21,17 @@ steps:
     destinationFolder: "$(Pipeline.Workspace)/src"
 
 - script: |
-    pip install -U pip
-    pip install -r "$(Pipeline.Workspace)/src/requirements_dev.txt"
-    pip install "$(Pipeline.Workspace)/src"
+    pip install --disable-pip-version-check -r "$(Pipeline.Workspace)/src/requirements_dev.txt"
+    pip install --no-deps --disable-pip-version-check -e "$(Pipeline.Workspace)/src"
   displayName: Install package
 
 - script: |
-    PYTHONDEVMODE=1 pytest -ra --cov=workflows --cov-report=xml --cov-branch
+    PYTHONDEVMODE=1 pytest -v -ra --cov=workflows --cov-report=xml --cov-branch
   displayName: Run tests
   workingDirectory: $(Pipeline.Workspace)/src
 
-- bash: bash <(curl -s https://codecov.io/bash) -n "Python $(PYTHON_VERSION) $(Agent.OS)"
-  displayName: 'Publish coverage stats'
+- bash: bash <(curl -s https://codecov.io/bash) -t $(CODECOV_TOKEN) -n "Python $(PYTHON_VERSION) $(Agent.OS)"
+  displayName: Publish coverage stats
   continueOnError: True
   workingDirectory: $(Pipeline.Workspace)/src
   timeoutInMinutes: 2
