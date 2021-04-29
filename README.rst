@@ -23,7 +23,7 @@ Workflows
         :alt: Supported Python versions
 
 .. image:: https://img.shields.io/badge/code%20style-black-000000.svg
-        :target: https://github.com/ambv/black
+        :target: https://github.com/psf/black
         :alt: Code style: black
 
 .. image:: https://img.shields.io/lgtm/grade/python/g/DiamondLightSource/python-workflows.svg?logo=lgtm&logoWidth=18
@@ -47,4 +47,4 @@ To achieve more complex workflows services can be interconnected using
 `recipes`_ whereby the output of one service can be directed
 onwards to other services.
 
-.. _recipes: https://github.com/DiamondLightSource/python-workflows/tree/main/workflows/recipe/README.MD
+.. _recipes: https://github.com/DiamondLightSource/python-workflows/tree/main/src/workflows/recipe/README.MD
