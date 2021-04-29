@@ -1,15 +1,18 @@
-# Compiled python modules.
-*.pyc
+# Temporary files
+*~
+*.sw[op]
 
-# Temporary stuff
-*.swp
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
 
 # Setuptools distribution folder.
 /build/
 /dist/
 
 # Python egg metadata, regenerated from source files by setuptools.
-/*.egg-info
+*.egg-info
 /.eggs
 
 # Testing output
