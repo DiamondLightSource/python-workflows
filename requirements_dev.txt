@@ -1,5 +1,4 @@
-pip==21.0.1
-pytest==6.2.2
+pytest==6.2.3
 pytest-cov==2.11.1
 pytest-timeout==1.4.2
 setuptools==56.0.0
