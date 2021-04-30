@@ -28,7 +28,7 @@ stages:
 
       # Run flake8 validation on a shallow clone
       - bash: |
-          pip install flake8
+          pip install --disable-pip-version-check flake8
           python .azure-pipelines/flake8-validation.py
         displayName: Flake8 validation
 
@@ -47,8 +47,7 @@ stages:
           versionSpec: 3.9
 
       - bash: |
-          pip install -U pip
-          pip install collective.checkdocs wheel
+          pip install --disable-pip-version-check collective.checkdocs wheel
         displayName: Install dependencies
 
       - bash: |
@@ -119,8 +118,7 @@ stages:
           downloadPath: '$(System.ArtifactsDirectory)'
 
       - script: |
-          pip install -U pip
-          pip install twine
+          pip install --disable-pip-version-check twine
         displayName: Install twine
 
       - task: TwineAuthenticate@1
