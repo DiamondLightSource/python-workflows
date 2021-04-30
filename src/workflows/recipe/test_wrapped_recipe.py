@@ -1,6 +1,7 @@
 from unittest import mock
 
 import pytest
+
 import workflows
 from workflows.recipe import Recipe
 from workflows.recipe.wrapper import RecipeWrapper

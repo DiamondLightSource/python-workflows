@@ -1,5 +1,6 @@
-import workflows.contrib.status_monitor as status_monitor
 from unittest import mock
+
+import workflows.contrib.status_monitor as status_monitor
 
 
 @mock.patch("workflows.contrib.status_monitor.curses")

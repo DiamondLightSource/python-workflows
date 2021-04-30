@@ -20,8 +20,8 @@ import json
 import logging
 import sys
 
-import workflows.recipe
 import workflows
+import workflows.recipe
 
 
 def validate_recipe(json_filename):

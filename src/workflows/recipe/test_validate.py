@@ -7,8 +7,9 @@ import sys
 from unittest import mock
 
 import pytest
+
 import workflows
-from workflows.recipe.validate import validate_recipe, main
+from workflows.recipe.validate import main, validate_recipe
 
 
 def test_validate_returns_type_error_when_called_without_parameters():

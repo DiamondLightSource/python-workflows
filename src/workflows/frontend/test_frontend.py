@@ -1,6 +1,8 @@
-import pytest
-import workflows.frontend
 from unittest import mock
+
+import pytest
+
+import workflows.frontend
 from workflows.services.common_service import CommonService
 
 ### Helper classes used in tests ##############################################

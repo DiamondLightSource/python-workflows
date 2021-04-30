@@ -1,10 +1,11 @@
 import configparser
 import json
+import random
 import threading
 import time
-import random
 
 import pika
+
 import workflows
 from workflows.transport.common_transport import CommonTransport, json_serializer
 

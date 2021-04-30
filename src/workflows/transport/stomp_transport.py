@@ -4,6 +4,7 @@ import threading
 import time
 
 import stomp
+
 import workflows
 from workflows.transport.common_transport import CommonTransport, json_serializer
 

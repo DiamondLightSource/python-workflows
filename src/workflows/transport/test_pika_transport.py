@@ -1,5 +1,4 @@
 import argparse
-
 import importlib
 import inspect
 import json
@@ -8,8 +7,9 @@ import os
 import tempfile
 from unittest import mock
 
-import pytest
 import pika as pikapy
+import pytest
+
 import workflows
 import workflows.transport
 from workflows.transport.pika_transport import PikaTransport

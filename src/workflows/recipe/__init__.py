@@ -1,6 +1,6 @@
 from workflows.recipe.recipe import Recipe
-from workflows.recipe.wrapper import RecipeWrapper
 from workflows.recipe.validate import validate_recipe
+from workflows.recipe.wrapper import RecipeWrapper
 
 __all__ = [
     "Recipe",
