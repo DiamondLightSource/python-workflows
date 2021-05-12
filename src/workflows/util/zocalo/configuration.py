@@ -4,7 +4,7 @@ from zocalo.configuration import PluginSchema
 from workflows.transport.stomp_transport import StompTransport
 
 
-class StompPlugin:
+class Stomp:
     """A Zocalo configuration plugin to pre-populate StompTransport config defaults"""
 
     class Schema(PluginSchema):
