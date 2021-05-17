@@ -1,5 +1,7 @@
 import configparser
+import itertools
 import json
+import logging
 import random
 import threading
 import time
@@ -9,13 +11,16 @@ import pika
 import workflows
 from workflows.transport.common_transport import CommonTransport, json_serializer
 
+logger = logging.getLogger("workflows.transport.pika_transport")
+
 
 class PikaTransport(CommonTransport):
-    """Abstraction layer for messaging infrastructure. Here we are using Pika"""
+    """Abstraction layer for messaging infrastructure.
+    Here we are using RabbitMQ via pika."""
 
     # Set some sensible defaults
     defaults = {
-        "--rabbit-host": "cs04r-sc-vserv-253",
+        "--rabbit-host": "localhost",
         "--rabbit-port": 5672,
         "--rabbit-user": "guest",
         "--rabbit-pass": "guest",
@@ -31,9 +36,10 @@ class PikaTransport(CommonTransport):
         self._connected = False
         self._lock = threading.RLock()
         self._vhost = "/"
-        self._reconnection_attempts = 0
+        self._reconnection_allowed = True
 
-    def get_namespace(self):
+    def get_namespace(self) -> str:
+        """Return the RabbitMQ virtual host"""
         if self._vhost.endswith("."):
             return self._vhost[:-1]
         return self._vhost
@@ -83,7 +89,7 @@ class PikaTransport(CommonTransport):
             "--rabbit-host",
             metavar="HOST",
             default=cls.defaults.get("--rabbit-host"),
-            help="Rabbit broker address, default '%(default)s'",
+            help="RabbitMQ broker address, default '%(default)s'",
             type=str,
             action=SetParameter,
         )
@@ -91,15 +97,15 @@ class PikaTransport(CommonTransport):
             "--rabbit-port",
             metavar="PORT",
             default=cls.defaults.get("--rabbit-port"),
-            help="Rabbit broker port, default '%(default)s",
-            type=int,
+            help="RabbitMQ broker port, default '%(default)s",
+            type=str,
             action=SetParameter,
         )
         argparser.add_argument(
             "--rabbit-user",
             metavar="USER",
             default=cls.defaults.get("--rabbit-user"),
-            help="Rabbit user, default '%(default)s'",
+            help="RabbitMQ user, default '%(default)s'",
             type=str,
             action=SetParameter,
         )
@@ -107,7 +113,7 @@ class PikaTransport(CommonTransport):
             "--rabbit-pass",
             metavar="PASS",
             default=cls.defaults.get("--rabbit-pass"),
-            help="Rabbit password",
+            help="RabbitMQ password",
             type=str,
             action=SetParameter,
         )
@@ -115,7 +121,7 @@ class PikaTransport(CommonTransport):
             "--rabbit-vhost",
             metavar="VHST",
             default=cls.defaults.get("--rabbit-vhost"),
-            help="Rabbit virtual host, default '%(default)s'",
+            help="RabbitMQ virtual host, default '%(default)s'",
             type=str,
             action=SetParameter,
         )
@@ -143,7 +149,7 @@ class PikaTransport(CommonTransport):
             "--rabbit-host",
             metavar="HOST",
             default=cls.defaults.get("--rabbit-host"),
-            help="Rabbit broker address, default '%default'",
+            help="RabbitMQ broker address, default '%default'",
             type="string",
             nargs=1,
             action="callback",
@@ -153,8 +159,8 @@ class PikaTransport(CommonTransport):
             "--rabbit-port",
             metavar="PORT",
             default=cls.defaults.get("--rabbit-port"),
-            help="Rabbit broker port, default '%default'",
-            type="int",
+            help="RabbitMQ broker port, default '%default'",
+            type="string",
             nargs=1,
             action="callback",
             callback=set_parameter,
@@ -163,7 +169,7 @@ class PikaTransport(CommonTransport):
             "--rabbit-user",
             metavar="USER",
             default=cls.defaults.get("--rabbit-user"),
-            help="Rabbit user, default '%default'",
+            help="RabbitMQ user, default '%default'",
             type="string",
             nargs=1,
             action="callback",
@@ -173,7 +179,7 @@ class PikaTransport(CommonTransport):
             "--rabbit-pass",
             metavar="PASS",
             default=cls.defaults.get("--rabbit-pass"),
-            help="Rabbit password",
+            help="RabbitMQ password",
             type="string",
             nargs=1,
             action="callback",
@@ -183,7 +189,7 @@ class PikaTransport(CommonTransport):
             "--rabbit-vhost",
             metavar="VHST",
             default=cls.defaults.get("--rabbit-vhost"),
-            help="Rabbit virtual host, default '%default'",
+            help="RabbitMQ virtual host, default '%default'",
             type="string",
             nargs=1,
             action="callback",
@@ -193,63 +199,121 @@ class PikaTransport(CommonTransport):
             "--rabbit-conf",
             metavar="CNF",
             default=cls.defaults.get("--rabbit-conf"),
-            help="Rabbit configuration file containing connection information, disables default values",
+            help="RabbitMQ configuration file containing connection information, disables default values",
             type="string",
             nargs=1,
             action="callback",
             callback=set_parameter,
         )
 
+    def _generate_connection_parameters(self):
+        if hasattr(self, "_connection_parameters"):
+            return
+        username = self.config.get("--rabbit-user", self.defaults.get("--rabbit-user"))
+        password = self.config.get("--rabbit-pass", self.defaults.get("--rabbit-pass"))
+        credentials = pika.PlainCredentials(username, password)
+        host = self.config.get("--rabbit-host", self.defaults.get("--rabbit-host"))
+        port = str(self.config.get("--rabbit-port", self.defaults.get("--rabbit-port")))
+        vhost = self.config.get("--rabbit-vhost", self.defaults.get("--rabbit-vhost"))
+        if "," in host:
+            host = host.split(",")
+        else:
+            host = [host]
+        if "," in port:
+            port = [int(p) for p in port.split(",")]
+        else:
+            port = [int(port)]
+        if len(port) > len(host):
+            raise workflows.Disconnected(
+                "Invalid hostname/port specifications: cannot specify more ports than hosts"
+            )
+        if len(host) != len(port) and len(port) != 1:
+            raise workflows.Disconnected(
+                "Invalid hostname/port specifications: must either specify a single port, or one port per host"
+            )
+        if len(host) > len(port):
+            port = port * len(host)
+        connection_parameters = [
+            pika.ConnectionParameters(
+                host=h,
+                port=p,
+                virtual_host=vhost,
+                credentials=credentials,
+                retry_delay=5,
+                connection_attempts=3,
+            )
+            for h, p in zip(host, port)
+        ]
+
+        # Randomize connection order once to spread out equally across all servers
+        random.shuffle(connection_parameters)
+        self._reconnection_attempts = max(3, len(connection_parameters))
+        self._connection_parameters = itertools.cycle(connection_parameters)
+
     def connect(self):
-        """ It opens a connection and channel"""
+        """Ensure both connection and channel to the RabbitMQ server are open."""
+        self._reconnection_allowed = True
+        return self._reconnect()
+
+    def _reconnect(self):
+        """An internal function that ensures a connection is up and running,
+        but it will not force a reconnection when the connection state could not
+        be restored. This will be the case if any subscription has been set up."""
+        if not self._reconnection_allowed:
+            raise workflows.Disconnected("Reconnection is disallowed")
         with self._lock:
             if self._connected:
                 return True
-            username = self.config.get(
-                "--rabbit-user", self.defaults.get("--rabbit-user")
-            )
-            password = self.config.get(
-                "--rabbit-pass", self.defaults.get("--rabbit-pass")
-            )
-            credentials = pika.PlainCredentials(username, password)
-            host = self.config.get("--rabbit-host", self.defaults.get("--rabbit-host"))
-            port = int(
-                self.config.get("--rabbit-port", self.defaults.get("--rabbit-port"))
-            )
-            vhost = self.config.get(
-                "--rabbit-vhost", self.defaults.get("--rabbit-vhost")
-            )
-            try:
-                self._conn = pika.BlockingConnection(
-                    pika.ConnectionParameters(
-                        host=host,
-                        port=port,
-                        virtual_host=vhost,
-                        credentials=credentials,
+            self._generate_connection_parameters()
+            failed_attempts = []
+            for connection_attempt in range(self._reconnection_attempts):
+                connection = next(self._connection_parameters)
+                logger.debug(
+                    "Attempting connection %s (%d failed previous attempts)",
+                    connection,
+                    connection_attempt,
+                )
+                try:
+                    self._conn = pika.BlockingConnection(connection)
+                except pika.exceptions.AMQPConnectionError:
+                    logger.debug(
+                        "Could not initiate connection to RabbitMQ server at %s",
+                        connection,
                     )
-                )
-            except pika.exceptions.AMQPConnectionError:
+                    failed_attempts.append(("Connection Error", connection))
+                    continue
+                try:
+                    self._channel = self._conn.channel()
+                except pika.exceptions.AMQPChannelError:
+                    self.disconnect()
+                    logger.debug(
+                        "Channel error while connecting to RabbitMQ server at %s",
+                        connection,
+                    )
+                    failed_attempts.append(("Channel Error", connection))
+                    continue
+                self._connected = True
+                break
+            else:
                 raise workflows.Disconnected(
-                    "Could not initiate connection to RabbitMQ server"
+                    "Could not initiate connection to RabbitMQ server after %d failed attempts.\n%s",
+                    len(failed_attempts),
+                    "\n".join(f"{e[1]}: {e[0]}" for e in failed_attempts),
                 )
-            try:
-                self._channel = self._conn.channel()
-            except pika.exceptions.AMQPChannelError:
-                self.disconnect()
-                raise workflows.Disconnected("Caught a channel error")
-            self._connected = True
         return True
 
-    def is_connected(self):
+    def is_connected(self) -> bool:
         """Return connection status."""
-        self._connected = (
+        if (
             self._connected
             and self._conn
             and self._conn.is_open
             and self._channel
             and self._channel.is_open
-        )
-        return self._connected
+        ):
+            return True
+        self.disconnect()
+        return False
 
     def disconnect(self):
         """Gracefully close connection to pika server"""
@@ -259,85 +323,6 @@ class PikaTransport(CommonTransport):
             self._channel.close()
         if self._conn and self._conn.is_open:
             self._conn.close()
-
-    def reconnect(self):
-        """ It opens a connection and channel"""
-        with self._lock:
-            if self._connected:
-                return True
-            max_reconnection_attempts = 3
-            if self._reconnection_attempts > max_reconnection_attempts:
-                return False
-            username = self.config.get(
-                "--rabbit-user", self.defaults.get("--rabbit-user")
-            )
-            password = self.config.get(
-                "--rabbit-pass", self.defaults.get("--rabbit-pass")
-            )
-            credentials = pika.PlainCredentials(username, password)
-
-            port = int(
-                self.config.get("--rabbit-port", self.defaults.get("--rabbit-port"))
-            )
-            vhost = self.config.get(
-                "--rabbit-vhost", self.defaults.get("--rabbit-vhost")
-            )
-
-            host1 = "cs04r-sc-vserv-252"
-            host2 = "cs04r-sc-vserv-253"
-            host3 = "cs04r-sc-vserv-254"
-
-            retry_delay = 5
-            connection_attempts = 3
-
-            node1 = pika.ConnectionParameters(
-                host=host1,
-                port=port,
-                virtual_host=vhost,
-                credentials=credentials,
-                retry_delay=retry_delay,
-                connection_attempts=connection_attempts,
-            )
-
-            node2 = pika.ConnectionParameters(
-                host=host2,
-                port=port,
-                virtual_host=vhost,
-                credentials=credentials,
-                retry_delay=retry_delay,
-                connection_attempts=connection_attempts,
-            )
-
-            node3 = pika.ConnectionParameters(
-                host=host3,
-                port=port,
-                virtual_host=vhost,
-                credentials=credentials,
-                retry_delay=retry_delay,
-                connection_attempts=connection_attempts,
-            )
-
-            endpoints = [node1, node2, node3]
-
-            if self._reconnection_attempts == 0:
-                random.shuffle(endpoints)
-            else:
-                endpoints.append(endpoints.pop(0))
-
-            try:
-                self._reconnection_attempts += 1
-                self._conn = pika.BlockingConnection(endpoints)
-            except pika.exceptions.AMQPConnectionError:
-                raise workflows.Disconnected(
-                    "Could not initiate connection to RabbitMQ server"
-                )
-            try:
-                self._channel = self._conn.channel()
-            except pika.exceptions.AMQPChannelError:
-                self.disconnect()
-                raise workflows.Disconnected("Caught a channel error")
-            self._connected = True
-        return True
 
     def broadcast_status(self, status):
         """Broadcast transient status information to all listeners"""
@@ -374,6 +359,7 @@ class PikaTransport(CommonTransport):
             if not auto_ack:
                 self._ack(method.delivery_tag)
 
+        self._reconnection_allowed = False
         self._channel.basic_qos(prefetch_count=1)
         self._channel.basic_consume(
             queue=queue,
@@ -415,6 +401,7 @@ class PikaTransport(CommonTransport):
                 body,
             )
 
+        self._reconnection_allowed = False
         self._channel.basic_qos(prefetch_count=1)
         self._channel.basic_consume(
             queue=queue,
@@ -462,6 +449,7 @@ class PikaTransport(CommonTransport):
             headers["x-message-ttl"] = int((time.time() + expiration) * 1000)
 
         properties = pika.BasicProperties(headers=headers, delivery_mode=2)
+        self._reconnect()  # Ensure we are connected
         self._channel.confirm_delivery()
         try:
             self._channel.basic_publish(
@@ -471,16 +459,24 @@ class PikaTransport(CommonTransport):
                 properties=properties,
                 mandatory=True,
             )
-        except pika.exceptions.AMQPChannelError:
+        except (pika.exceptions.AMQPChannelError, pika.exceptions.AMQPConnectionError):
             self.disconnect()
-            raise workflows.Disconnected("Caught a channel error")
-        except pika.exceptions.AMQPConnectionError:
-            self.disconnect()
-            time.sleep(5)
-            if not self.reconnect():
-                raise workflows.Disconnected(
-                    "Connection to RabbitMQ server was closed."
+            self._reconnect()
+            self._channel.confirm_delivery()
+            try:
+                self._channel.basic_publish(
+                    exchange="",
+                    routing_key=destination,
+                    body=message,
+                    properties=properties,
+                    mandatory=True,
                 )
+            except (
+                pika.exceptions.AMQPChannelError,
+                pika.exceptions.AMQPConnectionError,
+            ):
+                self.disconnect()
+                raise workflows.Disconnected("Connection to RabbitMQ server lost")
 
     def _broadcast(
         self, destination, message, headers=None, delay=None, expiration=None, **kwargs
@@ -503,8 +499,8 @@ class PikaTransport(CommonTransport):
             headers["x-delay"] = 1000 * delay
         if expiration:
             headers["x-message-ttl"] = int((time.time() + expiration) * 1000)
-
         properties = pika.BasicProperties(headers=headers, delivery_mode=2)
+        self._reconnect()  # Ensure we are connected
         try:
             self._channel.basic_publish(
                 exchange=destination,
@@ -513,37 +509,38 @@ class PikaTransport(CommonTransport):
                 properties=properties,
                 mandatory=True,
             )
-        except pika.exceptions.AMQPChannelError:
+        except (pika.exceptions.AMQPChannelError, pika.exceptions.AMQPConnectionError):
             self.disconnect()
-            raise workflows.Disconnected("Caught a channel error")
-        except pika.exceptions.AMQPConnectionError:
-            self.disconnect()
-            time.sleep(5)
-            if not self.reconnect():
-                raise workflows.Disconnected(
-                    "Connection to RabbitMQ server was closed."
+            self._reconnect()
+            try:
+                self._channel.basic_publish(
+                    exchange=destination,
+                    routing_key="",
+                    body=message,
+                    properties=properties,
+                    mandatory=True,
                 )
+            except (
+                pika.exceptions.AMQPChannelError,
+                pika.exceptions.AMQPConnectionError,
+            ):
+                self.disconnect()
+                raise workflows.Disconnected("Connection to RabbitMQ server lost")
 
-    def _transaction_begin(self, transaction_id, **kwargs):
-        """Start a new transaction.
-        Pika does not support transaction_id as argument.
-        :param transaction_id: ID for this transaction in the transport layer.
+    def _transaction_begin(self, **kwargs):
+        """Enter transaction mode.
         :param **kwargs: Further parameters for the transport layer.
         """
         self._channel.tx_select()
 
-    def _transaction_abort(self, transaction_id, **kwargs):
+    def _transaction_abort(self, **kwargs):
         """Abort a transaction and roll back all operations.
-        Pika does not support transaction_id as argument.
-        :param transaction_id: ID of transaction to be aborted.
         :param **kwargs: Further parameters for the transport layer.
         """
         self._channel.tx_rollback()
 
-    def _transaction_commit(self, transaction_id, **kwargs):
+    def _transaction_commit(self, **kwargs):
         """Commit a transaction.
-        Pika does not support transaction_id as argument.
-        :param transaction_id: ID of transaction to be committed.
         :param **kwargs: Further parameters for the transport layer.
         """
         self._channel.tx_commit()
@@ -551,24 +548,16 @@ class PikaTransport(CommonTransport):
     def _ack(self, message_id, **kwargs):
         """Acknowledge receipt of a message. This only makes sense when the
         'acknowledgement' flag was set for the relevant subscription.
-        Pika does not support acknowledgment with subscription ID.
         :param message_id: ID of the message to be acknowledged
-        :param subscription: ID of the relevant subscriptiong
-        :param **kwargs: Further parameters for the transport layer. For example
-               transaction: Transaction ID if acknowledgement should be part of
-                            a transaction
+        :param **kwargs: Further parameters for the transport layer.
         """
         self._channel.basic_ack(delivery_tag=message_id)
 
     def _nack(self, message_id, **kwargs):
         """Reject receipt of a message. This only makes sense when the
         'acknowledgement' flag was set for the relevant subscription.
-        Pika does not support acknowledgment with subscription ID.
         :param message_id: ID of the message to be rejected
-        :param subscription: ID of the relevant subscriptiong
-        :param **kwargs: Further parameters for the transport layer. For example
-               transaction: Transaction ID if rejection should be part of a
-                            transaction
+        :param **kwargs: Further parameters for the transport layer.
         """
         self._channel.basic_nack(delivery_tag=message_id)
 

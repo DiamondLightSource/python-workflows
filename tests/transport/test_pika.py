@@ -1,10 +1,7 @@
 import argparse
-import importlib
 import inspect
 import json
 import optparse
-import os
-import tempfile
 from unittest import mock
 
 import pika as pikapy
@@ -21,7 +18,7 @@ def test_lookup_and_initialize_pika_transport_layer():
     """
     pika = workflows.transport.lookup("PikaTransport")
     assert pika == PikaTransport
-    pika()
+    assert pika()
 
 
 def test_add_command_line_help_optparse():
@@ -65,7 +62,7 @@ def test_adding_arguments_to_argparser():
 
 
 @mock.patch("workflows.transport.pika_transport.pika")
-def test_check_config_file_behaviour(mockpika):
+def test_check_config_file_behaviour(mockpika, tmp_path):
     """Check that a specified configuration file is read, that command line
     parameters have precedence and are passed on to the pika layer."""
     mockconn = mock.Mock()
@@ -75,27 +72,27 @@ def test_check_config_file_behaviour(mockpika):
     pika = PikaTransport()
     pika.add_command_line_options(parser)
 
-    cfgfile = tempfile.NamedTemporaryFile(delete=False)
     try:
-        cfgfile.write(
-            """
-# An example pika configuration file
-# Only lines in the [pika] block will be interpreted
+        stored_defaults = pika.defaults.copy()
+        stored_config = pika.config.copy()
 
-[rabbit]
-host = localhost
-port = 5672
-username = someuser
-password = somesecret
-vhost = namespace
-""".encode(
-                "utf-8"
-            )
+        cfgfile = tmp_path / "config"
+        cfgfile.write_text(
+            """
+    # An example pika configuration file
+    # Only lines in the [pika] block will be interpreted
+
+    [rabbit]
+    host = localhost
+    port = 5672
+    username = someuser
+    password = somesecret
+    vhost = namespace
+    """
         )
-        cfgfile.close()
 
         parser.parse_args(
-            ["--rabbit-conf", cfgfile.name, "--rabbit-user", mock.sentinel.user]
+            ["--rabbit-conf", str(cfgfile), "--rabbit-user", mock.sentinel.user]
         )
 
         pika = PikaTransport()
@@ -111,17 +108,17 @@ vhost = namespace
             "host": "localhost",
             "port": 5672,
             "virtual_host": "namespace",
-            "credentials": mock.ANY,
+            "credentials": mockpika.PlainCredentials.return_value,
+            "connection_attempts": mock.ANY,
+            "retry_delay": mock.ANY,
         }
 
-        importlib.reload(workflows.transport.pika_transport)
-        globals()["PikaTransport"] = workflows.transport.pika_transport.PikaTransport
+        with pytest.raises(workflows.Error):
+            parser.parse_args(["--rabbit-conf", ""])
 
     finally:
-        os.remove(cfgfile.name)
-
-    with pytest.raises(workflows.Error):
-        parser.parse_args(["--rabbit-conf", ""])
+        pika.defaults = stored_defaults
+        pika.config = stored_config
 
 
 @mock.patch("workflows.transport.pika_transport.pika")
@@ -139,10 +136,6 @@ def test_anonymous_connection(mockpika):
 
     pika = PikaTransport()
     pika.connect()
-
-    # Reset configuration for subsequent tests by reloading PikaTransport
-    importlib.reload(workflows.transport.pika_transport)
-    globals()["PikaTransport"] = workflows.transport.pika_transport.PikaTransport
 
     mockpika.BlockingConnection.assert_called_once()
     mockpika.PlainCredentials.assert_called_once_with("", "")
@@ -320,7 +313,8 @@ def test_sending_message_with_expiration(time, mockpika):
 
 @mock.patch("workflows.transport.pika_transport.pika")
 def test_error_handling_on_send(mockpika):
-    """Unrecoverable errors during sending should mark the connection as disconnected."""
+    """Unrecoverable errors during sending should lead to one reconnection attempt.
+    Further errors should raise an Exception, further send attempts to try to reconnect."""
     pika = PikaTransport()
     pika.connect()
     mockconn = mockpika.BlockingConnection
@@ -328,34 +322,16 @@ def test_error_handling_on_send(mockpika):
     mockchannel.basic_publish.side_effect = pikapy.exceptions.AMQPChannelError()
     mockpika.exceptions = pikapy.exceptions
 
+    assert mockconn.call_count == 1
     with pytest.raises(workflows.Disconnected):
         pika._send(str(mock.sentinel.queue), mock.sentinel.message)
     assert not pika.is_connected()
-
-
-@mock.patch("workflows.transport.pika_transport.pika")
-def test_error_reconnecting_on_send(mockpika):
-    """Test connection errors are recoverable and reconnects to a different host"""
-    pika = PikaTransport()
-    pika.connect()
-    mockconn = mockpika.BlockingConnection
-    mockchannel = mockconn.return_value.channel.return_value
-    mockchannel.basic_publish.side_effect = pikapy.exceptions.AMQPConnectionError()
-    mockpika.exceptions = pikapy.exceptions
-
-    args, kwargs = mockpika.ConnectionParameters.call_args
-    assert not args
-    initial_host = kwargs.get("host")
-
-    mockconn.assert_called_once()
-    pika._send(str(mock.sentinel.queue), mock.sentinel.message)
     assert mockconn.call_count == 2
-    args, kwargs = mockpika.ConnectionParameters.call_args
-    assert not args
-    host = kwargs.get("host")
-    assert initial_host != host
 
+    mockchannel.basic_publish.side_effect = None
+    pika._send(str(mock.sentinel.queue), mock.sentinel.message)
     assert pika.is_connected()
+    assert mockconn.call_count == 3
 
 
 @mock.patch("workflows.transport.pika_transport.pika")
@@ -451,7 +427,8 @@ def test_broadcasting_message_with_expiration(time, mockpika):
 
 @mock.patch("workflows.transport.pika_transport.pika")
 def test_error_handling_on_broadcast(mockpika):
-    """Unrecoverable errors during broadcasting should mark the connection as disconnected."""
+    """Unrecoverable errors during broadcasting should lead to one reconnection attempt.
+    Further errors should raise an Exception, further send attempts to try to reconnect."""
     pika = PikaTransport()
     pika.connect()
     mockconn = mockpika.BlockingConnection
@@ -459,34 +436,16 @@ def test_error_handling_on_broadcast(mockpika):
     mockchannel.basic_publish.side_effect = pikapy.exceptions.AMQPChannelError()
     mockpika.exceptions = pikapy.exceptions
 
+    assert mockconn.call_count == 1
     with pytest.raises(workflows.Disconnected):
         pika._broadcast(str(mock.sentinel.channel), mock.sentinel.message)
     assert not pika.is_connected()
-
-
-@mock.patch("workflows.transport.pika_transport.pika")
-def test_error_reconnecting_on_broadcast(mockpika):
-    """Test connection errors are recoverable and reconnects to a different host"""
-    pika = PikaTransport()
-    pika.connect()
-    mockconn = mockpika.BlockingConnection
-    mockchannel = mockconn.return_value.channel.return_value
-    mockchannel.basic_publish.side_effect = pikapy.exceptions.AMQPConnectionError()
-    mockpika.exceptions = pikapy.exceptions
-
-    args, kwargs = mockpika.ConnectionParameters.call_args
-    assert not args
-    initial_host = kwargs.get("host")
-
-    mockconn.assert_called_once()
-    pika._broadcast(str(mock.sentinel.queue), mock.sentinel.message)
     assert mockconn.call_count == 2
-    args, kwargs = mockpika.ConnectionParameters.call_args
-    assert not args
-    host = kwargs.get("host")
-    assert initial_host != host
 
+    mockchannel.basic_publish.side_effect = None
+    pika._broadcast(str(mock.sentinel.channel), mock.sentinel.message)
     assert pika.is_connected()
+    assert mockconn.call_count == 3
 
 
 @mock.patch("workflows.transport.pika_transport.pika")
@@ -771,7 +730,7 @@ def test_transaction_calls(mockpika):
     mockchannel = mockconn.return_value.channel.return_value
     mockproperties = mockpika.BasicProperties
 
-    pika._transaction_begin(1)
+    pika._transaction_begin()
     mockchannel.tx_select.assert_called_once()
 
     pika._send("destination", mock.sentinel.message, transaction=mock.sentinel.txid)
@@ -786,16 +745,16 @@ def test_transaction_calls(mockpika):
     }
     assert mockproperties.call_args[1] == {"headers": {}, "delivery_mode": 2}
 
-    pika._transaction_abort(1)
+    pika._transaction_abort()
     mockchannel.tx_rollback.assert_called_once()
 
-    pika._transaction_commit(2)
+    pika._transaction_commit()
     mockchannel.tx_commit.assert_called_once()
 
 
 @mock.patch("workflows.transport.pika_transport.pika")
 def test_ack_message(mockpika):
-    """Test that the _ack function is properly forwarded to pika"""
+    """Test that the _ack function call is properly forwarded to pika"""
     pika = PikaTransport()
     pika.connect()
     mockconn = mockpika.BlockingConnection
@@ -807,7 +766,7 @@ def test_ack_message(mockpika):
 
 @mock.patch("workflows.transport.pika_transport.pika")
 def test_nack_message(mockpika):
-    """Test that the _ack function is properly forwarded to pika"""
+    """Test that the _nack function call is properly forwarded to pika"""
     pika = PikaTransport()
     pika.connect()
     mockconn = mockpika.BlockingConnection
