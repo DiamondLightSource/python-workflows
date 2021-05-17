@@ -21,6 +21,7 @@ steps:
     destinationFolder: "$(Pipeline.Workspace)/src"
 
 - script: |
+    set -eux
     pip install --disable-pip-version-check -r "$(Pipeline.Workspace)/src/requirements_dev.txt"
     pip install --no-deps --disable-pip-version-check -e "$(Pipeline.Workspace)/src"
   displayName: Install package
