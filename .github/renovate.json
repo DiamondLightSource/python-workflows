@@ -1,0 +1,37 @@
+{
+  "extends": [
+    "config:base"
+  ],
+  "labels": [
+    "dependencies"
+  ],
+  "pip_requirements": {
+    "fileMatch": [
+      "^requirements.*\\.txt$"
+    ],
+    "groupName": "all dependencies",
+    "groupSlug": "all",
+    "packageRules": [
+      {
+        "groupName": "all dependencies",
+        "groupSlug": "all",
+        "matchPackagePatterns": [
+          "*"
+        ]
+      }
+    ]
+  },
+  "prCreation": "not-pending",
+  "prHourlyLimit": 2,
+  "pre-commit": {
+    "schedule": [
+      "after 10am and before 4pm every 3 months on the first day of the month"
+    ],
+    "stabilityDays": 10
+  },
+  "schedule": [
+    "after 7am and before 4pm every monday"
+  ],
+  "stabilityDays": 2,
+  "timezone": "Europe/London"
+}
