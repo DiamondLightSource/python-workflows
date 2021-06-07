@@ -6,6 +6,7 @@ import json
 import optparse
 import os
 import tempfile
+from collections import namedtuple
 from unittest import mock
 
 import pytest
@@ -14,6 +15,8 @@ import stomp as stomppy
 import workflows
 import workflows.transport
 from workflows.transport.stomp_transport import StompTransport
+
+_frame = namedtuple("frame", "headers, body")
 
 
 def test_lookup_and_initialize_stomp_transport_layer():
@@ -411,10 +414,12 @@ def test_messages_are_deserialized_after_transport(mockstomp):
     callback = mock.Mock()
     stomp.subscribe("channel", callback)
     subscription_id = mockconn.subscribe.call_args[0][1]
-    message_handler({"subscription": subscription_id}, banana_str)
+    message_handler(_frame({"subscription": subscription_id}, banana_str))
     callback.assert_called_once_with({"subscription": subscription_id}, banana)
 
-    message_handler({"subscription": subscription_id}, mock.sentinel.undeserializable)
+    message_handler(
+        _frame({"subscription": subscription_id}, mock.sentinel.undeserializable)
+    )
     callback.assert_called_with(
         {"subscription": subscription_id}, mock.sentinel.undeserializable
     )
@@ -423,10 +428,12 @@ def test_messages_are_deserialized_after_transport(mockstomp):
     callback = mock.Mock()
     stomp.subscribe_broadcast("channel", callback)
     subscription_id = mockconn.subscribe.call_args[0][1]
-    message_handler({"subscription": subscription_id}, banana_str)
+    message_handler(_frame({"subscription": subscription_id}, banana_str))
     callback.assert_called_once_with({"subscription": subscription_id}, banana)
 
-    message_handler({"subscription": subscription_id}, mock.sentinel.undeserializable)
+    message_handler(
+        _frame({"subscription": subscription_id}, mock.sentinel.undeserializable)
+    )
     callback.assert_called_with(
         {"subscription": subscription_id}, mock.sentinel.undeserializable
     )
@@ -435,14 +442,14 @@ def test_messages_are_deserialized_after_transport(mockstomp):
     callback = mock.Mock()
     stomp.subscribe("channel", callback, disable_mangling=True)
     subscription_id = mockconn.subscribe.call_args[0][1]
-    message_handler({"subscription": subscription_id}, banana_str)
+    message_handler(_frame({"subscription": subscription_id}, banana_str))
     callback.assert_called_once_with({"subscription": subscription_id}, banana_str)
 
     # Test broadcast subscriptions with mangling disabled
     callback = mock.Mock()
     stomp.subscribe_broadcast("channel", callback, disable_mangling=True)
     subscription_id = mockconn.subscribe.call_args[0][1]
-    message_handler({"subscription": subscription_id}, banana_str)
+    message_handler(_frame({"subscription": subscription_id}, banana_str))
     callback.assert_called_once_with({"subscription": subscription_id}, banana_str)
 
 
@@ -508,11 +515,11 @@ def test_subscribe_to_queue(mockstomp):
     }
 
     assert mock_cb1.call_count == 0
-    listener.on_message({"subscription": 1}, mock.sentinel.message1)
+    listener.on_message(_frame({"subscription": 1}, mock.sentinel.message1))
     mock_cb1.assert_called_once_with({"subscription": 1}, mock.sentinel.message1)
 
     assert mock_cb2.call_count == 0
-    listener.on_message({"subscription": 2}, mock.sentinel.message2)
+    listener.on_message(_frame({"subscription": 2}, mock.sentinel.message2))
     mock_cb2.assert_called_once_with({"subscription": 2}, mock.sentinel.message2)
 
     stomp._subscribe(3, str(mock.sentinel.channel3), mock_cb2, acknowledgement=True)
@@ -572,11 +579,11 @@ def test_subscribe_to_broadcast(mockstomp):
     }
 
     assert mock_cb1.call_count == 0
-    listener.on_message({"subscription": 1}, mock.sentinel.message1)
+    listener.on_message(_frame({"subscription": 1}, mock.sentinel.message1))
     mock_cb1.assert_called_once_with({"subscription": 1}, mock.sentinel.message1)
 
     assert mock_cb2.call_count == 0
-    listener.on_message({"subscription": 2}, mock.sentinel.message2)
+    listener.on_message(_frame({"subscription": 2}, mock.sentinel.message2))
     mock_cb2.assert_called_once_with({"subscription": 2}, mock.sentinel.message2)
 
     stomp._unsubscribe(1)
