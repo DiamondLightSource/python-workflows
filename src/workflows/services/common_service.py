@@ -156,6 +156,10 @@ class CommonService:
             self.__pipe_frontend.send(data_structure)
 
     @property
+    def config(self):
+        return self._environment.get("config")
+
+    @property
     def transport(self):
         return self._transport
 
