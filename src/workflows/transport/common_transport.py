@@ -316,6 +316,12 @@ class CommonTransport:
         self.__transactions.remove(transaction_id)
         self._transaction_commit(transaction_id, **kwargs)
 
+    @property
+    def is_reconnectable(self):
+        """Check if the transport object is in a status where reconnecting is
+        supported. There must not be any active subscriptions or transactions."""
+        return not self.__subscriptions and not self.__transactions
+
     #
     # -- Low level communication calls to be implemented by subclass -----------
     #
