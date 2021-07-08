@@ -1,4 +1,9 @@
+import logging
+import time
+
 import workflows.recipe
+
+logger = logging.getLogger("workflows.recipe.wrapper")
 
 
 class RecipeWrapper:
@@ -205,16 +210,53 @@ class RecipeWrapper:
         ):
             dest_kwargs["delay"] = self.recipe[destination]["transport-delay"]
         if self.recipe[destination].get("queue"):
-            self.transport.send(
+            self._retry_transport(
+                self.transport.send,
                 self.recipe[destination]["queue"],
                 self._generate_full_recipe_message(destination, payload, add_path_step),
                 headers=header,
                 **dest_kwargs
             )
         if self.recipe[destination].get("topic"):
-            self.transport.broadcast(
+            self._retry_transport(
+                self.transport.broadcast,
                 self.recipe[destination]["topic"],
                 self._generate_full_recipe_message(destination, payload, add_path_step),
                 headers=header,
                 **dest_kwargs
             )
+
+    def _retry_transport(self, function, *args, **kwargs):
+        """Attempt to send a message, and in case the connection has been lost,
+        attempt to reconnect. Reconnecting only works on the assumption that
+        the previous connection did not include any subscriptions, which should
+        be true for wrappers."""
+        attempt = 0
+        limit = 10
+        initial_failure = None
+        while True:
+            try:
+                if initial_failure:
+                    logger.info("Reconnection attempt %d of %d", attempt, limit)
+                    self.transport.connect()
+                return function(*args, **kwargs)
+            except workflows.Disconnected as e:
+                if not self.transport.is_reconnectable:
+                    raise
+                attempt = attempt + 1
+                if not initial_failure:
+                    initial_failure = e
+                if attempt > limit:
+                    logger.error("Transport connection failure", exc_info=True)
+                    raise initial_failure from None
+                delay = attempt * attempt * 3
+                # wait 3, 12, 27, 48, 75, 108, 147, 192, 243, 300 seconds
+                # between attempts
+                delay = 1
+                logger.warning(
+                    "Connection failure detected during send attempt."
+                    " Retrying in %d seconds",
+                    delay,
+                    exc_info=True,
+                )
+                time.sleep(delay)
