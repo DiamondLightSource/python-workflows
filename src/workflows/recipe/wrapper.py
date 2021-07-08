@@ -252,7 +252,6 @@ class RecipeWrapper:
                 delay = attempt * attempt * 3
                 # wait 3, 12, 27, 48, 75, 108, 147, 192, 243, 300 seconds
                 # between attempts
-                delay = 1
                 logger.warning(
                     "Connection failure detected during send attempt."
                     " Retrying in %d seconds",
