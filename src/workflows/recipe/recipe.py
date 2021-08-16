@@ -342,7 +342,7 @@ class Recipe:
                 if isinstance(new_recipe["error"], (list, tuple)):
                     new_recipe["error"] = list(new_recipe["error"])
                 else:
-                    new_recipe["error"] = list([new_recipe["error"]])
+                    new_recipe["error"] = [new_recipe["error"]]
                 if isinstance(other.recipe["error"], (list, tuple)):
                     new_recipe["error"].extend(translate(other.recipe["error"]))
                 else:

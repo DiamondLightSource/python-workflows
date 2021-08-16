@@ -22,7 +22,7 @@ def test_lookup_and_initialize_pika_transport_layer():
 
 
 def test_add_command_line_help_optparse():
-    """ Check that command line parameters are registered in the parser."""
+    """Check that command line parameters are registered in the parser."""
     parser = mock.MagicMock()
 
     PikaTransport().add_command_line_options(parser)
