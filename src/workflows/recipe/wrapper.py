@@ -232,7 +232,7 @@ class RecipeWrapper:
         the previous connection did not include any subscriptions, which should
         be true for wrappers."""
         attempt = 0
-        limit = 10
+        limit = 12
         initial_failure = None
         while True:
             try:
@@ -250,8 +250,8 @@ class RecipeWrapper:
                     logger.error("Transport connection failure", exc_info=True)
                     raise initial_failure from None
                 delay = attempt * attempt * 3
-                # wait 3, 12, 27, 48, 75, 108, 147, 192, 243, 300 seconds
-                # between attempts
+                # wait 3, 12, 27, 48, 75, 108, 147, 192, 243, 300, 363, 432 seconds
+                # between attempts for a total maximum of 32.5 minutes
                 logger.warning(
                     "Connection failure detected during send attempt."
                     " Retrying in %d seconds",
