@@ -284,6 +284,7 @@ class PikaTransport(CommonTransport):
                     continue
                 try:
                     self._channel = self._conn.channel()
+                    self._channel.confirm_delivery()
                 except pika.exceptions.AMQPChannelError:
                     self.disconnect()
                     logger.debug(
@@ -450,7 +451,6 @@ class PikaTransport(CommonTransport):
 
         properties = pika.BasicProperties(headers=headers, delivery_mode=2)
         self._reconnect()  # Ensure we are connected
-        self._channel.confirm_delivery()
         try:
             self._channel.basic_publish(
                 exchange="",
@@ -462,7 +462,6 @@ class PikaTransport(CommonTransport):
         except (pika.exceptions.AMQPChannelError, pika.exceptions.AMQPConnectionError):
             self.disconnect()
             self._reconnect()
-            self._channel.confirm_delivery()
             try:
                 self._channel.basic_publish(
                     exchange="",
