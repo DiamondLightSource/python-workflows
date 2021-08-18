@@ -79,7 +79,7 @@ class ServiceStarter:
             "--transport",
             dest="transport",
             metavar="TRN",
-            default="StompTransport",
+            default=workflows.transport.default_transport,
             help="Transport mechanism. Known mechanisms: "
             + ", ".join(workflows.transport.get_known_transports())
             + " (default: %default)",
