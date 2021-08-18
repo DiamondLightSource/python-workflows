@@ -351,9 +351,13 @@ class PikaTransport(CommonTransport):
         def _redirect_callback(ch, method, properties, body):
             callback(
                 {
+                    "consumer_tag": method.consumer_tag,
+                    "delivery_mode": properties.delivery_mode,
+                    "exchange": method.exchange,
+                    "headers": properties.headers,
                     "message-id": method.delivery_tag,
-                    "pika-method": method,
-                    "pika-properties": properties,
+                    "redelivered": method.redelivered,
+                    "routing_key": method.routing_key,
                 },
                 body,
             )

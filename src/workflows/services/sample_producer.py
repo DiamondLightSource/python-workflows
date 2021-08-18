@@ -30,6 +30,6 @@ class SampleProducer(CommonService):
         self.log.info("Sending message #%d", self.counter)
         self._transport.send(
             "transient.destination",
-            "Message #%d\n++++++++Produced@ %f"
+            "Message #%d\n++++++++Produced @%10.3f ms"
             % (self.counter, (time.time() % 1000) * 1000),
         )

@@ -21,23 +21,16 @@ class SampleConsumer(CommonService):
 
     def consume_message(self, header, message):
         """Consume a message"""
-        logmessage = {
-            "time": (time.time() % 1000) * 1000,
-            "header": "",
-            "message": message,
-        }
-        if header:
-            logmessage["header"] = (
-                json.dumps(header, indent=2) + "\n" + "----------------" + "\n"
-            )
-        if isinstance(message, dict):
-            logmessage["message"] = (
-                json.dumps(message, indent=2) + "\n" + "----------------" + "\n"
-            )
+        t = (time.time() % 1000) * 1000
 
-        self.log.info("=== Consume ====\n{header}{message}".format(**logmessage))
-        self.log.info("Received message @{time}".format(**logmessage))
-        self.log.debug(
-            "Received message @{time}\n{header}{message}".format(**logmessage)
+        if header:
+            header = json.dumps(header, indent=2) + "\n" + "----------------" + "\n"
+        else:
+            header = ""
+        if isinstance(message, dict):
+            message = json.dumps(message, indent=2) + "\n" + "----------------" + "\n"
+
+        self.log.info(
+            f"=== Consume ====\n{header}{message}\nReceived message @{t:10.3f} ms"
         )
         time.sleep(0.1)
