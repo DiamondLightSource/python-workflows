@@ -2,6 +2,7 @@ import configparser
 import json
 import threading
 import time
+from typing import Any, Dict
 
 import stomp
 
@@ -22,7 +23,7 @@ class StompTransport(CommonTransport):
         "--stomp-prfx": "",
     }
     # Effective configuration
-    config = {}
+    config: Dict[Any, Any] = {}
 
     def __init__(self):
         self._connected = False

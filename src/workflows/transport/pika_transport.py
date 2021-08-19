@@ -5,6 +5,7 @@ import logging
 import random
 import threading
 import time
+from typing import Any, Dict
 
 import pika
 
@@ -28,7 +29,7 @@ class PikaTransport(CommonTransport):
     }
 
     # Effective configuration
-    config = {}
+    config: Dict[Any, Any] = {}
 
     def __init__(self):
         self._channel = None

@@ -1,6 +1,7 @@
 import curses
 import threading
 import time
+from typing import Any, Dict
 
 import workflows.transport
 from workflows.services.common_service import CommonService
@@ -16,7 +17,7 @@ class Monitor:  # pragma: no cover
     shutdown = False
     """Set to true to end the main loop and shut down the service monitor."""
 
-    cards = {}
+    cards: Dict[Any, Any] = {}
     """Register card shown for seen services"""
 
     border_chars = ()
