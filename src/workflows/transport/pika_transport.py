@@ -5,7 +5,7 @@ import logging
 import random
 import threading
 import time
-from typing import Any, Dict
+from typing import Any, Dict, Iterable
 
 import pika
 
@@ -16,8 +16,13 @@ logger = logging.getLogger("workflows.transport.pika_transport")
 
 
 class PikaTransport(CommonTransport):
-    """Abstraction layer for messaging infrastructure.
-    Here we are using RabbitMQ via pika."""
+    """Abstraction layer for messaging infrastructure for RabbitMQ via pika.
+
+    Pika methods with both the BlockingConnection and SelectConnection adapters
+    take control over the thread, and temporarily release it via callbacks.
+    So to make pika work with the workflows model we need a thread that only
+    runs pika.
+    """
 
     # Set some sensible defaults
     defaults = {
@@ -35,9 +40,10 @@ class PikaTransport(CommonTransport):
         self._channel = None
         self._conn = None
         self._connected = False
-        self._lock = threading.RLock()
-        self._vhost = "/"
+        self._lock = threading.Lock()
+        self._pika_thread = None
         self._reconnection_allowed = True
+        self._vhost = "/"
 
     def get_namespace(self) -> str:
         """Return the RabbitMQ virtual host"""
@@ -207,12 +213,13 @@ class PikaTransport(CommonTransport):
             callback=set_parameter,
         )
 
-    def _generate_connection_parameters(self):
+    def _generate_connection_parameters(self) -> List[pika.ConnectionParameters]:
         if hasattr(self, "_connection_parameters"):
             return
         username = self.config.get("--rabbit-user", self.defaults.get("--rabbit-user"))
         password = self.config.get("--rabbit-pass", self.defaults.get("--rabbit-pass"))
         credentials = pika.PlainCredentials(username, password)
+
         host = self.config.get("--rabbit-host", self.defaults.get("--rabbit-host"))
         port = str(self.config.get("--rabbit-port", self.defaults.get("--rabbit-port")))
         vhost = self.config.get("--rabbit-vhost", self.defaults.get("--rabbit-vhost"))
@@ -224,32 +231,30 @@ class PikaTransport(CommonTransport):
             port = [int(p) for p in port.split(",")]
         else:
             port = [int(port)]
-        if len(port) > len(host):
+        if len(port) == 1:
+            port = port * len(host)
+        elif len(port) > len(host):
             raise workflows.Disconnected(
                 "Invalid hostname/port specifications: cannot specify more ports than hosts"
             )
-        if len(host) != len(port) and len(port) != 1:
-            raise workflows.Disconnected(
+        elif len(port) < len(host):
+              raise workflows.Disconnected(
                 "Invalid hostname/port specifications: must either specify a single port, or one port per host"
             )
-        if len(host) > len(port):
-            port = port * len(host)
         connection_parameters = [
             pika.ConnectionParameters(
                 host=h,
                 port=p,
                 virtual_host=vhost,
                 credentials=credentials,
-                retry_delay=5,
-                connection_attempts=3,
             )
             for h, p in zip(host, port)
         ]
 
-        # Randomize connection order once to spread out equally across all servers
+        # Randomize connection order once to spread connection attempts equally across all servers
         random.shuffle(connection_parameters)
-        self._reconnection_attempts = max(3, len(connection_parameters))
-        self._connection_parameters = itertools.cycle(connection_parameters)
+        # self._reconnection_attempts = max(3, len(connection_parameters))
+        # self._connection_parameters = itertools.cycle(connection_parameters)
 
     def connect(self):
         """Ensure both connection and channel to the RabbitMQ server are open."""
@@ -268,20 +273,20 @@ class PikaTransport(CommonTransport):
             self._generate_connection_parameters()
             failed_attempts = []
             for connection_attempt in range(self._reconnection_attempts):
-                connection = next(self._connection_parameters)
+                parameters = next(self._connection_parameters)
                 logger.debug(
                     "Attempting connection %s (%d failed previous attempts)",
-                    connection,
+                    parameters,
                     connection_attempt,
                 )
                 try:
-                    self._conn = pika.BlockingConnection(connection)
+                    self._conn = pika.BlockingConnection(parameters)
                 except pika.exceptions.AMQPConnectionError:
                     logger.debug(
                         "Could not initiate connection to RabbitMQ server at %s",
-                        connection,
+                        parameters,
                     )
-                    failed_attempts.append(("Connection Error", connection))
+                    failed_attempts.append(("Connection Error", parameters))
                     continue
                 try:
                     self._channel = self._conn.channel()
@@ -290,9 +295,9 @@ class PikaTransport(CommonTransport):
                     self.disconnect()
                     logger.debug(
                         "Channel error while connecting to RabbitMQ server at %s",
-                        connection,
+                        parameters,
                     )
-                    failed_attempts.append(("Channel Error", connection))
+                    failed_attempts.append(("Channel Error", parameters))
                     continue
                 self._connected = True
                 break
@@ -585,3 +590,8 @@ class PikaTransport(CommonTransport):
             return json.loads(message)
         except (TypeError, ValueError):
             return message
+
+
+class _PikaThread(threading.Thread):
+    def __init__(self, connection_parameters: Iterable[pika.ConnectionParameters]):
+        super().__init__(name="workflows pika_transport", daemon=False)
