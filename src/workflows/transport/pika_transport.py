@@ -1,5 +1,6 @@
 import collections
 import configparser
+import functools
 import json
 import logging
 import random
@@ -273,6 +274,7 @@ class PikaTransport(CommonTransport):
         return self._pika_thread and self._pika_thread.connected
 
     def _reconnect(self):
+        return
         """An internal function that ensures a connection is up and running,
         but it will not force a reconnection when the connection state could not
         be restored. This will be the case if any subscription has been set up."""
@@ -458,32 +460,13 @@ class PikaTransport(CommonTransport):
             headers["x-message-ttl"] = int((time.time() + expiration) * 1000)
 
         properties = pika.BasicProperties(headers=headers, delivery_mode=2)
-        self._reconnect()  # Ensure we are connected
-        try:
-            self._channel.basic_publish(
-                exchange="",
-                routing_key=destination,
-                body=message,
-                properties=properties,
-                mandatory=True,
-            )
-        except (pika.exceptions.AMQPChannelError, pika.exceptions.AMQPConnectionError):
-            self.disconnect()
-            self._reconnect()
-            try:
-                self._channel.basic_publish(
-                    exchange="",
-                    routing_key=destination,
-                    body=message,
-                    properties=properties,
-                    mandatory=True,
-                )
-            except (
-                pika.exceptions.AMQPChannelError,
-                pika.exceptions.AMQPConnectionError,
-            ):
-                self.disconnect()
-                raise workflows.Disconnected("Connection to RabbitMQ server lost")
+        self._pika_thread.send(
+            exchange="",
+            routing_key=destination,
+            body=message,
+            properties=properties,
+            mandatory=True,
+        )
 
     def _broadcast(
         self, destination, message, headers=None, delay=None, expiration=None, **kwargs
@@ -662,19 +645,60 @@ class _PikaThread(threading.Thread):
             logger.info(
                 f"Connecting to {self._parameters[0].host}:{self._parameters[0].port} (attempt {self._connection_attempt})"
             )
-        #           self._connect()
+            self._connect(self._parameters[0])
         #        time.sleep(2)
         #        self._event_connected()
         #        time.sleep(2)
         self.stop()
 
-    def _connect(self):
+    def _connect(self, parameters: pika.ConnectionParameters):
         self._state = _PikaThreadStatus.CONNECTING
-        self._parameters.rotate()
-        print(self._parameters[0])
         self._pika_connection = pika.SelectConnection(
-            self._parameters[0],
-            #            on_open_callback=self.on_connection_open,
-            #            on_open_error_callback=self.on_connection_open_error,
-            #            on_close_callback=self.on_connection_closed)
+            parameters,
+            on_open_callback=self.on_open_connection_callback,
+            on_open_error_callback=self.on_open_error_callback,
+            on_close_callback=self.on_close_callback,
         )
+        # here we block.
+        self._pika_connection.ioloop.start()
+
+    def on_open_connection_callback(self, connection):
+        logger.info(f"open callback {connection}")
+        connection.channel(on_open_callback=self.on_open_channel_callback)
+
+    def on_open_channel_callback(self, channel):
+        self._pika_channel = channel
+        logger.info(f"open callback {channel}")
+        channel.add_on_close_callback(self.on_closed_channel_callback)
+        # Connection established.
+        self._event_connected()
+
+    def on_closed_channel_callback(self, channel):
+        logger.info(f"closed callback {channel}")
+
+    def on_open_error_callback(self, *args, **kwargs):
+        logger.info(f"open error callback {args}  {kwargs}")
+
+    def on_close_callback(self, *args, **kwargs):
+        logger.info(f"close callback {args}  {kwargs}")
+
+    def send(
+        self,
+        exchange: str,
+        routing_key: str,
+        body: Any,
+        properties: Any,
+        mandatory: bool = True,
+    ):
+        if not self.connected:
+            raise workflows.Disconnected("Connection not ready for sending")
+        # Opportunity for race condition below. Does this matter?
+        send_call = functools.partial(
+            self._pika_channel.basic_publish,
+            exchange=exchange,
+            routing_key=routing_key,
+            body=body,
+            properties=properties,
+            mandatory=mandatory,
+        )
+        self._pika_connection.ioloop.add_callback_threadsafe(send_call)
