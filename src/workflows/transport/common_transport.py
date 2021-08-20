@@ -21,7 +21,7 @@ class CommonTransport:
     # -- High level communication calls ----------------------------------------
     #
 
-    def connect(self):
+    def connect(self) -> bool:
         """Connect the transport class. This function must be overridden.
         :return: True-like value when connection successful,
                  False-like value otherwise."""

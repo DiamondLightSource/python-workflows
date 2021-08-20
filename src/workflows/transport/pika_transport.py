@@ -1,11 +1,12 @@
+import collections
 import configparser
-import itertools
 import json
 import logging
 import random
 import threading
 import time
-from typing import Any, Dict, Iterable
+from enum import Enum
+from typing import Any, Dict, Iterable, List
 
 import pika
 
@@ -214,23 +215,25 @@ class PikaTransport(CommonTransport):
         )
 
     def _generate_connection_parameters(self) -> List[pika.ConnectionParameters]:
-        if hasattr(self, "_connection_parameters"):
-            return
         username = self.config.get("--rabbit-user", self.defaults.get("--rabbit-user"))
         password = self.config.get("--rabbit-pass", self.defaults.get("--rabbit-pass"))
         credentials = pika.PlainCredentials(username, password)
 
-        host = self.config.get("--rabbit-host", self.defaults.get("--rabbit-host"))
-        port = str(self.config.get("--rabbit-port", self.defaults.get("--rabbit-port")))
+        host_string = self.config.get(
+            "--rabbit-host", self.defaults.get("--rabbit-host")
+        )
+        port_string = str(
+            self.config.get("--rabbit-port", self.defaults.get("--rabbit-port"))
+        )
         vhost = self.config.get("--rabbit-vhost", self.defaults.get("--rabbit-vhost"))
-        if "," in host:
-            host = host.split(",")
+        if "," in host_string:
+            host = host_string.split(",")
         else:
-            host = [host]
-        if "," in port:
-            port = [int(p) for p in port.split(",")]
+            host = [host_string]
+        if "," in port_string:
+            port = [int(p) for p in port_string.split(",")]
         else:
-            port = [int(port)]
+            port = [int(port_string)]
         if len(port) == 1:
             port = port * len(host)
         elif len(port) > len(host):
@@ -238,7 +241,7 @@ class PikaTransport(CommonTransport):
                 "Invalid hostname/port specifications: cannot specify more ports than hosts"
             )
         elif len(port) < len(host):
-              raise workflows.Disconnected(
+            raise workflows.Disconnected(
                 "Invalid hostname/port specifications: must either specify a single port, or one port per host"
             )
         connection_parameters = [
@@ -253,13 +256,21 @@ class PikaTransport(CommonTransport):
 
         # Randomize connection order once to spread connection attempts equally across all servers
         random.shuffle(connection_parameters)
-        # self._reconnection_attempts = max(3, len(connection_parameters))
-        # self._connection_parameters = itertools.cycle(connection_parameters)
+        return connection_parameters
 
-    def connect(self):
+    def connect(self) -> bool:
         """Ensure both connection and channel to the RabbitMQ server are open."""
-        self._reconnection_allowed = True
-        return self._reconnect()
+        with self._lock:
+            if not self._pika_thread:
+                self._pika_thread = _PikaThread(self._generate_connection_parameters())
+                self._pika_thread.start()
+            self._pika_thread.wait_for_connection()
+        self._reconnection_allowed = True  # deprecated
+        return self._pika_thread.connected
+
+    def is_connected(self) -> bool:
+        """Return connection status."""
+        return self._pika_thread and self._pika_thread.connected
 
     def _reconnect(self):
         """An internal function that ensures a connection is up and running,
@@ -309,30 +320,17 @@ class PikaTransport(CommonTransport):
                 )
         return True
 
-    def is_connected(self) -> bool:
-        """Return connection status."""
-        if (
-            self._connected
-            and self._conn
-            and self._conn.is_open
-            and self._channel
-            and self._channel.is_open
-        ):
-            return True
-        self.disconnect()
-        return False
-
     def disconnect(self):
         """Gracefully close connection to pika server"""
-        if self._connected:
-            self._connected = False
-        if self._channel and self._channel.is_open:
-            self._channel.close()
-        if self._conn and self._conn.is_open:
-            self._conn.close()
+        with self._lock:
+            if not self._pika_thread:
+                return
+            self._pika_thread.stop()
+            self._pika_thread.wait_for_disconnection()
 
     def broadcast_status(self, status):
         """Broadcast transient status information to all listeners"""
+        return  # XXX
         self._broadcast(
             "transient.status",
             json.dumps(status),
@@ -592,6 +590,91 @@ class PikaTransport(CommonTransport):
             return message
 
 
+class _PikaThreadStatus(Enum):
+    DISCONNECTED = 0
+    CONNECTING = 1
+    CONNECTED = 2
+    STOPPING = 3
+    STOPPED = 4
+
+
 class _PikaThread(threading.Thread):
+    """Internal helper thread that communicates with the pika package."""
+
     def __init__(self, connection_parameters: Iterable[pika.ConnectionParameters]):
-        super().__init__(name="workflows pika_transport", daemon=False)
+        super().__init__(
+            name="workflows pika_transport", daemon=False, target=self._run
+        )
+
+        self._events: Dict[str, threading.Event] = {"connected": threading.Event()}
+        self._parameters = collections.deque(connection_parameters)
+        self._state: _PikaThreadStatus = _PikaThreadStatus.DISCONNECTED
+
+        self._connection_attempt = 0
+        self._pika_channel: Any
+        self._pika_connection: pika.SelectConnection
+
+    def stop(self):
+        self._state = _PikaThreadStatus.STOPPING
+        time.sleep(1)  # shutting down
+        self._event_finalized()
+
+    @property
+    def connected(self) -> bool:
+        return self._state == _PikaThreadStatus.CONNECTED
+
+    def wait_for_connection(self):
+        self._events["connected"].wait()
+        if not self.connected:
+            raise workflows.Disconnected("No connection to RabbitMQ server")
+
+    def _event_connected(self):
+        self._state = _PikaThreadStatus.CONNECTED
+        self._events["connected"].set()
+
+    def _event_finalized(self):
+        """Fires all events to release all waiters as the object is now dead."""
+        self._state = _PikaThreadStatus.STOPPED
+        for event in self._events.values():
+            event.set()
+
+    def _run(self):
+        """This function will be called from the python threading library and
+        runs in a separate, named thread."""
+
+        logger.info("Hi from thread!")
+        self._state = _PikaThreadStatus.CONNECTING
+        while self._state not in (
+            _PikaThreadStatus.STOPPING,
+            _PikaThreadStatus.STOPPED,
+        ):
+            self._parameters.rotate()
+            if self._connection_attempt > max(3, len(self._parameters)):
+                logger.error("Reached maximum connection attempts. Giving up.")
+                break
+            if self._connection_attempt > 0:
+                wait_time = 0.5 * self._connection_attempt * self._connection_attempt
+                logger.info(
+                    f"Waiting {wait_time} seconds before next connection attempt..."
+                )
+                time.sleep(wait_time)
+            self._connection_attempt += 1
+            logger.info(
+                f"Connecting to {self._parameters[0].host}:{self._parameters[0].port} (attempt {self._connection_attempt})"
+            )
+        #           self._connect()
+        #        time.sleep(2)
+        #        self._event_connected()
+        #        time.sleep(2)
+        self.stop()
+
+    def _connect(self):
+        self._state = _PikaThreadStatus.CONNECTING
+        self._parameters.rotate()
+        print(self._parameters[0])
+        self._pika_connection = pika.SelectConnection(
+            self._parameters[0],
+            #            on_open_callback=self.on_connection_open,
+            #            on_open_error_callback=self.on_connection_open_error,
+            #            on_close_callback=self.on_connection_closed)
+        )
