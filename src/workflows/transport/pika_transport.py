@@ -607,7 +607,7 @@ class _PikaThread(threading.Thread):
         self._events["disconnected"].set()
 
         self._connection_attempt = 0
-        self._pika_channel: Optional[Any] = None
+        self._pika_channel: Optional[pika.channel.Channel] = None
         self._pika_connection: Optional[pika.SelectConnection] = None
         self._reconnection_allowed: bool = True
 
