@@ -589,16 +589,29 @@ class _PikaThread(threading.Thread):
             name="workflows pika_transport", daemon=False, target=self._run
         )
 
-        self._events: Dict[str, threading.Event] = {"connected": threading.Event()}
+        self._events: Dict[str, threading.Event] = {
+            "connected": threading.Event(),
+            "disconnected": threading.Event(),
+        }
         self._parameters = collections.deque(connection_parameters)
         self._state: _PikaThreadStatus = _PikaThreadStatus.DISCONNECTED
+        self._events["disconnected"].set()
 
         self._connection_attempt = 0
         self._pika_channel: Any
         self._pika_connection: pika.SelectConnection
 
     def stop(self):
+        print("stop call")
         self._state = _PikaThreadStatus.STOPPING
+        if self._pika_connection:
+            if self._pika_channel:
+                self._pika_connection.ioloop.add_callback_threadsafe(
+                    self._pika_channel.close
+                )
+            self._pika_connection.ioloop.add_callback_threadsafe(
+                self._pika_connection.close
+            )
         time.sleep(1)  # shutting down
         self._event_finalized()
 
@@ -611,9 +624,19 @@ class _PikaThread(threading.Thread):
         if not self.connected:
             raise workflows.Disconnected("No connection to RabbitMQ server")
 
+    def wait_for_disconnection(self):
+        self._events["disconnected"].wait()
+
     def _event_connected(self):
+        if self._state in (_PikaThreadStatus.STOPPING, _PikaThreadStatus.STOPPED):
+            ...  # XXX
         self._state = _PikaThreadStatus.CONNECTED
         self._events["connected"].set()
+
+    def _event_disconnected(self):
+        if self._state not in (_PikaThreadStatus.STOPPING, _PikaThreadStatus.STOPPED):
+            self._state = _PikaThreadStatus.DISCONNECTED
+        self._events["disconnected"].set()
 
     def _event_finalized(self):
         """Fires all events to release all waiters as the object is now dead."""
@@ -649,10 +672,14 @@ class _PikaThread(threading.Thread):
         #        time.sleep(2)
         #        self._event_connected()
         #        time.sleep(2)
+        print("Pikathread left main loop")
         self.stop()
+        print("Pikathread ends")
 
     def _connect(self, parameters: pika.ConnectionParameters):
         self._state = _PikaThreadStatus.CONNECTING
+        self._events["connected"].clear()
+        self._events["disconnected"].clear()
         self._pika_connection = pika.SelectConnection(
             parameters,
             on_open_callback=self.on_open_connection_callback,
@@ -660,7 +687,9 @@ class _PikaThread(threading.Thread):
             on_close_callback=self.on_close_callback,
         )
         # here we block.
+        print("PT going into block")
         self._pika_connection.ioloop.start()
+        print("PT returned from block")
 
     def on_open_connection_callback(self, connection):
         logger.info(f"open callback {connection}")
@@ -678,9 +707,11 @@ class _PikaThread(threading.Thread):
 
     def on_open_error_callback(self, *args, **kwargs):
         logger.info(f"open error callback {args}  {kwargs}")
+        self._event_disconnected()
 
     def on_close_callback(self, *args, **kwargs):
         logger.info(f"close callback {args}  {kwargs}")
+        self._event_disconnected()
 
     def send(
         self,
