@@ -7,7 +7,7 @@ import random
 import threading
 import time
 from enum import Enum
-from typing import Any, Dict, Iterable, List
+from typing import Any, Dict, Iterable, List, Optional
 
 import pika
 
@@ -329,6 +329,7 @@ class PikaTransport(CommonTransport):
                 return
             self._pika_thread.stop()
             self._pika_thread.wait_for_disconnection()
+            self._pika_thread.join()
 
     def broadcast_status(self, status):
         """Broadcast transient status information to all listeners"""
@@ -574,11 +575,19 @@ class PikaTransport(CommonTransport):
 
 
 class _PikaThreadStatus(Enum):
-    DISCONNECTED = 0
+    NEW = 0
     CONNECTING = 1
     CONNECTED = 2
     STOPPING = 3
     STOPPED = 4
+
+    @property
+    def is_new(self):
+        return self is self.NEW
+
+    @property
+    def is_end_of_life(self):
+        return self in {self.STOPPING, self.STOPPED}
 
 
 class _PikaThread(threading.Thread):
@@ -594,15 +603,24 @@ class _PikaThread(threading.Thread):
             "disconnected": threading.Event(),
         }
         self._parameters = collections.deque(connection_parameters)
-        self._state: _PikaThreadStatus = _PikaThreadStatus.DISCONNECTED
+        self._state: _PikaThreadStatus = _PikaThreadStatus.NEW
         self._events["disconnected"].set()
 
         self._connection_attempt = 0
-        self._pika_channel: Any
-        self._pika_connection: pika.SelectConnection
+        self._pika_channel: Optional[Any] = None
+        self._pika_connection: Optional[pika.SelectConnection] = None
+        self._reconnection_allowed: bool = True
 
     def stop(self):
-        print("stop call")
+        """Close all connections and wait for object cleanup."""
+        self._stop()
+        self.wait_for_disconnection(timeout=3)
+        self._finalize()
+
+    def _stop(self):
+        """Close all connections without waiting."""
+        if self._state.is_end_of_life:
+            return
         self._state = _PikaThreadStatus.STOPPING
         if self._pika_connection:
             if self._pika_channel:
@@ -612,48 +630,57 @@ class _PikaThread(threading.Thread):
             self._pika_connection.ioloop.add_callback_threadsafe(
                 self._pika_connection.close
             )
-        time.sleep(1)  # shutting down
-        self._event_finalized()
 
     @property
     def connected(self) -> bool:
-        return self._state == _PikaThreadStatus.CONNECTED
+        return self._state is _PikaThreadStatus.CONNECTED
 
     def wait_for_connection(self):
         self._events["connected"].wait()
-        if not self.connected:
-            raise workflows.Disconnected("No connection to RabbitMQ server")
 
-    def wait_for_disconnection(self):
-        self._events["disconnected"].wait()
+    def wait_for_disconnection(self, **kwargs):
+        self._events["disconnected"].wait(**kwargs)
 
     def _event_connected(self):
-        if self._state in (_PikaThreadStatus.STOPPING, _PikaThreadStatus.STOPPED):
-            ...  # XXX
+        if self._state.is_end_of_life:
+            self._state = _PikaThreadStatus.CONNECTED
+            self._stop()
+            return
         self._state = _PikaThreadStatus.CONNECTED
         self._events["connected"].set()
 
     def _event_disconnected(self):
-        if self._state not in (_PikaThreadStatus.STOPPING, _PikaThreadStatus.STOPPED):
-            self._state = _PikaThreadStatus.DISCONNECTED
+        self._pika_connection.ioloop.stop()
+        if self._state.is_end_of_life or not self._reconnection_allowed:
+            self._state = _PikaThreadStatus.STOPPED
+        else:
+            self._state = _PikaThreadStatus.CONNECTING
         self._events["disconnected"].set()
 
-    def _event_finalized(self):
-        """Fires all events to release all waiters as the object is now dead."""
+    def _finalize(self):
+        """Fire all events to release all waiters as the object is now dead."""
         self._state = _PikaThreadStatus.STOPPED
+        if self._pika_connection:
+            self._pika_connection.ioloop.stop()
         for event in self._events.values():
             event.set()
+        self._pika_channel = None
+        self._pika_connection = None
+
+    def start(self):
+        """Spawn the pika communication thread
+        after running a quick sanity check on the object."""
+        if not self._state.is_new:
+            raise RuntimeError("pika.thread objects are not reusable")
+        super().start()
 
     def _run(self):
         """This function will be called from the python threading library and
         runs in a separate, named thread."""
 
-        logger.info("Hi from thread!")
+        logger.debug("pika.thread starting")
         self._state = _PikaThreadStatus.CONNECTING
-        while self._state not in (
-            _PikaThreadStatus.STOPPING,
-            _PikaThreadStatus.STOPPED,
-        ):
+        while not self._state.is_end_of_life:
             self._parameters.rotate()
             if self._connection_attempt > max(3, len(self._parameters)):
                 logger.error("Reached maximum connection attempts. Giving up.")
@@ -669,12 +696,12 @@ class _PikaThread(threading.Thread):
                 f"Connecting to {self._parameters[0].host}:{self._parameters[0].port} (attempt {self._connection_attempt})"
             )
             self._connect(self._parameters[0])
-        #        time.sleep(2)
-        #        self._event_connected()
-        #        time.sleep(2)
-        print("Pikathread left main loop")
-        self.stop()
-        print("Pikathread ends")
+        logger.debug("pika.thread cleaning up")
+        self._stop()
+        if self._pika_connection is not None and not self._pika_connection.is_closed:
+            self._pika_connection.ioloop.start()
+        self._finalize()
+        logger.debug("pika.thread terminating")
 
     def _connect(self, parameters: pika.ConnectionParameters):
         self._state = _PikaThreadStatus.CONNECTING
@@ -686,10 +713,9 @@ class _PikaThread(threading.Thread):
             on_open_error_callback=self.on_open_error_callback,
             on_close_callback=self.on_close_callback,
         )
-        # here we block.
-        print("PT going into block")
-        self._pika_connection.ioloop.start()
-        print("PT returned from block")
+        logger.info("pika.thread entering IO loop")
+        self._pika_connection.ioloop.start()  # pika thread blocks here for the duration of the connection
+        logger.info("pika.thread leaving IO loop")
 
     def on_open_connection_callback(self, connection):
         logger.info(f"open callback {connection}")
@@ -702,15 +728,15 @@ class _PikaThread(threading.Thread):
         # Connection established.
         self._event_connected()
 
-    def on_closed_channel_callback(self, channel):
-        logger.info(f"closed callback {channel}")
+    def on_closed_channel_callback(self, channel, reason):
+        logger.info(f"Closed channel {channel} with {reason}")
 
     def on_open_error_callback(self, *args, **kwargs):
         logger.info(f"open error callback {args}  {kwargs}")
         self._event_disconnected()
 
-    def on_close_callback(self, *args, **kwargs):
-        logger.info(f"close callback {args}  {kwargs}")
+    def on_close_callback(self, connection, reason):
+        logger.info(f"Closed connection {connection} with {reason}")
         self._event_disconnected()
 
     def send(
@@ -721,7 +747,7 @@ class _PikaThread(threading.Thread):
         properties: Any,
         mandatory: bool = True,
     ):
-        if not self.connected:
+        if not self.connected or not self._pika_channel or not self._pika_connection:
             raise workflows.Disconnected("Connection not ready for sending")
         # Opportunity for race condition below. Does this matter?
         send_call = functools.partial(
