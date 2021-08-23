@@ -107,7 +107,7 @@ class Frontend:
             self._transport_factory, "__call__"
         ), "No valid transport factory given"
         self._transport = self._transport_factory()
-        #        assert self._transport.connect(), "Could not connect to transport layer"
+        assert self._transport.connect(), "Could not connect to transport layer"
 
         #        if transport_command_channel:
         #            self._transport.subscribe_broadcast(
@@ -240,9 +240,9 @@ class Frontend:
                         self.switch_service()
 
                 # Check that the transport is alive
-        #            if not self._transport.is_connected():
-        #               self._terminate_service()
-        #              raise workflows.Error("Lost transport layer connection")
+                if not self._transport.is_connected():
+                    self._terminate_service()
+                    raise workflows.Error("Lost transport layer connection")
         finally:
             self.log.debug("Left main loop")
             self.update_status(status_code=CommonService.SERVICE_STATUS_TEARDOWN)
