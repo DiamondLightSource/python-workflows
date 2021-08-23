@@ -22,7 +22,7 @@ class SampleProducer(CommonService):
         subscriptions with the messaging layer, and register callbacks.
         This function can be overridden by specific service implementations."""
         self.log.info("Starting message producer")
-        self._register_idle(1, self.create_message)
+        self._register_idle(3, self.create_message)
 
     def create_message(self):
         """Create and send a unique message for this service."""
@@ -33,5 +33,3 @@ class SampleProducer(CommonService):
             "Message #%d\n++++++++Produced @%10.3f ms"
             % (self.counter, (time.time() % 1000) * 1000),
         )
-        if self.counter > 2:
-            self._shutdown()
