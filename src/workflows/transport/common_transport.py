@@ -324,7 +324,7 @@ class CommonTransport:
     # -- Low level communication calls to be implemented by subclass -----------
     #
 
-    def _subscribe(self, sub_id, channel, callback, **kwargs):
+    def _subscribe(self, sub_id: int, channel, callback, **kwargs):
         """Listen to a queue, notify via callback function.
         :param sub_id: ID for this subscription in the transport layer
         :param channel: Queue name to subscribe to
