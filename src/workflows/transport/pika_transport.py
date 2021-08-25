@@ -680,6 +680,7 @@ class _PikaThread(threading.Thread):
         self._state = _PikaThreadStatus.STOPPED
         if hasattr(self, "_pika_connection"):
             self._pika_connection.ioloop.stop()
+        if hasattr(self, "_pika_connection"):
             del self._pika_connection
         self._pika_channel.clear()
         for event in self._events.values():
@@ -717,7 +718,10 @@ class _PikaThread(threading.Thread):
             self._connect(self._parameters[0])
         logger.debug("pika.thread cleaning up")
         self._stop()
-        if self._pika_connection is not None and not self._pika_connection.is_closed:
+        if (
+            getattr(self, "_pika_connection", None)
+            and not self._pika_connection.is_closed
+        ):
             self._pika_connection.ioloop.start()
         self._finalize()
         logger.debug("pika.thread terminating")
