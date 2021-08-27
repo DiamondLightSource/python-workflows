@@ -165,83 +165,91 @@ class Frontend:
             self._status_last_broadcast = time.time()
 
     def run(self):
-        """The main loop of the frontend. Here incoming messages from the service
-        are processed and forwarded to the corresponding callback methods."""
+        """The main loop of the frontend.
+        This is where the frontend process will spend most of its time."""
         self.log.debug("Entered main loop")
-        while not self.shutdown:
-            # If no service is running slow down the main loop
-            if not self._pipe_service:
-                time.sleep(0.3)
-            self.update_status()
-            # While a service is running, check for incoming messages from that service
-            if self._pipe_service and self._pipe_service.poll(1):
-                try:
-                    message = self._pipe_service.recv()
-                    if isinstance(message, dict) and "band" in message:
-                        # only dictionaries with 'band' entry are valid messages
-                        try:
-                            handler = getattr(self, "parse_band_" + message["band"])
-                        except AttributeError:
-                            handler = None
-                            self.log.warning("Unknown band %s", str(message["band"]))
-                        if handler:
-                            handler(message)
-                    else:
-                        self.log.warning("Invalid message received %s", str(message))
-                except EOFError:
-                    # Service has gone away
-                    error_message = False
-                    if self._service_status == CommonService.SERVICE_STATUS_END:
-                        self.log.info("Service terminated")
-                    elif self._service_status == CommonService.SERVICE_STATUS_ERROR:
-                        error_message = "Service terminated with error code"
-                    elif self._service_status in (
-                        CommonService.SERVICE_STATUS_NONE,
-                        CommonService.SERVICE_STATUS_NEW,
-                        CommonService.SERVICE_STATUS_STARTING,
-                    ):
-                        error_message = (
-                            "Service may have died unexpectedly in "
-                            + "initialization (last known status: %s)"
-                            % CommonService.human_readable_state.get(
-                                self._service_status, self._service_status
-                            )
-                        )
-                    else:
-                        error_message = (
-                            "Service may have died unexpectedly"
-                            " (last known status: %s)"
-                            % CommonService.human_readable_state.get(
-                                self._service_status, self._service_status
-                            )
-                        )
-                    if error_message:
-                        self.log.error(error_message)
+        try:
+            while not self.shutdown:
+                # If no service is running slow down the main loop
+                if not self._pipe_service:
+                    time.sleep(0.3)
+                self.update_status()
+
+                self._iterate_main_loop()
+
+                # Check that the transport is still alive
+                if not self._transport.is_connected():
                     self._terminate_service()
-                    if self.restart_service:
-                        self.exponential_backoff()
-                    else:
-                        self.shutdown = True
-                        if error_message:
-                            raise workflows.Error(error_message)
+                    raise workflows.Error("Lost transport layer connection")
+        finally:
+            self.log.debug("Left main loop")
+            if self._transport.is_connected():
+                self.update_status(status_code=CommonService.SERVICE_STATUS_TEARDOWN)
+            self._terminate_service()
+            self._transport.disconnect()
+            self.log.debug("Terminating.")
 
-            with self.__lock:
-                if (
-                    self._service is None
-                    and self.restart_service
-                    and self._service_factory
+    def _iterate_main_loop(self):
+        """Collection of steps that are run over and over again in the main loop
+        of the frontend. Here incoming messages from the service are processed
+        and forwarded to their corresponding callback methods."""
+
+        # While a service is running, check for incoming messages from that service
+        if self._pipe_service and self._pipe_service.poll(1):
+            try:
+                message = self._pipe_service.recv()
+                if isinstance(message, dict) and "band" in message:
+                    # only dictionaries with 'band' entry are valid messages
+                    try:
+                        handler = getattr(self, "parse_band_" + message["band"])
+                    except AttributeError:
+                        handler = None
+                        self.log.warning("Unknown band %s", str(message["band"]))
+                    if handler:
+                        handler(message)
+                else:
+                    self.log.warning("Invalid message received %s", str(message))
+            except EOFError:
+                # Service has gone away
+                error_message = False
+                if self._service_status == CommonService.SERVICE_STATUS_END:
+                    self.log.info("Service terminated")
+                elif self._service_status == CommonService.SERVICE_STATUS_ERROR:
+                    error_message = "Service terminated with error code"
+                elif self._service_status in (
+                    CommonService.SERVICE_STATUS_NONE,
+                    CommonService.SERVICE_STATUS_NEW,
+                    CommonService.SERVICE_STATUS_STARTING,
                 ):
-                    self.update_status(status_code=CommonService.SERVICE_STATUS_NEW)
-                    self.switch_service()
-
-            # Check that the transport is alive
-            if not self._transport.is_connected():
+                    error_message = (
+                        "Service may have died unexpectedly in "
+                        + "initialization (last known status: %s)"
+                        % CommonService.human_readable_state.get(
+                            self._service_status, self._service_status
+                        )
+                    )
+                else:
+                    error_message = (
+                        "Service may have died unexpectedly"
+                        " (last known status: %s)"
+                        % CommonService.human_readable_state.get(
+                            self._service_status, self._service_status
+                        )
+                    )
+                if error_message:
+                    self.log.error(error_message)
                 self._terminate_service()
-                raise workflows.Error("Lost transport layer connection")
-        self.log.debug("Left main loop")
-        self.update_status(status_code=CommonService.SERVICE_STATUS_TEARDOWN)
-        self._terminate_service()
-        self.log.debug("Terminating.")
+                if self.restart_service:
+                    self.exponential_backoff()
+                else:
+                    self.shutdown = True
+                    if error_message:
+                        raise workflows.Error(error_message)
+
+        with self.__lock:
+            if self._service is None and self.restart_service and self._service_factory:
+                self.update_status(status_code=CommonService.SERVICE_STATUS_NEW)
+                self.switch_service()
 
     def send_command(self, command):
         """Send command to service via the command queue."""
