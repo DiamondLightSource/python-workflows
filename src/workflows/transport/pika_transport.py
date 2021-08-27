@@ -482,7 +482,8 @@ class PikaTransport(CommonTransport):
           transaction:      Transaction ID if message should be part of a
                             transaction
         """
-
+        logger.debug("broadcast disabled")
+        return
         if not headers:
             headers = {}
         if delay:
