@@ -185,6 +185,12 @@ class CommonService:
         else:
             self.log.debug("No transport layer defined for service. Skipping.")
 
+    def stop_transport(self):
+        """If a transport object has been defined then tear it down."""
+        if self.transport:
+            self.log.debug("Stopping transport object")
+            self.transport.disconnect()
+
     def _transport_interceptor(self, callback):
         """Takes a callback function and returns a function that takes headers and
         messages and places them on the main service queue."""
@@ -429,12 +435,14 @@ class CommonService:
             self.process_uncaught_exception(e)
             self.__update_service_status(self.SERVICE_STATUS_ERROR)
             self.in_shutdown()
+            self.stop_transport()
             return
 
         try:
             self.__update_service_status(self.SERVICE_STATUS_SHUTDOWN)
             self.in_shutdown()
             self.__update_service_status(self.SERVICE_STATUS_END)
+            self.stop_transport()
         except Exception as e:
             self.process_uncaught_exception(e)
             self.__update_service_status(self.SERVICE_STATUS_ERROR)
