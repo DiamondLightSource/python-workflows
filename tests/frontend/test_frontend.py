@@ -192,6 +192,7 @@ def test_frontend_can_handle_unhandled_service_initialization_exceptions():
         CommonService.SERVICE_STATUS_STARTING,
         CommonService.SERVICE_STATUS_ERROR,
         CommonService.SERVICE_STATUS_END,
+        CommonService.SERVICE_STATUS_TEARDOWN,
     ]
 
 
