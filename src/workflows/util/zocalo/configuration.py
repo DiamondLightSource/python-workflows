@@ -47,3 +47,14 @@ class Pika:
             ("vhost", "--rabbit-vhost"),
         ]:
             PikaTransport.defaults[target] = configuration[cfgoption]
+
+
+class Offline:
+    """A Zocalo configuration plugin to pre-populate OfflineTransport config defaults"""
+
+    class Schema(PluginSchema):
+        pass
+
+    @staticmethod
+    def activate(configuration):
+        pass
