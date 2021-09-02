@@ -5,8 +5,7 @@ import logging
 import pprint
 from typing import Any, Dict
 
-from workflows.transport.common_transport import CommonTransport,\
-    json_serializer
+from workflows.transport.common_transport import CommonTransport, json_serializer
 
 _offlog = logging.getLogger("workflows.transport.offline_transport")
 

@@ -1,10 +1,12 @@
+import decimal
 import logging
 from unittest import mock
 
+import pytest
+
 import workflows.transport
 from workflows.transport.offline_transport import OfflineTransport
-import decimal
-import pytest
+
 
 def test_lookup_and_initialize_offline_transport_layer():
     """Find the offline transport layer via the lookup mechanism and run
@@ -76,7 +78,7 @@ def test_send_message(caplog):
                 "workflows.transport.offline_transport",
                 logging.DEBUG,
                 debug,
-            )
+            ),
         ]
 
 
@@ -99,8 +101,9 @@ def test_send_broadcast(caplog):
                 "workflows.transport.offline_transport",
                 logging.DEBUG,
                 debug,
-            )
+            ),
         ]
+
 
 def test_messages_are_serialized_for_transport(caplog):
     """Test the message serialization."""
@@ -122,12 +125,14 @@ def test_messages_are_serialized_for_transport(caplog):
                 "workflows.transport.offline_transport",
                 logging.DEBUG,
                 banana_str,
-            )
+            ),
         ]
     caplog.clear()
     with caplog.at_level(logging.DEBUG):
         offline.broadcast(str(mock.sentinel.channel2), banana)
-        message = f"Broadcasting {len(banana_str)} bytes to {str(mock.sentinel.channel2)}"
+        message = (
+            f"Broadcasting {len(banana_str)} bytes to {str(mock.sentinel.channel2)}"
+        )
         assert caplog.record_tuples == [
             (
                 "workflows.transport.offline_transport",
@@ -138,7 +143,7 @@ def test_messages_are_serialized_for_transport(caplog):
                 "workflows.transport.offline_transport",
                 logging.DEBUG,
                 banana_str,
-            )
+            ),
         ]
 
     with pytest.raises(Exception):
