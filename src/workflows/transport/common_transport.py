@@ -21,6 +21,11 @@ class CommonTransport:
     # -- High level communication calls ----------------------------------------
     #
 
+    @classmethod
+    def add_command_line_options(cls, parser):
+        """Function to inject command line parameters."""
+        pass
+
     def connect(self) -> bool:
         """Connect the transport class. This function must be overridden.
         :return: True-like value when connection successful,
