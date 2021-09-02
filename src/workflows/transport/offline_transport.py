@@ -5,7 +5,8 @@ import logging
 import pprint
 from typing import Any, Dict
 
-from workflows.transport.common_transport import CommonTransport
+from workflows.transport.common_transport import CommonTransport,\
+    json_serializer
 
 _offlog = logging.getLogger("workflows.transport.offline_transport")
 
@@ -59,12 +60,12 @@ class OfflineTransport(CommonTransport):
     def _send(
         self, destination, message, headers=None, delay=None, expiration=None, **kwargs
     ):
-        self._output(f"Sending {len(message)} bytes to {destination}")
+        self._output(f"Sending {len(message)} bytes to {destination}", message)
 
     def _broadcast(
         self, destination, message, headers=None, delay=None, expiration=None, **kwargs
     ):
-        self._output(f"Broadcasting {len(message)} bytes to {destination}")
+        self._output(f"Broadcasting {len(message)} bytes to {destination}", message)
 
     def _transaction_begin(self, transaction_id, **kwargs):
         self._output(f"Starting transaction {transaction_id}")
@@ -87,11 +88,4 @@ class OfflineTransport(CommonTransport):
 
     @staticmethod
     def _mangle_for_sending(message):
-        return json.dumps(message)
-
-    @staticmethod
-    def _mangle_for_receiving(message):
-        try:
-            return json.loads(message)
-        except (TypeError, ValueError):
-            return message
+        return json.dumps(message, default=json_serializer)

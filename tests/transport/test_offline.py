@@ -3,7 +3,8 @@ from unittest import mock
 
 import workflows.transport
 from workflows.transport.offline_transport import OfflineTransport
-
+import decimal
+import pytest
 
 def test_lookup_and_initialize_offline_transport_layer():
     """Find the offline transport layer via the lookup mechanism and run
@@ -61,14 +62,20 @@ def test_send_message(caplog):
     offline = OfflineTransport()
     offline.connect()
 
-    with caplog.at_level(logging.INFO):
+    with caplog.at_level(logging.DEBUG):
         offline._send(str(mock.sentinel.channel), str(mock.sentinel.message))
         message = f"Sending {len(str(mock.sentinel.message))} bytes to {str(mock.sentinel.channel)}"
+        debug = f"{str(mock.sentinel.message)}"
         assert caplog.record_tuples == [
             (
                 "workflows.transport.offline_transport",
                 logging.INFO,
                 f"Offline Transport: {message}",
+            ),
+            (
+                "workflows.transport.offline_transport",
+                logging.DEBUG,
+                debug,
             )
         ]
 
@@ -78,16 +85,64 @@ def test_send_broadcast(caplog):
     offline = OfflineTransport()
     offline.connect()
 
-    with caplog.at_level(logging.INFO):
+    with caplog.at_level(logging.DEBUG):
         offline._broadcast(str(mock.sentinel.channel), str(mock.sentinel.message))
         message = f"Broadcasting {len(str(mock.sentinel.message))} bytes to {str(mock.sentinel.channel)}"
+        debug = f"{str(mock.sentinel.message)}"
         assert caplog.record_tuples == [
             (
                 "workflows.transport.offline_transport",
                 logging.INFO,
                 f"Offline Transport: {message}",
+            ),
+            (
+                "workflows.transport.offline_transport",
+                logging.DEBUG,
+                debug,
             )
         ]
+
+def test_messages_are_serialized_for_transport(caplog):
+    """Test the message serialization."""
+    banana = {"entry": [1, 2.0, decimal.Decimal(3), "banana"]}
+    banana_str = '{"entry": [1, 2.0, 3.0, "banana"]}'
+    offline = OfflineTransport()
+    offline.connect()
+
+    with caplog.at_level(logging.DEBUG):
+        offline.send(str(mock.sentinel.channel1), banana)
+        message = f"Sending {len(banana_str)} bytes to {str(mock.sentinel.channel1)}"
+        assert caplog.record_tuples == [
+            (
+                "workflows.transport.offline_transport",
+                logging.INFO,
+                f"Offline Transport: {message}",
+            ),
+            (
+                "workflows.transport.offline_transport",
+                logging.DEBUG,
+                banana_str,
+            )
+        ]
+    caplog.clear()
+    with caplog.at_level(logging.DEBUG):
+        offline.broadcast(str(mock.sentinel.channel2), banana)
+        message = f"Broadcasting {len(banana_str)} bytes to {str(mock.sentinel.channel2)}"
+        assert caplog.record_tuples == [
+            (
+                "workflows.transport.offline_transport",
+                logging.INFO,
+                f"Offline Transport: {message}",
+            ),
+            (
+                "workflows.transport.offline_transport",
+                logging.DEBUG,
+                banana_str,
+            )
+        ]
+
+    with pytest.raises(Exception):
+        offline.send(str(mock.sentinel.channel), mock.sentinel.unserializable)
 
 
 def test_subscribe_to_queue(caplog):
