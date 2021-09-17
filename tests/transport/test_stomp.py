@@ -479,14 +479,13 @@ def test_subscribe_to_queue(mockstomp):
         1,
         str(mock.sentinel.channel1),
         mock_cb1,
-        transformation=mock.sentinel.transformation,
     )
 
     mockconn.subscribe.assert_called_once()
     args, kwargs = mockconn.subscribe.call_args
     assert args == ("/queue/" + str(mock.sentinel.channel1), 1)
     assert kwargs == {
-        "headers": {"transformation": mock.sentinel.transformation},
+        "headers": {},
         "ack": "auto",
     }
 
@@ -497,7 +496,6 @@ def test_subscribe_to_queue(mockstomp):
         retroactive=True,
         selector=mock.sentinel.selector,
         exclusive=True,
-        transformation=True,
         priority=42,
     )
     assert mockconn.subscribe.call_count == 2
@@ -508,7 +506,6 @@ def test_subscribe_to_queue(mockstomp):
             "activemq.retroactive": "true",
             "selector": mock.sentinel.selector,
             "activemq.exclusive": "true",
-            "transformation": "jms-object-json",
             "activemq.priority": 42,
         },
         "ack": "auto",
@@ -560,23 +557,20 @@ def test_subscribe_to_broadcast(mockstomp):
         1,
         str(mock.sentinel.channel1),
         mock_cb1,
-        transformation=mock.sentinel.transformation,
     )
 
     mockconn.subscribe.assert_called_once()
     args, kwargs = mockconn.subscribe.call_args
     assert args == ("/topic/" + str(mock.sentinel.channel1), 1)
-    assert kwargs == {"headers": {"transformation": mock.sentinel.transformation}}
+    assert kwargs == {"headers": {}}
 
     stomp._subscribe_broadcast(
-        2, str(mock.sentinel.channel2), mock_cb2, retroactive=True, transformation=True
+        2, str(mock.sentinel.channel2), mock_cb2, retroactive=True
     )
     assert mockconn.subscribe.call_count == 2
     args, kwargs = mockconn.subscribe.call_args
     assert args == ("/topic/" + str(mock.sentinel.channel2), 2)
-    assert kwargs == {
-        "headers": {"activemq.retroactive": "true", "transformation": "jms-object-json"}
-    }
+    assert kwargs == {"headers": {"activemq.retroactive": "true"}}
 
     assert mock_cb1.call_count == 0
     listener.on_message(_frame({"subscription": 1}, mock.sentinel.message1))
