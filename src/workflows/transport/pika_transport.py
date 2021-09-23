@@ -15,6 +15,8 @@ import pika
 import workflows
 from workflows.transport.common_transport import CommonTransport, json_serializer
 
+from collections.abc import Hashable, Mapping
+
 logger = logging.getLogger("workflows.transport.pika_transport")
 
 
@@ -390,7 +392,13 @@ class PikaTransport(CommonTransport):
                 prefetch_count=prefetch_count,
             )
 
-    def _subscribe_broadcast(self, consumer_tag, queue, callback, **kwargs):
+    def _subscribe_broadcast(
+        self,
+        sub_id: Hashable,
+        exchange: str,
+        callback: Callable[[Mapping[str, Any], Any], None],
+        **_kwargs,
+    ):
         """Listen to a queue, notify via callback function.
         :param consumer_tag: ID for this subscription in the transport layer
         :param queue: Queue name to subscribe to. Queue is bind to exchange
