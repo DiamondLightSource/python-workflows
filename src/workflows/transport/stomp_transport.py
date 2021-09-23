@@ -325,6 +325,9 @@ class StompTransport(CommonTransport):
           ignore_namespace: Do not apply namespace to the destination name
           retroactive:      Ask broker to send old messages if possible
         """
+        # Callback is ignored - verify that it matches the pre-stored version
+        assert callback is None or callback == self.__subscriptions[sub_id]["callback"]
+
         headers = {}
         if kwargs.get("ignore_namespace"):
             destination = "/topic/" + channel
