@@ -407,6 +407,11 @@ class PikaTransport(CommonTransport):
           ignore_namespace: Do not apply namespace to the destination name
           retroactive:      Ask broker to send old messages if possible
         """
+        # Callback is stored on an internal property before calling this
+        # Validate that it's identical to avoid mismatch errors
+        assert (
+            callback is None or callback == self.__subscriptions[sub_id]["callback"]
+        ), "Pased callback does not match stored"
 
         headers = {}
 
