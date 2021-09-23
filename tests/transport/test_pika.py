@@ -653,6 +653,36 @@ def test_subscribe_to_queue(mockpika):
     mockchannel.basic_cancel.assert_called_with(callback=None, consumer_tag=2)
 
 
+def test_multiple_subscribe_to_broadcast():
+    """Test multiple subscriptions to a broadcast channel"""
+    # Make an entirely separate connection to RabbitMQ
+    import pika
+    conn = pika.BlockingConnection()
+    side_channel = conn.channel()
+
+
+    # pika = PikaTransport()
+    # pika.connect()
+
+    # We create our own channel to check assumptions about multiple delivery
+# ?    side_channel = pika._conn.channel()
+    # Make sure that the queue and exchange exists
+    side_channel.exchange_declare("transient.status", passive=True)
+    side_channel.queue_declare("transient.status", exclusive=True, auto_delete=True)
+    side_channel.queue_bind("transient.status", "transient.status")
+    breakpoint()
+
+    # def _subscribe_broadcast(self, consumer_tag, queue, callback, **kwargs):
+
+    messages = []
+    def cb(*args, **kwargs):
+        messages.append((args, kwargs))
+
+    pika.subscribe_broadcast("transient.status", cb)
+
+
+
+
 @mock.patch("workflows.transport.pika_transport.pika")
 def test_subscribe_to_broadcast(mockpika):
     """Test subscribing to a queue (producer-consumer), callback functions and unsubscribe"""
