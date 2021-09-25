@@ -5,6 +5,7 @@ import optparse
 from unittest import mock
 
 import pika
+from pika import exchange_type
 import pytest
 import threading
 import time
@@ -812,6 +813,15 @@ def connection_params():
     return params
 
 
+@pytest.fixture
+def channel(connection_params) -> pika.channel.Channel:
+    conn = pika.BlockingConnection(connection_params)
+    try:
+        yield conn.channel()
+    finally:
+        conn.close()
+
+
 def test_multiple_subscribe_to_broadcast():
     """Test multiple subscriptions to a broadcast channel"""
     # Make an entirely separate connection to RabbitMQ
@@ -872,7 +882,9 @@ def test_pikathread_broadcast_subscribe(connection_params):
         got_message.set()
 
     # Make a subscription and wait for it to be valid
-    thread.subscribe_broadcast(0, "_broadcast_check_exchange", _callback).result()
+    thread.subscribe_broadcast(
+        "_broadcast_check_exchange", _callback, consumer_tag=0, reconnectable=True
+    ).result()
 
     chan.basic_publish("_broadcast_check_exchange", routing_key="", body="A Message")
 
@@ -881,3 +893,39 @@ def test_pikathread_broadcast_subscribe(connection_params):
 
     thread.join(re_raise=True, stop=True)
     conn.close()
+
+
+def test_pikathread_non_reconnectable_subscribe(
+    connection_params, channel: pika.channel.Channel
+):
+    thread = _PikaThread(connection_params)
+    try:
+        thread.start(wait_for_connection=True)
+        channel.exchange_declare("_broadcast_check_exchange", exchange_type="fanout")
+
+        got_message = threading.Event()
+
+        def _got_message(*args):
+            got_message.set()
+
+        thread.subscribe_broadcast(
+            "_broadcast_check_exchange", _got_message, reconnectable=True
+        ).result()
+        # Force reconnection - normally we want this to be transparent, but
+        # let's twiddle the internals so we can wait for reconnection as we
+        # don't want to pick up the message before it resets
+        print("Terminating connection")
+        thread._connected.clear()
+        thread._connection.add_callback_threadsafe(lambda: thread._connection.close())
+        thread.wait_for_connection()
+        print("Reconnected, apparently")
+        # Now, make sure we still get this message
+        channel.basic_publish(
+            "_broadcast_check_exchange", routing_key="", body="A Message"
+        )
+        got_message.wait(2)
+        assert got_message.is_set()
+
+    finally:
+        channel.exchange_delete("_broadcast_check_exchange")
+        thread.join(stop=True)
