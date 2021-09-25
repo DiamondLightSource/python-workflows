@@ -4,7 +4,7 @@ import json
 import optparse
 from unittest import mock
 
-import pika as pikapy
+import pika
 import pytest
 
 import workflows
@@ -182,8 +182,8 @@ def test_instantiate_link_and_connect_to_broker(mockpika):
 def test_error_handling_when_connecting_to_broker(mockpika):
     """Test the Pika connection routine."""
     transport = PikaTransport()
-    mockpika.BlockingConnection.side_effect = pikapy.exceptions.AMQPConnectionError()
-    mockpika.exceptions.AMQPConnectionError = pikapy.exceptions.AMQPConnectionError
+    mockpika.BlockingConnection.side_effect = pika.exceptions.AMQPConnectionError()
+    mockpika.exceptions.AMQPConnectionError = pika.exceptions.AMQPConnectionError
 
     with pytest.raises(workflows.Disconnected):
         transport.connect()
@@ -191,8 +191,8 @@ def test_error_handling_when_connecting_to_broker(mockpika):
     assert not transport.is_connected()
 
     mockconn = mockpika.BlockingConnection
-    mockconn.return_value.channel.side_effect = pikapy.exceptions.AMQPChannelError()
-    mockpika.exceptions.AMQPChannelError = pikapy.exceptions.AMQPChannelError
+    mockconn.return_value.channel.side_effect = pika.exceptions.AMQPChannelError()
+    mockpika.exceptions.AMQPChannelError = pika.exceptions.AMQPChannelError
 
     with pytest.raises(workflows.Disconnected):
         transport.connect()
@@ -319,8 +319,8 @@ def test_error_handling_on_send(mockpika):
     transport.connect()
     mockconn = mockpika.BlockingConnection
     mockchannel = mockconn.return_value.channel.return_value
-    mockchannel.basic_publish.side_effect = pikapy.exceptions.AMQPChannelError()
-    mockpika.exceptions = pikapy.exceptions
+    mockchannel.basic_publish.side_effect = pika.exceptions.AMQPChannelError()
+    mockpika.exceptions = pika.exceptions
 
     assert mockconn.call_count == 1
     with pytest.raises(workflows.Disconnected):
@@ -435,8 +435,8 @@ def test_error_handling_on_broadcast(mockpika):
     transport.connect()
     mockconn = mockpika.BlockingConnection
     mockchannel = mockconn.return_value.channel.return_value
-    mockchannel.basic_publish.side_effect = pikapy.exceptions.AMQPChannelError()
-    mockpika.exceptions = pikapy.exceptions
+    mockchannel.basic_publish.side_effect = pika.exceptions.AMQPChannelError()
+    mockpika.exceptions = pika.exceptions
 
     assert mockconn.call_count == 1
     with pytest.raises(workflows.Disconnected):
@@ -737,15 +737,15 @@ def test_error_handling_on_subscribing(mockpika):
     transport.connect()
     mockconn = mockpika.BlockingConnection
     mockchannel = mockconn.return_value.channel.return_value
-    mockchannel.start_consuming.side_effect = pikapy.exceptions.AMQPChannelError()
-    mockpika.exceptions = pikapy.exceptions
+    mockchannel.start_consuming.side_effect = pika.exceptions.AMQPChannelError()
+    mockpika.exceptions = pika.exceptions
 
     with pytest.raises(workflows.Disconnected):
         transport._subscribe(1, str(mock.sentinel.queue1), mock_cb)
     assert not transport.is_connected()
 
-    mockchannel.start_consuming.side_effect = pikapy.exceptions.AMQPConnectionError()
-    mockpika.exceptions = pikapy.exceptions
+    mockchannel.start_consuming.side_effect = pika.exceptions.AMQPConnectionError()
+    mockpika.exceptions = pika.exceptions
 
     with pytest.raises(workflows.Disconnected):
         transport._subscribe(1, str(mock.sentinel.queue1), mock_cb)
@@ -820,11 +820,11 @@ def test_nack_message(mockpika):
 @pytest.fixture
 def connection_params():
     params = [
-        pikapy.ConnectionParameters(
+        pika.ConnectionParameters(
             "localhost",
             5672,
             "/",
-            pikapy.PlainCredentials("guest", "guest"),
+            pika.PlainCredentials("guest", "guest"),
             connection_attempts=1,
             retry_delay=1,
             socket_timeout=1,
