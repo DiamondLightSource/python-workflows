@@ -9,7 +9,7 @@ import pytest
 
 import workflows
 import workflows.transport
-from workflows.transport.pika_transport import PikaTransport
+from workflows.transport.pika_transport import PikaTransport, _PikaThread
 
 
 def test_lookup_and_initialize_pika_transport_layer():
@@ -657,15 +657,15 @@ def test_multiple_subscribe_to_broadcast():
     """Test multiple subscriptions to a broadcast channel"""
     # Make an entirely separate connection to RabbitMQ
     import pika
+
     conn = pika.BlockingConnection()
     side_channel = conn.channel()
-
 
     # pika = PikaTransport()
     # pika.connect()
 
     # We create our own channel to check assumptions about multiple delivery
-# ?    side_channel = pika._conn.channel()
+    # ?    side_channel = pika._conn.channel()
     # Make sure that the queue and exchange exists
     side_channel.exchange_declare("transient.status", passive=True)
     side_channel.queue_declare("transient.status", exclusive=True, auto_delete=True)
@@ -675,12 +675,11 @@ def test_multiple_subscribe_to_broadcast():
     # def _subscribe_broadcast(self, consumer_tag, queue, callback, **kwargs):
 
     messages = []
+
     def cb(*args, **kwargs):
         messages.append((args, kwargs))
 
     pika.subscribe_broadcast("transient.status", cb)
-
-
 
 
 @mock.patch("workflows.transport.pika_transport.pika")
@@ -804,3 +803,44 @@ def test_nack_message(mockpika):
 
     pika._nack(mock.sentinel.messageid)
     mockchannel.basic_nack.assert_called_once_with(delivery_tag=mock.sentinel.messageid)
+
+    # defaults = {
+    #     "--rabbit-host": "localhost",
+    #     "--rabbit-port": 5672,
+    #     "--rabbit-user": "guest",
+    #     "--rabbit-pass": "guest",
+    #     "--rabbit-vhost": "/",
+    # }
+
+
+@pytest.fixture
+def connection_params():
+    params = [
+        pikapy.ConnectionParameters(
+            "localhost",
+            5672,
+            "/",
+            pikapy.PlainCredentials("guest", "guest"),
+            connection_attempts=1,
+            retry_delay=1,
+            socket_timeout=1,
+            stack_timeout=2,
+        )
+    ]
+    # Try a connection here to make sure this is valid
+    try:
+        pikapy.BlockingConnection(params)
+    except BaseException:
+        pytest.skip("Failed to create test RabbitMQ connection")
+    return params
+
+
+def test_pikathread(connection_params):
+    thread = _PikaThread(connection_params)
+    thread.start()
+    print("Waiting for pika connection")
+    thread.wait_for_connection()
+    print("stopping connection")
+    thread.stop()
+    thread.join()
+    assert not thread.exc_info
