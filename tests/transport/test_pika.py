@@ -804,7 +804,7 @@ def connection_params():
     ]
     # Try a connection here to make sure this is valid
     try:
-        pikapy.BlockingConnection(params)
+        pika.BlockingConnection(params)
     except BaseException:
         pytest.skip("Failed to create test RabbitMQ connection")
     return params
