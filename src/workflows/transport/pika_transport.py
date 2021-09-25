@@ -870,7 +870,7 @@ class _PikaThread(threading.Thread):
                 random.shuffle(self._connection_parameters)
                 self._connection = pika.BlockingConnection(self._connection_parameters)
                 self._state = _PikaThreadStatus.CONNECTED
-                self.__connected.set()
+                self._connected.set()
                 # Clear the channels because this might be a reconnect
                 self._pika_channels = {}
                 self._pika_shared_channel = None
