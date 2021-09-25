@@ -728,6 +728,11 @@ class _PikaThread(threading.Thread):
         # Make sure we cannot race condition on starting
         self._start_lock = threading.Lock()
 
+    @property
+    def state(self) -> _PikaThreadStatus:
+        """Read the current connection state"""
+        return self._state
+
     def start(self):
         """Spawn the thread. Can Only call once per instance. Thread-safe."""
 
