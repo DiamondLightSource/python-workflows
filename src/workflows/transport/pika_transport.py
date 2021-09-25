@@ -764,6 +764,8 @@ class _PikaThread(threading.Thread):
             )
 
         self._please_stop.set()
+        # We might be waiting for an event, so give the event loop one
+        self._connection.add_callback_threadsafe(lambda: None)
 
     def join(self, timeout: Optional[float] = None, *, re_raise: bool = False):
         """Wait until the thread terminates.
