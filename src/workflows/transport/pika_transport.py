@@ -1059,7 +1059,7 @@ class _PikaThread(threading.Thread):
             if result.set_running_or_notify_cancel():
                 # If not specified, generate a consumer_tag automatically
                 if consumer_tag is None:
-                    consumer_tag = min([-5000] + list(self._subscriptions.values())) - 1
+                    consumer_tag = min([-5000] + list(self._subscriptions.keys())) - 1
                 assert (
                     consumer_tag not in self._subscriptions
                 ), f"Subscription request {consumer_tag} rejected due to existing subscription {self._subscriptions[consumer_tag]}"

@@ -895,7 +895,7 @@ def test_pikathread_broadcast_subscribe(connection_params):
     conn.close()
 
 
-def test_pikathread_non_reconnectable_subscribe(
+def test_pikathread_broadcast_reconnection(
     connection_params, channel: pika.channel.Channel
 ):
     thread = _PikaThread(connection_params)
@@ -925,6 +925,19 @@ def test_pikathread_non_reconnectable_subscribe(
         )
         got_message.wait(2)
         assert got_message.is_set()
+
+        # Add a non-resubscribable connection
+        got_message_2 = threading.Event()
+
+        def _got_message_2(*args):
+            got_message_2.set()
+
+        thread.subscribe_broadcast(
+            "_broadcast_check_exchange", _got_message_2, reconnectable=False
+        ).result()
+        thread._connected.clear()
+        thread._connection.add_callback_threadsafe(lambda: thread._connection.close())
+        thread.join()
 
     finally:
         channel.exchange_delete("_broadcast_check_exchange")
