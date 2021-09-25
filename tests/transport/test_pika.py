@@ -842,5 +842,4 @@ def test_pikathread(connection_params):
     thread.wait_for_connection()
     print("stopping connection")
     thread.stop()
-    thread.join()
-    assert not thread.exc_info
+    thread.join(re_raise=True)

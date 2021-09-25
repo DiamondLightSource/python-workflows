@@ -747,10 +747,10 @@ class _PikaThread(threading.Thread):
 
     def stop(self):
         """
-        Asynchronously request disconnection and cleanup. Thread-safe.
+        Request termination, including disconnection and cleanup if necessary.
 
-        This will request stop, but will not block waiting. Please use
-        .join() to wait for termination.
+        This will not block. Please call join() to wait until the thread
+        has terminated.
         """
         # Wanted to check this hadn't happened yet - but hard to do
         # without race conditions in a thread-safe way. Check if we
@@ -765,6 +765,22 @@ class _PikaThread(threading.Thread):
 
         self._please_stop.set()
 
+    def join(self, timeout: Optional[float] = None, *, re_raise: bool = False):
+        """Wait until the thread terminates.
+
+        Args:
+            timeout:
+                When not None, a floating point number specifying a
+                timeout for the operation in seconds (or fractions thereof).
+            re_raise:
+                If the thread terminated due to an exception, then raise
+                this exception in the callers thread. Equivalent to calling
+                'raise_if_exception' after 'join()'.
+        """
+        super().join(timeout)
+        if re_raise:
+            self.raise_if_exception()
+
     def wait_for_connection(self, timeout=None):
         """
         Safely wait until the thread has connected and is communicating with the server.
@@ -775,15 +791,21 @@ class _PikaThread(threading.Thread):
         """
         self._connected.wait(timeout)
 
-    @property
-    def exc_info(self) -> Optional[Tuple[Any, Any, Any]]:
-        """
-        Retrieve the sys.exc_info tuple for the exception which caused this thread to fail.S
+    def raise_if_exception(self):
+        """If the thread has failed with an exception, raise it in the callers thread."""
+        exception = self._exc_info
+        if exception:
+            raise exception[0].with_traceback(exception[1], exception[2])
 
-        If the thread/pika connection has not failed, or was cleanly
-        shutdown on request, this will be None.
-        """
-        return self._exc_info
+    # @property
+    # def exc_info(self) -> Optional[Tuple[Any, Any, Any]]:
+    #     """
+    #     Retrieve the sys.exc_info tuple for the exception which caused this thread to fail.S
+
+    #     If the thread/pika connection has not failed, or was cleanly
+    #     shutdown on request, this will be None.
+    #     """
+    #     return self._exc_info
 
     ####################################################################
     # PikaThread Internal methods
