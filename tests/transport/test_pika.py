@@ -855,16 +855,29 @@ def test_pikathread_broadcast_subscribe(connection_params):
     thread.start()
     thread.wait_for_connection()
 
+    # Let's make our own connection to send a message
+    conn = pika.BlockingConnection(connection_params)
+    chan = conn.channel()
+    chan.exchange_declare(
+        "_broadcast_check_exchange", exchange_type="fanout", auto_delete=True
+    )
+
+    # Basic check that a message has come through
     got_message = threading.Event()
 
-    def _callback(*args):
-        print(repr(args))
+    def _callback(channel, basic_deliver, properties, body):
+        print(
+            f"Got message:\n  Channel: {channel.channel_number}\n  basic_deliver: {basic_deliver}\n  properties: {properties}\n\n  {body.decode()}"
+        )
         got_message.set()
 
     # Make a subscription and wait for it to be valid
-    thread.subscribe_broadcast(0, "transient.status", _callback).result()
+    thread.subscribe_broadcast(0, "_broadcast_check_exchange", _callback).result()
 
-    # Let's make our own connection to send a message
-    conn = pika.BlockingConnection(connection_params)
+    chan.basic_publish("_broadcast_check_exchange", routing_key="", body="A Message")
+
+    got_message.wait(5)
+    assert got_message.is_set()
 
     thread.join(re_raise=True, stop=True)
+    conn.close()
