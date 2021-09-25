@@ -6,6 +6,8 @@ from unittest import mock
 
 import pika
 import pytest
+import threading
+import time
 
 import workflows
 import workflows.transport
@@ -845,5 +847,24 @@ def test_pikathread(connection_params):
     print("Waiting for pika connection")
     thread.wait_for_connection()
     print("stopping connection")
-    thread.stop()
-    thread.join(re_raise=True)
+    thread.join(re_raise=True, stop=True)
+
+
+def test_pikathread_broadcast_subscribe(connection_params):
+    thread = _PikaThread(connection_params)
+    thread.start()
+    thread.wait_for_connection()
+
+    got_message = threading.Event()
+
+    def _callback(*args):
+        print(repr(args))
+        got_message.set()
+
+    # Make a subscription and wait for it to be valid
+    thread.subscribe_broadcast(0, "transient.status", _callback).result()
+
+    # Let's make our own connection to send a message
+    conn = pika.BlockingConnection(connection_params)
+
+    thread.join(re_raise=True, stop=True)
