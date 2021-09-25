@@ -657,26 +657,28 @@ class _PikaSubscription:
     Attributes:
         arguments: Any extra arguments to pass through to pika
         auto_ack: Should this subscription auto-acknowledge messages?
-        exclusive: Should we be the only consumer?
-        on_message_callback: The function called by Pika on messages
-        prefetch_count: How many messages are we allowed to prefetch
-        kind: What type of subscription this is.
-        binding:
+        destination:
             The target for subscription. This is the exchange name if
             subscribing to broadcasts with an ephemeral queue, or the
             queue name if subscribing to a queue directly.
-        queue: The queue this subscription is actually bound to.
+        exclusive: Should we be the only consumer?
+        kind: What type of subscription this is.
+        on_message_callback: The function called by Pika on messages
+        prefetch_count: How many messages are we allowed to prefetch
+        queue:
+            The queue this subscription is actually physically bound to
         reconnectable: Are we allowed to reconnect to this subscription
     """
 
     arguments: Dict[str, Any]
     auto_ack: bool
-    exclusive: bool
-    on_message_callback: PikaCallback = dataclasses.field(repr=False)
-    kind: _PikaSubscriptionKind
     destination: str
+    exclusive: bool
+    kind: _PikaSubscriptionKind
+    on_message_callback: PikaCallback = dataclasses.field(repr=False)
+    prefetch_count: int
+    queue: str = dataclasses.field(init=False)
     reconnectable: bool
-    prefetch_count: int = 0
 
 
 class _PikaThread(threading.Thread):
@@ -701,7 +703,7 @@ class _PikaThread(threading.Thread):
         # Internal store of subscriptions, to resubscribe if necessary
         self._subscriptions: Dict[int, _PikaSubscription] = {}
         # The pika connection object
-        self._pika_connection: pika.BlockingConnection
+        self._connection: pika.BlockingConnection
         # Per-subscription channels. May be pointing to the shared channel
         self._pika_channels: Dict[int, pika.channel.Channel] = {}
         # A common, shared channel, used for non-QoS subscriptions
@@ -772,7 +774,9 @@ class _PikaThread(threading.Thread):
         # We might be waiting for an event, so give the event loop one
         self._connection.add_callback_threadsafe(lambda: None)
 
-    def join(self, timeout: Optional[float] = None, *, re_raise: bool = False):
+    def join(
+        self, timeout: Optional[float] = None, *, re_raise: bool = False, stop=False
+    ):
         """Wait until the thread terminates.
 
         Args:
@@ -783,7 +787,11 @@ class _PikaThread(threading.Thread):
                 If the thread terminated due to an exception, then raise
                 this exception in the callers thread. Equivalent to calling
                 'raise_if_exception' after 'join()'.
+            stop:
+                Call .stop() to request termination.
         """
+        if stop:
+            self.stop()
         super().join(timeout)
         if re_raise:
             self.raise_if_exception()
@@ -834,10 +842,10 @@ class _PikaThread(threading.Thread):
             # Either open a channel (if prefetch) or use the shared one
             if subscription.prefetch_count == 0:
                 if not self._pika_shared_channel:
-                    self._pika_shared_channel = self._pika_connection.channel()
+                    self._pika_shared_channel = self._connection.channel()
                 channel = self._pika_shared_channel
             else:
-                channel = self._pika_connection.channel()
+                channel = self._connection.channel()
 
             if subscription.kind == _PikaSubscriptionKind.FANOUT:
                 # If a FANOUT subscription, then we need to create and bind
@@ -846,19 +854,19 @@ class _PikaThread(threading.Thread):
                 channel.queue_bind(queue, subscription.destination)
                 subscription.queue = queue
             elif subscription.kind == _PikaSubscriptionKind.DIRECT:
-                queue = subscription.destination
+                subscription.queue = subscription.destination
             else:
                 raise NotImplementedError(
                     f"Unknown subscription kind: {subscription.kind}"
                 )
-
             channel.basic_consume(
-                queue,
+                subscription.queue,
                 subscription.on_message_callback,
                 auto_ack=subscription.auto_ack,
                 exclusive=subscription.exclusive,
                 consumer_tag=consumer_tag,
             )
+            logger.debug("Consuming (%d) on %s", consumer_tag, subscription.queue)
 
             # Record the consumer channel
             self._pika_channels[consumer_tag] = channel
@@ -916,6 +924,106 @@ class _PikaThread(threading.Thread):
         # on a connection somewhere. So now we've actually marked ourselves
         # as disconnected, mark
         self._connected.set()
+
+    def _add_subscription_in_thread(
+        self,
+        consumer_tag: int,
+        subscription: _PikaSubscription,
+        result: concurrent.futures.Future,
+    ):
+        """Add a subscription to the pika connection, on the connection thread."""
+        try:
+            if result.set_running_or_notify_cancel():
+                assert (
+                    consumer_tag not in self._subscriptions
+                ), f"Subscription request {consumer_tag} rejected due to existing subscription {self._subscriptions[consumer_tag]}"
+                self._subscriptions[consumer_tag] = subscription
+                self._synchronize_subscriptions()
+                result.set_result(None)
+        except BaseException as e:
+            result.set_exception(e)
+
+    def subscribe_queue(
+        self,
+        consumer_tag: int,
+        queue: str,
+        callback: PikaCallback,
+        *,
+        auto_ack: bool = True,
+        exclusive: bool = False,
+        prefetch_count: int = 1,
+        reconnectable: bool = False,
+    ) -> concurrent.futures.Future:
+        """
+        Subscribe to a queue. Thread-safe.
+
+        Args:
+            consumer_tag: Internal ID representing this subscription
+            queue: The queue to listen for messages on
+            callback: The function to call when receiving messages on this queue
+            auto_ack: Should this subscription auto-acknowledge messages?
+            exclusive: Should we be the only consumer?
+            prefetch_count: How many messages are we allowed to prefetch
+            reconnectable: Are we allowed to reconnect to this subscription
+
+        Returns:
+            A Future representing the subscription state. It will be set
+            to an empty value upon subscription success.
+        """
+
+        new_sub = _PikaSubscription(
+            arguments={},
+            auto_ack=auto_ack,
+            destination=queue,
+            exclusive=exclusive,
+            kind=_PikaSubscriptionKind.DIRECT,
+            on_message_callback=callback,
+            prefetch_count=prefetch_count,
+            reconnectable=reconnectable,
+        )
+        result = concurrent.futures.Future()
+        self._connection.add_callback_threadsafe(
+            functools.partial(
+                self._add_subscription_in_thread, consumer_tag, new_sub, result
+            )
+        )
+        return result
+
+    def subscribe_broadcast(
+        self,
+        consumer_tag: int,
+        exchange: str,
+        callback: PikaCallback,
+        *,
+        auto_ack: bool = True,
+        reconnectable: bool = False,
+        prefetch_count: int = 0,
+    ) -> concurrent.futures.Future:
+        """
+        Args:
+            consumer_tag: Internal ID representing this subscription
+            queue: The queue to listen for messages on
+            auto_ack: Should this subscription auto-acknowledge messages?
+            prefetch_count: How many messages are we allowed to prefetch
+            reconnectable: Are we allowed to reconnect to this subscription
+        """
+        new_sub = _PikaSubscription(
+            arguments={},
+            auto_ack=auto_ack,
+            destination=exchange,
+            exclusive=True,
+            kind=_PikaSubscriptionKind.FANOUT,
+            on_message_callback=callback,
+            prefetch_count=prefetch_count,
+            reconnectable=reconnectable,
+        )
+        result = concurrent.futures.Future()
+        self._connection.add_callback_threadsafe(
+            functools.partial(
+                self._add_subscription_in_thread, consumer_tag, new_sub, result
+            )
+        )
+        return result
 
 
 #     def _run(self):
