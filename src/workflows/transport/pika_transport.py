@@ -884,7 +884,10 @@ class _PikaThread(threading.Thread):
             auto_ack: Should this subscription auto-acknowledge messages?
             consumer_tag: Internal ID representing this subscription. Generated if unspecified.
             prefetch_count: How many messages are we allowed to prefetch
-            reconnectable: Are we allowed to reconnect to this subscription
+            reconnectable:
+                Are we allowed to reconnect to this subscription?
+                **Warning**: Reconnecting to broadcast exchanges has the
+                    potential for dropping messages sent while disconnected.
 
         Returns:
             A Future representing the subscription state. It will be set
@@ -1007,12 +1010,11 @@ class _PikaThread(threading.Thread):
                 logger.error("Failed to connect to pika server")
                 break
             except pika.exceptions.ConnectionClosed:
+                self._exc_info = sys.exc_info()
                 if self._please_stop.is_set():
                     logger.info("Connection closed on request")
-                    self._exc_info = sys.exc_info()
                 else:
                     logger.error("Connection closed unexpectedly")
-                    self._exc_info = sys.exc_info()
             except pika.exceptions.ChannelClosed as e:
                 logger.error("Channel closed: {e}")
                 self._exc_info = sys.exc_info()

@@ -3,12 +3,14 @@ import inspect
 import json
 import optparse
 from unittest import mock
-
+import uuid
+import pprint
 import pika
 from pika import exchange_type
 import pytest
 import threading
 import time
+import inspect
 
 import workflows
 import workflows.transport
@@ -793,6 +795,7 @@ def test_nack_message(mockpika):
 
 @pytest.fixture
 def connection_params():
+    """Connection Parameters for connecting to a physical RabbitMQ server"""
     params = [
         pika.ConnectionParameters(
             "localhost",
@@ -814,12 +817,74 @@ def connection_params():
 
 
 @pytest.fixture
-def channel(connection_params) -> pika.channel.Channel:
+def test_channel(connection_params) -> pika.channel.Channel:
     conn = pika.BlockingConnection(connection_params)
     try:
-        yield conn.channel()
+
+        class _test_channel:
+            def __init__(self, channel):
+                self.channel = channel
+                self._on_close = []
+
+            def __getattr__(self, name):
+                return getattr(self.channel, name)
+
+            def temporary_exchange_declare(self, auto_delete=False, **kwargs):
+                """
+                Declare an auto-named exchange that is automatically deleted on test end.
+
+                This differs from auto_delete in that even if auto_delete=False,
+                an attempt to auto-delete the exchange will be made on test-teardown.
+                """
+                exchange_name = "_test_pika_" + str(uuid.uuid4())
+                self.channel.exchange_declare(
+                    exchange_name, auto_delete=auto_delete, **kwargs
+                )
+                # If the server won't clean this up, we need to
+                if not auto_delete:
+                    self.register_cleanup(
+                        lambda: self.channel.exchange_delete(exchange_name)
+                    )
+                return exchange_name
+
+            def temporary_queue_declare(self, **kwargs):
+                """
+                Declare an auto-named queue that is automatically deleted on test end.
+
+                """
+                queue = self.channel.queue_declare("", **kwargs).method.queue
+                self.register_cleanup(lambda: self.channel.queue_delete(queue))
+                print(f"Got temporary queue for testing: {queue}")
+                return queue
+
+            def register_cleanup(self, task):
+                caller = inspect.getframeinfo(inspect.stack()[1][0])
+                self._on_close.append((caller.filename, caller.lineno, task))
+
+        channel = _test_channel(conn.channel())
+        try:
+            yield channel
+        finally:
+            # Make an attempt to run all of the shutdown tasks
+            for (filename, lineno, task) in reversed(channel._on_close):
+                try:
+                    task()
+                except BaseException as e:
+                    print(
+                        f"Encountered error cleaning up test channel, cleanup from {filename}:{lineno} may not be complete: %s",
+                        e,
+                    )
     finally:
         conn.close()
+
+
+# @contextmanager
+# def temporary_exchange(channel, kind):
+#     try:
+#         name = "_pytest_" + str(uuid.uuid4())
+#         chan.exchange_declare(name, exchange_type="fanout")
+#     finally:
+#         pass
 
 
 def test_multiple_subscribe_to_broadcast():
@@ -860,16 +925,13 @@ def test_pikathread(connection_params):
     thread.join(re_raise=True, stop=True)
 
 
-def test_pikathread_broadcast_subscribe(connection_params):
+def test_pikathread_broadcast_subscribe(connection_params, test_channel):
     thread = _PikaThread(connection_params)
     thread.start()
     thread.wait_for_connection()
 
-    # Let's make our own connection to send a message
-    conn = pika.BlockingConnection(connection_params)
-    chan = conn.channel()
-    chan.exchange_declare(
-        "_broadcast_check_exchange", exchange_type="fanout", auto_delete=True
+    exchange = test_channel.temporary_exchange_declare(
+        exchange_type="fanout", auto_delete=True
     )
 
     # Basic check that a message has come through
@@ -883,34 +945,32 @@ def test_pikathread_broadcast_subscribe(connection_params):
 
     # Make a subscription and wait for it to be valid
     thread.subscribe_broadcast(
-        "_broadcast_check_exchange", _callback, consumer_tag=0, reconnectable=True
+        exchange, _callback, consumer_tag=0, reconnectable=True
     ).result()
 
-    chan.basic_publish("_broadcast_check_exchange", routing_key="", body="A Message")
+    test_channel.basic_publish(exchange, routing_key="", body="A Message")
 
     got_message.wait(5)
     assert got_message.is_set()
 
     thread.join(re_raise=True, stop=True)
-    conn.close()
 
 
 def test_pikathread_broadcast_reconnection(
-    connection_params, channel: pika.channel.Channel
+    connection_params, test_channel: pika.channel.Channel
 ):
     thread = _PikaThread(connection_params)
     try:
         thread.start(wait_for_connection=True)
-        channel.exchange_declare("_broadcast_check_exchange", exchange_type="fanout")
 
         got_message = threading.Event()
 
         def _got_message(*args):
             got_message.set()
 
-        thread.subscribe_broadcast(
-            "_broadcast_check_exchange", _got_message, reconnectable=True
-        ).result()
+        exchange = test_channel.temporary_exchange_declare(exchange_type="fanout")
+        thread.subscribe_broadcast(exchange, _got_message, reconnectable=True).result()
+
         # Force reconnection - normally we want this to be transparent, but
         # let's twiddle the internals so we can wait for reconnection as we
         # don't want to pick up the message before it resets
@@ -918,11 +978,9 @@ def test_pikathread_broadcast_reconnection(
         thread._connected.clear()
         thread._connection.add_callback_threadsafe(lambda: thread._connection.close())
         thread.wait_for_connection()
-        print("Reconnected, apparently")
+        print("Reconnected")
         # Now, make sure we still get this message
-        channel.basic_publish(
-            "_broadcast_check_exchange", routing_key="", body="A Message"
-        )
+        test_channel.basic_publish(exchange, routing_key="", body="A Message")
         got_message.wait(2)
         assert got_message.is_set()
 
@@ -933,12 +991,40 @@ def test_pikathread_broadcast_reconnection(
             got_message_2.set()
 
         thread.subscribe_broadcast(
-            "_broadcast_check_exchange", _got_message_2, reconnectable=False
+            exchange, _got_message_2, reconnectable=False
         ).result()
-        thread._connected.clear()
+
+        # Make sure that the thread ends instead of disconnect if we force a disconnection
         thread._connection.add_callback_threadsafe(lambda: thread._connection.close())
         thread.join()
 
     finally:
-        channel.exchange_delete("_broadcast_check_exchange")
+        thread.join(stop=True)
+
+
+def test_pikathread_subscribe_queue(connection_params, test_channel):
+    queue = test_channel.temporary_queue_declare()
+    thread = _PikaThread(connection_params)
+    try:
+        thread.start()
+
+        got_message = threading.Event()
+
+        def _get_message(*args):
+            print(f"Got message: {pprint.pformat(args)}")
+            got_message.set()
+
+        thread.subscribe_queue(queue, _get_message)
+        test_channel.basic_publish("", queue, "This is a message")
+        got_message.wait(timeout=2)
+        assert got_message.is_set()
+
+        # print("Terminating connection")
+        # got_message.clear()
+        # thread._connected.clear()
+        # thread._connection.add_callback_threadsafe(lambda: thread._connection.close())
+        # thread.wait_for_connection()
+        # print("Reconnected")
+
+    finally:
         thread.join(stop=True)
