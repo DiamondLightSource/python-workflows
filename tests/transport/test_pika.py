@@ -11,6 +11,7 @@ import pytest
 import threading
 import time
 import inspect
+from queue import Queue
 
 import workflows
 import workflows.transport
@@ -818,6 +819,7 @@ def connection_params():
 
 @pytest.fixture
 def test_channel(connection_params) -> pika.channel.Channel:
+    """Convenience fixture to give a channel-like object with helpful methods for testing."""
     conn = pika.BlockingConnection(connection_params)
     try:
 
@@ -868,23 +870,14 @@ def test_channel(connection_params) -> pika.channel.Channel:
             # Make an attempt to run all of the shutdown tasks
             for (filename, lineno, task) in reversed(channel._on_close):
                 try:
+                    print(f"Cleaning up from {filename}:{lineno}")
                     task()
                 except BaseException as e:
                     print(
-                        f"Encountered error cleaning up test channel, cleanup from {filename}:{lineno} may not be complete: %s",
-                        e,
+                        f"Encountered error cleaning up test channel, cleanup from {filename}:{lineno} may not be complete: {e}",
                     )
     finally:
         conn.close()
-
-
-# @contextmanager
-# def temporary_exchange(channel, kind):
-#     try:
-#         name = "_pytest_" + str(uuid.uuid4())
-#         chan.exchange_declare(name, exchange_type="fanout")
-#     finally:
-#         pass
 
 
 def test_multiple_subscribe_to_broadcast():
@@ -1008,23 +1001,23 @@ def test_pikathread_subscribe_queue(connection_params, test_channel):
     try:
         thread.start()
 
-        got_message = threading.Event()
+        messages = Queue()
 
         def _get_message(*args):
             print(f"Got message: {pprint.pformat(args)}")
-            got_message.set()
+            messages.put(args[3])
 
-        thread.subscribe_queue(queue, _get_message)
+        thread.subscribe_queue(queue, _get_message, reconnectable=True)
         test_channel.basic_publish("", queue, "This is a message")
-        got_message.wait(timeout=2)
-        assert got_message.is_set()
+        assert messages.get(timeout=2) == b"This is a message"
 
-        # print("Terminating connection")
-        # got_message.clear()
-        # thread._connected.clear()
-        # thread._connection.add_callback_threadsafe(lambda: thread._connection.close())
-        # thread.wait_for_connection()
-        # print("Reconnected")
+        print("Terminating connection")
+        thread._connected.clear()
+        thread._connection.add_callback_threadsafe(lambda: thread._connection.close())
+        thread.wait_for_connection()
+        print("Reconnected")
+        test_channel.basic_publish("", queue, "This is another message")
+        assert messages.get(timeout=2) == b"This is another message"
 
     finally:
         thread.join(stop=True)
