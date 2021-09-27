@@ -295,8 +295,6 @@ class StompTransport(CommonTransport):
           selector:         Only receive messages filtered by a selector. See
                             https://activemq.apache.org/activemq-message-properties.html
                             for potential filter criteria. Uses SQL 92 syntax.
-          transformation:   Transform messages into different format. If set
-                            to True, will use 'jms-object-json' formatting.
         """
         headers = {}
         if kwargs.get("exclusive"):
@@ -311,11 +309,6 @@ class StompTransport(CommonTransport):
             headers["activemq.retroactive"] = "true"
         if kwargs.get("selector"):
             headers["selector"] = kwargs["selector"]
-        if kwargs.get("transformation"):
-            if kwargs["transformation"] is True:
-                headers["transformation"] = "jms-object-json"
-            else:
-                headers["transformation"] = kwargs["transformation"]
         if kwargs.get("acknowledgement"):
             ack = "client-individual"
         else:
@@ -331,8 +324,6 @@ class StompTransport(CommonTransport):
         :param **kwargs: Further parameters for the transport layer. For example
           ignore_namespace: Do not apply namespace to the destination name
           retroactive:      Ask broker to send old messages if possible
-          transformation:   Transform messages into different format. If set
-                            to True, will use 'jms-object-json' formatting.
         """
         headers = {}
         if kwargs.get("ignore_namespace"):
@@ -341,11 +332,6 @@ class StompTransport(CommonTransport):
             destination = "/topic/" + self._namespace + channel
         if kwargs.get("retroactive"):
             headers["activemq.retroactive"] = "true"
-        if kwargs.get("transformation"):
-            if kwargs["transformation"] is True:
-                headers["transformation"] = "jms-object-json"
-            else:
-                headers["transformation"] = kwargs["transformation"]
         self._conn.subscribe(destination, sub_id, headers=headers)
 
     def _unsubscribe(self, subscription, **kwargs):

@@ -398,8 +398,6 @@ class PikaTransport(CommonTransport):
         :param **kwargs: Further parameters for the transport layer. For example
           ignore_namespace: Do not apply namespace to the destination name
           retroactive:      Ask broker to send old messages if possible
-          transformation:   Transform messages into different format. If set
-                            to True, will use 'jms-object-json' formatting.
         """
 
         headers = {}
