@@ -244,15 +244,13 @@ class CommonTransport:
         else:
             message_id = message
         if not message_id:
-            raise workflows.Error("Cannot acknowledge message without " + "message ID")
+            raise workflows.Error("Cannot acknowledge message without message ID")
         if not subscription_id:
-            raise workflows.Error(
-                "Cannot acknowledge message without " + "subscription ID"
-            )
+            raise workflows.Error("Cannot acknowledge message without subscription ID")
         self.log.debug(
             "Acknowledging message %s on subscription %s", message_id, subscription_id
         )
-        self._ack(message_id, subscription_id, **kwargs)
+        self._ack(message_id, subscription_id=subscription_id, **kwargs)
 
     def nack(self, message, subscription_id=None, **kwargs):
         """Reject receipt of a message. This only makes sense when the
@@ -273,13 +271,13 @@ class CommonTransport:
         else:
             message_id = message
         if not message_id:
-            raise workflows.Error("Cannot reject message without " + "message ID")
+            raise workflows.Error("Cannot reject message without message ID")
         if not subscription_id:
-            raise workflows.Error("Cannot reject message without " + "subscription ID")
+            raise workflows.Error("Cannot reject message without subscription ID")
         self.log.debug(
             "Rejecting message %s on subscription %s", message_id, subscription_id
         )
-        self._nack(message_id, subscription_id, **kwargs)
+        self._nack(message_id, subscription_id=subscription_id, **kwargs)
 
     def transaction_begin(self, **kwargs):
         """Start a new transaction.

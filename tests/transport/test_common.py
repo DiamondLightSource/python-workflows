@@ -287,12 +287,24 @@ def test_messages_can_be_acknowledged_and_rejected():
         }
     )
 
-    ct._ack.assert_any_call(mock.sentinel.message_id1, mock.sentinel.subscription_id1)
-    ct._ack.assert_any_call(mock.sentinel.message_id3, mock.sentinel.subscription_id3)
-    ct._ack.assert_any_call(mock.sentinel.message_id5, mock.sentinel.subscription_id5)
-    ct._nack.assert_any_call(mock.sentinel.message_id2, mock.sentinel.subscription_id2)
-    ct._nack.assert_any_call(mock.sentinel.message_id4, mock.sentinel.subscription_id4)
-    ct._nack.assert_any_call(mock.sentinel.message_id6, mock.sentinel.subscription_id6)
+    ct._ack.assert_any_call(
+        mock.sentinel.message_id1, subscription_id=mock.sentinel.subscription_id1
+    )
+    ct._ack.assert_any_call(
+        mock.sentinel.message_id3, subscription_id=mock.sentinel.subscription_id3
+    )
+    ct._ack.assert_any_call(
+        mock.sentinel.message_id5, subscription_id=mock.sentinel.subscription_id5
+    )
+    ct._nack.assert_any_call(
+        mock.sentinel.message_id2, subscription_id=mock.sentinel.subscription_id2
+    )
+    ct._nack.assert_any_call(
+        mock.sentinel.message_id4, subscription_id=mock.sentinel.subscription_id4
+    )
+    ct._nack.assert_any_call(
+        mock.sentinel.message_id6, subscription_id=mock.sentinel.subscription_id6
+    )
 
     with pytest.raises(workflows.Error):
         ct.ack(None)
