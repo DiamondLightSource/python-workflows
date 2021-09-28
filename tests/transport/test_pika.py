@@ -1036,8 +1036,19 @@ def test_pikathread_send(connection_params, test_channel):
         thread.start()
         thread.send("", queue, "Test Message").result()
 
-        assert test_channel.basic_get(queue, auto_ack=True)
+        assert test_channel.basic_get(queue, auto_ack=True)[2] == b"Test Message"
 
+        # Make sure we don't have the missing queue declared
+        with pytest.raises(pika.exceptions.ChannelClosedByBroker):
+            check_channel = test_channel.connection.channel()
+            check_channel.queue_declare("unroutable-missing-queue", passive=True)
+
+        # Should not fail with mandatory=False
+        thread.send(
+            "", "unroutable-missing-queue", "Another Message", mandatory=False
+        ).result()
+
+        # But should fail with it declared
         with pytest.raises(pika.exceptions.UnroutableError):
             thread.send(
                 "", "unroutable-missing-queue", "Another Message", mandatory=True
