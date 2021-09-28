@@ -919,6 +919,7 @@ class _PikaThread(threading.Thread):
         properties: pika.spec.BasicProperties = None,
         mandatory: bool = True,
     ) -> concurrent.futures.Future:
+        """Send a message. Thread-safe."""
         future = concurrent.futures.Future()
 
         def _send():
