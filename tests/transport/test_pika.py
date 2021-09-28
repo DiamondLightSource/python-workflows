@@ -869,6 +869,7 @@ def test_channel(connection_params) -> pika.channel.Channel:
                 self._on_close.append((caller.filename, caller.lineno, task))
 
         channel = _test_channel(conn.channel())
+        channel.confirm_delivery()
         try:
             yield channel
         finally:
@@ -1036,6 +1037,11 @@ def test_pikathread_send(connection_params, test_channel):
         thread.send("", queue, "Test Message").result()
 
         assert test_channel.basic_get(queue, auto_ack=True)
+
+        with pytest.raises(pika.exceptions.UnroutableError):
+            thread.send(
+                "", "unroutable-missing-queue", "Another Message", mandatory=True
+            ).result()
 
     finally:
         thread.join(stop=True)

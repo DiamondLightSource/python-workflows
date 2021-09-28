@@ -945,6 +945,7 @@ class _PikaThread(threading.Thread):
         """Get the shared (no prefetch) channel. Create if necessary."""
         if not self._pika_shared_channel:
             self._pika_shared_channel = self._connection.channel()
+            self._pika_shared_channel.confirm_delivery()
         return self._pika_shared_channel
 
     def _synchronize_subscriptions(self):
@@ -968,6 +969,7 @@ class _PikaThread(threading.Thread):
                 channel = self._get_shared_channel()
             else:
                 channel = self._connection.channel()
+                channel.confirm_delivery()
 
             if subscription.kind == _PikaSubscriptionKind.FANOUT:
                 # If a FANOUT subscription, then we need to create and bind
