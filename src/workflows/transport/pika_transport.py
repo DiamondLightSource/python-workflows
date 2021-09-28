@@ -911,8 +911,41 @@ class _PikaThread(threading.Thread):
         )
         return result
 
+    def send(
+        self,
+        exchange: str,
+        routing_key: str,
+        body: Union[str, bytes],
+        properties: pika.spec.BasicProperties = None,
+        mandatory: bool = True,
+    ) -> concurrent.futures.Future:
+        future = concurrent.futures.Future()
+
+        def _send():
+            if future.set_running_or_notify_cancel():
+                try:
+                    self._get_shared_channel().basic_publish(
+                        exchange=exchange,
+                        routing_key=routing_key,
+                        body=body,
+                        properties=properties,
+                        mandatory=mandatory,
+                    )
+                    future.set_result(None)
+                except BaseException as e:
+                    future.set_exception(e)
+
+        self._connection.add_callback_threadsafe(_send)
+        return future
+
     ####################################################################
     # PikaThread Internal methods
+
+    def _get_shared_channel(self) -> pika.spec.Channel:
+        """Get the shared (no prefetch) channel. Create if necessary."""
+        if not self._pika_shared_channel:
+            self._pika_shared_channel = self._connection.channel()
+        return self._pika_shared_channel
 
     def _synchronize_subscriptions(self):
         """Synchronize subscriptions list with the current connection."""
@@ -932,9 +965,7 @@ class _PikaThread(threading.Thread):
 
             # Either open a channel (if prefetch) or use the shared one
             if subscription.prefetch_count == 0:
-                if not self._pika_shared_channel:
-                    self._pika_shared_channel = self._connection.channel()
-                channel = self._pika_shared_channel
+                channel = self._get_shared_channel()
             else:
                 channel = self._connection.channel()
 

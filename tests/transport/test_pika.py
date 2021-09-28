@@ -849,13 +849,18 @@ def test_channel(connection_params) -> pika.channel.Channel:
                     )
                 return exchange_name
 
-            def temporary_queue_declare(self, **kwargs):
+            def temporary_queue_declare(
+                self, auto_delete=False, exclusive=False, **kwargs
+            ):
                 """
                 Declare an auto-named queue that is automatically deleted on test end.
 
                 """
-                queue = self.channel.queue_declare("", **kwargs).method.queue
-                self.register_cleanup(lambda: self.channel.queue_delete(queue))
+                queue = self.channel.queue_declare(
+                    "", auto_delete=auto_delete, exclusive=exclusive, **kwargs
+                ).method.queue
+                if not (auto_delete or exclusive):
+                    self.register_cleanup(lambda: self.channel.queue_delete(queue))
                 print(f"Got temporary queue for testing: {queue}")
                 return queue
 
@@ -1018,6 +1023,19 @@ def test_pikathread_subscribe_queue(connection_params, test_channel):
         print("Reconnected")
         test_channel.basic_publish("", queue, "This is another message")
         assert messages.get(timeout=2) == b"This is another message"
+
+    finally:
+        thread.join(stop=True)
+
+
+def test_pikathread_send(connection_params, test_channel):
+    queue = test_channel.temporary_queue_declare(exclusive=True)
+    thread = _PikaThread(connection_params)
+    try:
+        thread.start()
+        thread.send("", queue, "Test Message").result()
+
+        assert test_channel.basic_get(queue, auto_ack=True)
 
     finally:
         thread.join(stop=True)
