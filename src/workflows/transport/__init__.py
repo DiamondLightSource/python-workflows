@@ -1,3 +1,7 @@
+import argparse
+import optparse
+from typing import Union
+
 import pkg_resources
 
 default_transport = "StompTransport"
@@ -10,8 +14,34 @@ def lookup(transport):
     )
 
 
-def add_command_line_options(parser):
+def add_command_line_options(
+    parser: Union[argparse.ArgumentParser, optparse.OptionParser],
+    transport_argument: bool = False,
+) -> None:
     """Add command line options for all available transport layer classes."""
+    if transport_argument:
+        if isinstance(parser, argparse.ArgumentParser):
+            parser.add_argument(
+                "-t",
+                "--transport",
+                dest="transport",
+                metavar="TRN",
+                default=default_transport,
+                help="Transport mechanism. Known mechanisms: "
+                + ", ".join(get_known_transports())
+                + f" (default: {default_transport})",
+            )
+        else:
+            parser.add_option(
+                "-t",
+                "--transport",
+                dest="transport",
+                metavar="TRN",
+                default=default_transport,
+                help="Transport mechanism. Known mechanisms: "
+                + ", ".join(get_known_transports())
+                + " (default: %default)",
+            )
     for transport in get_known_transports().values():
         transport().add_command_line_options(parser)
 
