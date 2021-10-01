@@ -74,17 +74,7 @@ class ServiceStarter:
             help="Name of the service to start. Known services: "
             + ", ".join(known_services),
         )
-        parser.add_option(
-            "-t",
-            "--transport",
-            dest="transport",
-            metavar="TRN",
-            default=workflows.transport.default_transport,
-            help="Transport mechanism. Known mechanisms: "
-            + ", ".join(workflows.transport.get_known_transports())
-            + " (default: %default)",
-        )
-        workflows.transport.add_command_line_options(parser)
+        workflows.transport.add_command_line_options(parser, transport_argument=True)
 
         # Call on_parser_preparation hook
         parser = self.on_parser_preparation(parser) or parser
