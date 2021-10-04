@@ -895,7 +895,7 @@ class _PikaThread(threading.Thread):
         This will return True even if the connection is not physically
         connected, or in the process of reconnecting.
         """
-        return self._connected.is_set() and self._state not in (
+        return self.__started.is_set() and self._state not in (
             _PikaThreadStatus.STOPPED,
             _PikaThreadStatus.STOPPING,
         )
