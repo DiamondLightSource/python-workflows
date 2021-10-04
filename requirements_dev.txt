@@ -2,6 +2,6 @@ dataclasses==0.8; python_version < '3.7'
 pytest==6.2.5
 pytest-cov==2.12.1
 pytest-timeout==1.4.2
-setuptools==58.1.0
+setuptools==58.2.0
 stomp.py==7.0.0
 pika==1.2.0
