@@ -991,6 +991,8 @@ class _PikaThread(threading.Thread):
                     logger.debug("Connecting to AMPQ")
                 else:
                     logger.debug(f"Reconnecting to AMPQ #{connection_counter}")
+                # Clear any exceptions from past connections
+                self._exc_info = None
                 self._state = _PikaThreadStatus.CONNECTING
 
                 # Make sure we don't always connect to the same server first
