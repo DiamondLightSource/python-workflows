@@ -638,9 +638,18 @@ class _PikaThread(threading.Thread):
             How to connect to the AMPQ server. This is an iterable of
             possible connections, which will be attempted in a random
             order.
+        reconnection_attempts:
+            How many times to consecutively attempt connection before
+            giving up. Connecting successfully (and reattaching any
+            reconnectable queues) resets this counter. Successive
+            attempts will wait longer before reattempting.
     """
 
-    def __init__(self, connection_parameters: Iterable[pika.ConnectionParameters]):
+    def __init__(
+        self,
+        connection_parameters: Iterable[pika.ConnectionParameters],
+        reconnection_attempts=5,
+    ):
         super().__init__(
             name="workflows pika_transport", daemon=False, target=self._run
         )
@@ -648,7 +657,7 @@ class _PikaThread(threading.Thread):
         # Internal store of subscriptions, to resubscribe if necessary
         self._subscriptions: Dict[int, _PikaSubscription] = {}
         # The pika connection object
-        self._connection: pika.BlockingConnection
+        self._connection: Optional[pika.BlockingConnection] = None
         # Per-subscription channels. May be pointing to the shared channel
         self._pika_channels: Dict[int, pika.channel.Channel] = {}
         # A common, shared channel, used for non-QoS subscriptions
@@ -659,7 +668,7 @@ class _PikaThread(threading.Thread):
         self._connection_parameters = list(connection_parameters)
         # If we failed with an unexpected exception
         self._exc_info: Optional[Tuple[Any, Any, Any]] = None
-
+        self._reconnection_attempt_limit = reconnection_attempts
         # General bookkeeping events
 
         # When set, requests the main loop to stop when convenient
@@ -919,6 +928,9 @@ class _PikaThread(threading.Thread):
     ####################################################################
     # PikaThread Internal methods
 
+    def _debug_close_connection(self):
+        self._connection.add_callback_threadsafe(lambda: self._connection.close())
+
     def _get_shared_channel(self) -> pika.spec.Channel:
         """Get the shared (no prefetch) channel. Create if necessary."""
         if not self._pika_shared_channel:
@@ -981,12 +993,35 @@ class _PikaThread(threading.Thread):
         assert self._reconnection_allowed, "Should be true until first synchronize"
         logger.debug("pika thread starting")
         connection_counter = 0
+        connection_attempts_since_last_connection = 0
 
         # Loop until we either can't, or are asked not to
         while (
             connection_counter == 0 or self._reconnection_allowed
         ) and not self._please_stop.is_set():
             try:
+                # If we've reconnecting to the limit, give up
+                if (
+                    self._reconnection_attempt_limit
+                    and connection_attempts_since_last_connection
+                    > self._reconnection_attempt_limit
+                ):
+                    logger.error(
+                        "Failed to establish connection after %d attempts; giving up"
+                    )
+                    break
+                # If we are hitting repeat reconnections without success, sleep for a bit and hope
+                # that the server comes back
+                if connection_attempts_since_last_connection > 0:
+                    sleep_time = 2 ** (connection_attempts_since_last_connection - 1)
+                    logger.info(
+                        "Failed to connect on attempt %d - sleeping %ds",
+                        connection_attempts_since_last_connection,
+                        sleep_time,
+                    )
+                    time.sleep(sleep_time)
+
+                connection_attempts_since_last_connection += 1
                 if connection_counter == 0:
                     logger.debug("Connecting to AMPQ")
                 else:
@@ -1012,16 +1047,13 @@ class _PikaThread(threading.Thread):
                 # until all requested subscriptions have been actioned.
                 self._state = _PikaThreadStatus.CONNECTED
                 self._connected.set()
-
+                # Since we are properly reconnected, reset the fail count
+                connection_attempts_since_last_connection = 0
                 logger.debug("Waiting for events")
 
                 # Run until we are asked to stop, or fail
                 while not self._please_stop.is_set():
                     self._connection.process_data_events(None)
-            except connection_workflow.AMQPConnectionWorkflowFailed:
-                # We failed to even connect the first time - in this case fail visibly
-                logger.error("Failed to connect to pika server")
-                break
             except pika.exceptions.ConnectionClosed:
                 self._exc_info = sys.exc_info()
                 if self._please_stop.is_set():
@@ -1036,6 +1068,13 @@ class _PikaThread(threading.Thread):
                     "Got ConnectionWrongStateError - connection closed by other means?"
                 )
                 self._exc_info = sys.exc_info()
+            except pika.exceptions.AMQPConnectionError as e:
+                self._exc_info = sys.exc_info()
+                # Connection failed. Are we the first?
+                if connection_counter == 0:
+                    logger.error("Initial connection failed: %s", repr(e))
+                    break
+                logger.error("Connection %d failed: %s", connection_counter, repr(e))
             except BaseException as e:
                 logger.error(f"Connection failed for unknown reason: {e!r}")
                 self._exc_info = sys.exc_info()
@@ -1050,7 +1089,7 @@ class _PikaThread(threading.Thread):
         self._state = _PikaThreadStatus.STOPPING
 
         # Make sure the connection is closed
-        if not self._connection.is_closed:
+        if self._connection and not self._connection.is_closed:
             self._connection.close()
 
         self._state = _PikaThreadStatus.STOPPED
@@ -1061,6 +1100,8 @@ class _PikaThread(threading.Thread):
         # as disconnected, mark all other outstanding events as "complete"
         # to resolve deadlocks.
         self._connected.set()
+
+        logger.debug("Leaving PikaThread runloop")
 
     def _add_subscription_in_thread(
         self,

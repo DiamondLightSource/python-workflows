@@ -1,4 +1,5 @@
 import argparse
+import copy
 import inspect
 import json
 import optparse
@@ -15,7 +16,30 @@ from queue import Queue
 
 import workflows
 import workflows.transport
+import workflows.transport.pika_transport
 from workflows.transport.pika_transport import PikaTransport, _PikaThread
+
+
+@pytest.fixture
+def mock_pikathread(monkeypatch):
+    # class Mock_PikaThread(mock.Mock):
+    #     instances = []
+
+    #     def __init__(self, params):
+    #         self.params = params
+    #         Mock_PikaThread.instances.append(self)
+
+    #     @classmethod
+    #     def instance(cls):
+    #         assert len(cls.instances) == 1
+    #         return cls.instances[0]
+
+    instance = mock.Mock(spec=_PikaThread)
+    instance.return_value = instance
+
+    monkeypatch.setattr(workflows.transport.pika_transport, "_PikaThread", instance)
+
+    return instance
 
 
 def test_lookup_and_initialize_pika_transport_layer():
@@ -68,11 +92,13 @@ def test_adding_arguments_to_argparser():
 
 
 @mock.patch("workflows.transport.pika_transport.pika")
-def test_check_config_file_behaviour(mockpika, tmp_path):
+# @mock.patch("workflows.transport.pika_transport._PikaThread")
+def test_check_config_file_behaviour(mockpika, mock_pikathread, tmp_path):
     """Check that a specified configuration file is read, that command line
     parameters have precedence and are passed on to the pika layer."""
-    mockconn = mock.Mock()
-    mockpika.BlockingConnection.return_value = mockconn
+
+    # mock_thread = mock.Mock()
+    # mockpikathread.__init__.return_value = mock_thread
 
     parser = optparse.OptionParser()
     transport = PikaTransport()
@@ -104,7 +130,7 @@ def test_check_config_file_behaviour(mockpika, tmp_path):
         transport = PikaTransport()
         transport.connect()
 
-        mockpika.BlockingConnection.assert_called_once()
+        mock_pikathread.start.assert_called_once()
         mockpika.PlainCredentials.assert_called_once_with(
             mock.sentinel.user, "somesecret"
         )
@@ -115,8 +141,6 @@ def test_check_config_file_behaviour(mockpika, tmp_path):
             "port": 5672,
             "virtual_host": "namespace",
             "credentials": mockpika.PlainCredentials.return_value,
-            "connection_attempts": mock.ANY,
-            "retry_delay": mock.ANY,
         }
 
         with pytest.raises(workflows.Error):
@@ -128,7 +152,7 @@ def test_check_config_file_behaviour(mockpika, tmp_path):
 
 
 @mock.patch("workflows.transport.pika_transport.pika")
-def test_anonymous_connection(mockpika):
+def test_anonymous_connection(mockpika, mock_pikathread):
     """check that a specified configuration file is read, that command line
     parameters have precedence and are passed on the pika layer"""
 
@@ -143,53 +167,55 @@ def test_anonymous_connection(mockpika):
     transport = PikaTransport()
     transport.connect()
 
-    mockpika.BlockingConnection.assert_called_once()
+    mock_pikathread.start.assert_called_once()
     mockpika.PlainCredentials.assert_called_once_with("", "")
 
 
 @mock.patch("workflows.transport.pika_transport.pika")
-def test_instantiate_link_and_connect_to_broker(mockpika):
+def test_instantiate_link_and_connect_to_broker(mockpika, mock_pikathread):
     """Test the Pika connection routine."""
     transport = PikaTransport()
-    mockconn = mockpika.BlockingConnection
-    mockchannel = mockconn.return_value.channel.return_value
+    # mockconn = mockpika.BlockingConnection
+    # mockchannel = mockconn.return_value.channel.return_value
     assert not transport.is_connected()
 
     transport.connect()
 
-    mockconn.assert_called_once()
-    mockconn.return_value.channel.assert_called_once()
+    mock_pikathread.start.assert_called_once()
+
     assert transport.is_connected()
 
     transport.connect()
 
-    mockconn.assert_called_once()
-    mockconn.return_value.channel.assert_called_once()
+    # No reconnection
+    mock_pikathread.start.assert_called_once()
+    mock_pikathread.join.assert_not_called()
     assert transport.is_connected()
 
     transport.disconnect()
 
-    mockconn.assert_called_once()
-    mockconn.return_value.close.assert_called_once()
-    mockconn.return_value.is_open = False
-    mockchannel.close.assert_called_once()
-    mockchannel.is_open = False
+    mock_pikathread.join.assert_called_once()
+    mock_pikathread.alive = False
+    # mockconn.assert_called_once()
+    # mockconn.return_value.close.assert_called_once()
+    # mockconn.return_value.is_open = False
+    # mockchannel.close.assert_called_once()
+    # mockchannel.is_open = False
     assert not transport.is_connected()
 
     transport.disconnect()
 
-    mockconn.assert_called_once()
-    mockconn.return_value.close.assert_called_once()
-    mockchannel.close.assert_called_once()
+    assert mock_pikathread.join.call_count == 2
     assert not transport.is_connected()
 
 
 @mock.patch("workflows.transport.pika_transport.pika")
-def test_error_handling_when_connecting_to_broker(mockpika):
+def test_error_handling_when_connecting_to_broker(mockpika, mock_pikathread):
     """Test the Pika connection routine."""
     transport = PikaTransport()
-    mockpika.BlockingConnection.side_effect = pika.exceptions.AMQPConnectionError()
-    mockpika.exceptions.AMQPConnectionError = pika.exceptions.AMQPConnectionError
+    mock_pikathread.start.side_effect = pika.exceptions.AMQPConnectionError
+    # mockpika.BlockingConnection.side_effect = pika.exceptions.AMQPConnectionError()
+    # mockpika.exceptions.AMQPConnectionError = pika.exceptions.AMQPConnectionError
 
     with pytest.raises(workflows.Disconnected):
         transport.connect()
@@ -1056,3 +1082,32 @@ def test_pikathread_send(connection_params, test_channel):
 
     finally:
         thread.join(stop=True)
+
+
+def test_pikathread_bad_conn_params(connection_params):
+    # Ensure that a bad connection parameter fails immediately
+    bad_params = [copy.copy(connection_params[0])]
+    bad_params[0].port = 1
+    thread = _PikaThread(bad_params)
+    thread.start(wait_for_connection=False)
+    thread.join(timeout=5)
+    assert not thread.is_alive()
+
+    with pytest.raises(pika.exceptions.AMQPConnectionError):
+        thread.raise_if_exception()
+
+    # Start a working connection
+    params = [copy.copy(connection_params[0])]
+    thread = _PikaThread(connection_params)
+    thread.start()
+    # Forcibly cause a failure of reconnection by editing the inner connection dict
+    # - otherwise, we can't guarantee that it will do them in the right order
+    thread._connection_parameters[0].port = 1
+    # Make sure it will fail on the next attempt
+    thread._reconnection_attempt_limit = 1
+    # Force a reconnection
+    print("\n\nForcing Reconnection")
+    thread._debug_close_connection()
+    # Wait for it to do this reconnection wait of 1s
+    thread.join(timeout=5, stop=False)
+    assert not thread.is_alive()
