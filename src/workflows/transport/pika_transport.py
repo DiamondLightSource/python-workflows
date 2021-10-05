@@ -1,28 +1,24 @@
-import collections
 import configparser
 import dataclasses
 import functools
-import itertools
 import json
 import logging
 import random
+import sys
 import threading
 import time
-from enum import Enum, auto
-from typing import Any, Callable, Dict, Iterable, List, Union, Optional, Tuple
-from concurrent.futures import Future
 import uuid
-import sys
+from collections.abc import Hashable, Mapping
+from concurrent.futures import Future
+from enum import Enum, auto
+from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Union
 
 import pika
 import pika.exceptions
-
 from pika.adapters.blocking_connection import BlockingChannel
 
 import workflows
 from workflows.transport.common_transport import CommonTransport, json_serializer
-
-from collections.abc import Hashable, Mapping
 
 logger = logging.getLogger("workflows.transport.pika_transport")
 
@@ -693,7 +689,7 @@ class _PikaThread(threading.Thread):
         # The pika connection object
         self._connection: Optional[pika.BlockingConnection] = None
         # Per-subscription channels. May be pointing to the shared channel
-        self._pika_channels: Dict[int, pika.channel.Channel] = {}
+        self._pika_channels: Dict[str, pika.channel.Channel] = {}
         # A common, shared channel, used for non-QoS subscriptions
         self._pika_shared_channel: Optional[BlockingChannel]
         # Are we allowed to reconnect. Can only be turned off, never on
@@ -913,7 +909,7 @@ class _PikaThread(threading.Thread):
         return result
 
     def unsubscribe(self, consumer_tag: str) -> Future[None]:
-        if not consumer_tag in self._subscriptions:
+        if consumer_tag not in self._subscriptions:
             raise KeyError(f"No such subscription with consumer tag '{consumer_tag}'")
 
         assert self._connection is not None
@@ -924,12 +920,12 @@ class _PikaThread(threading.Thread):
             try:
                 if result.set_running_or_notify_cancel():
                     logger.debug("Unsubscribing consumer tag '%s'", consumer_tag)
-                    subscription = self._subscriptions.pop(consumer_tag)
+                    self._subscriptions.remove(consumer_tag)
                     channel = self._pika_channels.pop(consumer_tag)
                     channel.basic_cancel(str(consumer_tag))
 
                     # Close the channel if nobody else is using it
-                    if not channel in self._pika_channels.values():
+                    if channel not in self._pika_channels.values():
                         logger.debug("Closing channel that is now unused")
                         channel.close()
 
@@ -975,10 +971,12 @@ class _PikaThread(threading.Thread):
 
     def ack(self, delivery_tag: int, subscription_id: str, *, multiple=False):
         subscription_id = str(subscription_id)
-        if not subscription_id in self._subscriptions:
+        if subscription_id not in self._subscriptions:
             raise KeyError(f"Could not find subscription {subscription_id} to ACK")
 
         channel = self._pika_channels[subscription_id]
+
+        assert self._connection is not None
 
         self._connection.add_callback_threadsafe(
             lambda: channel.basic_ack(delivery_tag, multiple=multiple)
@@ -988,10 +986,12 @@ class _PikaThread(threading.Thread):
         self, delivery_tag: int, subscription_id: str, *, multiple=False, requeue=True
     ):
         subscription_id = str(subscription_id)
-        if not subscription_id in self._subscriptions:
+        if subscription_id not in self._subscriptions:
             raise KeyError(f"Could not find subscription {subscription_id} to NACK")
 
         channel = self._pika_channels[subscription_id]
+
+        assert self._connection is not None
 
         self._connection.add_callback_threadsafe(
             lambda: channel.basic_nack(delivery_tag, multiple=multiple, requeue=requeue)
@@ -1166,9 +1166,9 @@ class _PikaThread(threading.Thread):
                 else:
                     logger.error("Connection closed unexpectedly")
             except pika.exceptions.ChannelClosed as e:
-                logger.error("Channel closed: {e}")
+                logger.error("Channel closed: %r", e)
                 self._exc_info = sys.exc_info()
-            except pika.exceptions.ConnectionWrongStateError as e:
+            except pika.exceptions.ConnectionWrongStateError:
                 logger.debug(
                     "Got ConnectionWrongStateError - connection closed by other means?"
                 )
@@ -1177,7 +1177,7 @@ class _PikaThread(threading.Thread):
                 self._exc_info = sys.exc_info()
                 # Connection failed. Are we the first?
                 if connection_counter == 0:
-                    logger.error("Initial connection failed: %s", repr(e))
+                    logger.error("Initial connection failed: %r", e)
                     break
                 logger.error("Connection %d failed: %s", connection_counter, repr(e))
             except BaseException as e:
