@@ -3,14 +3,14 @@ import copy
 import inspect
 import json
 import optparse
-from unittest import mock
-import uuid
 import pprint
+import threading
+import uuid
+from queue import Empty, Queue
+from unittest import mock
+
 import pika
 import pytest
-import threading
-import inspect
-from queue import Queue, Empty
 
 import workflows
 import workflows.transport
@@ -201,8 +201,6 @@ def test_broadcast_status(mockpika, mock_pikathread):
     transport = PikaTransport()
     transport.connect()
 
-    mockconn = mockpika.BlockingConnection
-    mockchannel = mockconn.return_value.channel.return_value
     mockproperties = mockpika.BasicProperties
 
     transport.broadcast_status({"status": str(mock.sentinel.status)})
@@ -302,23 +300,23 @@ def test_error_handling_on_send(mockpika, mock_pikathread):
 
     pytest.xfail("Don't understand send failure modes yet")
 
-    transport = PikaTransport()
-    transport.connect()
-    mockpika.exceptions = pika.exceptions
-    mock_pikathread.send.return_value.result.side_effect = (
-        pika.exceptions.AMQPChannelError
-    )
+    # transport = PikaTransport()
+    # transport.connect()
+    # mockpika.exceptions = pika.exceptions
+    # mock_pikathread.send.return_value.result.side_effect = (
+    #     pika.exceptions.AMQPChannelError
+    # )
 
-    with pytest.raises(workflows.Disconnected):
-        transport._send(str(mock.sentinel.queue), mock.sentinel.message)
+    # with pytest.raises(workflows.Disconnected):
+    #     transport._send(str(mock.sentinel.queue), mock.sentinel.message)
 
-    assert not transport.is_connected()
-    assert mockconn.call_count == 2
+    # assert not transport.is_connected()
+    # assert mockconn.call_count == 2
 
-    mockchannel.basic_publish.side_effect = None
-    transport._send(str(mock.sentinel.queue), mock.sentinel.message)
-    assert transport.is_connected()
-    assert mockconn.call_count == 3
+    # mockchannel.basic_publish.side_effect = None
+    # transport._send(str(mock.sentinel.queue), mock.sentinel.message)
+    # assert transport.is_connected()
+    # assert mockconn.call_count == 3
 
 
 @mock.patch("workflows.transport.pika_transport.pika")
