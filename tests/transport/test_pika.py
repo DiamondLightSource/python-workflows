@@ -171,8 +171,7 @@ def test_anonymous_connection(mockpika, mock_pikathread):
     mockpika.PlainCredentials.assert_called_once_with("", "")
 
 
-@mock.patch("workflows.transport.pika_transport.pika")
-def test_instantiate_link_and_connect_to_broker(mockpika, mock_pikathread):
+def test_instantiate_link_and_connect_to_broker(mock_pikathread):
     """Test the Pika connection routine."""
     transport = PikaTransport()
     # mockconn = mockpika.BlockingConnection
@@ -180,15 +179,14 @@ def test_instantiate_link_and_connect_to_broker(mockpika, mock_pikathread):
     assert not transport.is_connected()
 
     transport.connect()
-
     mock_pikathread.start.assert_called_once()
+    mock_pikathread.start.side_effect = RuntimeError
 
     assert transport.is_connected()
 
-    transport.connect()
+    with pytest.raises(RuntimeError):
+        transport.connect()
 
-    # No reconnection
-    mock_pikathread.start.assert_called_once()
     mock_pikathread.join.assert_not_called()
     assert transport.is_connected()
 
