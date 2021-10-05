@@ -193,7 +193,7 @@ def test_instantiate_link_and_connect_to_broker(mock_pikathread):
     transport.disconnect()
 
     mock_pikathread.join.assert_called_once()
-    mock_pikathread.alive = False
+    mock_pikathread.connection_alive = False
     # mockconn.assert_called_once()
     # mockconn.return_value.close.assert_called_once()
     # mockconn.return_value.is_open = False
@@ -219,7 +219,7 @@ def test_error_handling_when_connecting_to_broker(mockpika, mock_pikathread):
     with pytest.raises(workflows.Disconnected):
         transport.connect()
 
-    assert transport.is_connected() is mock_pikathread.alive
+    assert transport.is_connected() is mock_pikathread.connection_alive
 
 
 @mock.patch("workflows.transport.pika_transport.pika")
@@ -746,7 +746,7 @@ def test_error_handling_on_subscribing(mockpika, mock_pikathread):
     # mockconn = mockpika.BlockingConnection
     # mockchannel = mockconn.return_value.channel.return_value
     mockpika.exceptions = pika.exceptions
-    mock_pikathread.alive = False
+    mock_pikathread.connection_alive = False
     mock_pikathread.subscribe_queue.return_value.result.side_effect = (
         pika.exceptions.AMQPChannelError
     )

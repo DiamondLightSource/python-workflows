@@ -319,13 +319,13 @@ class PikaTransport(CommonTransport):
             raise workflows.Disconnected(e)
 
         # This either succeeded or the entire connection failed irreversably
-        return self._pika_thread.alive
+        return self._pika_thread.connection_alive
 
     def is_connected(self) -> bool:
         """Return connection status."""
         # TODO: Does this question even make sense with reconnection?
-        #       Surely .alive is (slightly) better?
-        return self._pika_thread and self._pika_thread.alive
+        #       Surely .connection_alive is (slightly) better?
+        return self._pika_thread and self._pika_thread.connection_alive
 
     def disconnect(self):
         """Gracefully close connection to pika server"""
@@ -799,7 +799,7 @@ class _PikaThread(threading.Thread):
         a floating point number specifying a timeout for the operation
         in seconds (or fractions thereof).
         """
-        if not self.alive:
+        if not self.connection_alive:
             raise RuntimeError("Connection stopped or failed")
         self._connected.wait(timeout)
         self.raise_if_exception()
@@ -998,7 +998,7 @@ class _PikaThread(threading.Thread):
         )
 
     @property
-    def alive(self) -> bool:
+    def connection_alive(self) -> bool:
         """
         Is the connection object connected, or in the process of reconnecting?
 
@@ -1024,7 +1024,7 @@ class _PikaThread(threading.Thread):
     #     Note that this might have changed by the time that you make a
     #     decision based on this property.
     #     """
-    #     return self.alive and self._connected.is_set()
+    #     return self.connection_alive and self._connected.is_set()
 
     ####################################################################
     # PikaThread Internal methods
