@@ -15,12 +15,12 @@ import uuid
 import sys
 
 import pika
-from pika.adapters.utils import connection_workflow
+import pika.exceptions
 
 import workflows
 from workflows.transport.common_transport import CommonTransport, json_serializer
 
-from collections.abc import Hashable, Mapping, Container
+from collections.abc import Hashable, Mapping
 
 logger = logging.getLogger("workflows.transport.pika_transport")
 
@@ -28,7 +28,7 @@ logger = logging.getLogger("workflows.transport.pika_transport")
 MessageCallback = Callable[[Mapping[str, Any], Any], None]
 # The form pika expects callbacks in
 PikaCallback = Callable[
-    [pika.channel.Channel, pika.spec.Basic.Return, pika.spec.BasicProperties, bytes],
+    [pika.channel.Channel, pika.spec.Basic.Deliver, pika.spec.BasicProperties, bytes],
     None,
 ]
 
@@ -40,20 +40,29 @@ def _rewrite_callback_to_pika(callback: MessageCallback) -> PikaCallback:
     This involves unwrapping the pika headers and putting them into a
     general headers dictionaly for the workflows.transport callback.
     """
-    return lambda _channel, method, properties, body: callback(
-        {
-            "consumer_tag": str(method.consumer_tag),
-            "delivery_mode": properties.delivery_mode,
-            "exchange": method.exchange,
-            "headers": properties.headers,
-            "message-id": method.delivery_tag,
-            "redelivered": method.redelivered,
-            "routing_key": method.routing_key,
-            "pika-method": method,
-            "pika-properties": properties,
-        },
-        body,
-    )
+
+    def _translate_callback(
+        _channel: pika.channel.Channel,
+        method: pika.spec.Basic.Deliver,
+        properties: pika.spec.BasicProperties,
+        body: bytes,
+    ) -> None:
+        callback(
+            {
+                "consumer_tag": str(method.consumer_tag),
+                "delivery_mode": properties.delivery_mode,
+                "exchange": method.exchange,
+                "headers": properties.headers,
+                "message-id": method.delivery_tag,
+                "redelivered": method.redelivered,
+                "routing_key": method.routing_key,
+                "pika-method": method,
+                "pika-properties": properties,
+            },
+            body,
+        )
+
+    return _translate_callback
 
 
 class PikaTransport(CommonTransport):
@@ -335,6 +344,7 @@ class PikaTransport(CommonTransport):
         exclusive: bool = False,
         prefetch_count: int = 1,
         reconnectable: bool = False,
+        **_kwargs,
     ):
         """
         Listen to a queue, notify via callback function.
@@ -1175,7 +1185,7 @@ class _PikaThread(threading.Thread):
             if result.set_running_or_notify_cancel():
                 # If not specified, generate a consumer_tag automatically
                 if consumer_tag is None:
-                    consumer_tag = uuid.uuid4()
+                    consumer_tag = str(uuid.uuid4())
                 assert (
                     consumer_tag not in self._subscriptions
                 ), f"Subscription request {consumer_tag} rejected due to existing subscription {self._subscriptions[consumer_tag]}"
