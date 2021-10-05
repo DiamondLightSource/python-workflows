@@ -12,7 +12,7 @@ import pytest
 import threading
 import time
 import inspect
-from queue import Queue
+from queue import Queue, Empty
 
 import workflows
 import workflows.transport
@@ -567,18 +567,11 @@ def test_messages_are_deserialized_after_transport(mockpika, mock_pikathread):
     banana_str = '{"entry": [0, "banana"]}'
     transport = PikaTransport()
     transport.connect()
-    # mockconn = mockpika.BlockingConnection
-    # mockchannel = mockconn.return_value.channel.return_value
-    # mockproperties = mockpika.BasicProperties
-    # mockdeliver = mockpika.BasicDeliver
 
     # Test subscriptions
     callback = mock.Mock()
-    # transport.__subscriptions["queue"] = callback
     transport.subscribe("queue", callback)
 
-    # message_handler = mockchannel.basic_consume.call_args[1].get("on_message_callback")
-    # mock_pikathread.subscribe.assert_called()
     # Extract the function passed to pikathread, and call it
     args, kwargs = mock_pikathread.subscribe_queue.call_args
     message_handler = kwargs["callback"]
@@ -588,7 +581,6 @@ def test_messages_are_deserialized_after_transport(mockpika, mock_pikathread):
         mock.Mock(),
         banana_str,
     )
-    # message_handler(mockchannel, mockdeliver, mockproperties, banana_str)
     callback.assert_called_once()
     args, kwargs = callback.call_args
     assert not kwargs
@@ -641,101 +633,110 @@ def test_messages_are_deserialized_after_transport(mockpika, mock_pikathread):
 
 
 @mock.patch("workflows.transport.pika_transport.pika")
-def test_subscribe_to_queue(mockpika):
+def test_subscribe_to_queue(mockpika, mock_pikathread):
     """Test subscribing to a queue (producer-consumer), callback functions and unsubscribe"""
-    mock_cb = mock.Mock()
     transport = PikaTransport()
     transport.connect()
-    mockconn = mockpika.BlockingConnection
-    mockchannel = mockconn.return_value.channel.return_value
 
+    mock_cb = mock.Mock()
+    transport._CommonTransport__subscriptions[1] = {"callback": mock_cb}
     transport._subscribe(1, str(mock.sentinel.queue1), mock_cb)
 
-    mockchannel.basic_consume.assert_called_once()
-    args, kwargs = mockchannel.basic_consume.call_args
+    mock_pikathread.subscribe_queue.assert_called_once()
+
+    # mockchannel.basic_consume.assert_called_once()
+    args, kwargs = mock_pikathread.subscribe_queue.call_args
     assert not args
     assert kwargs == {
-        "queue": str(mock.sentinel.queue1),
-        "on_message_callback": mock.ANY,
         "auto_ack": True,
+        "callback": mock.ANY,
         "consumer_tag": "1",
-        "arguments": {},
+        "exclusive": False,
+        "prefetch_count": 1,
+        "queue": str(mock.sentinel.queue1),
+        "reconnectable": False,
     }
 
+    transport._CommonTransport__subscriptions[2] = {"callback": mock_cb}
     transport._subscribe(2, str(mock.sentinel.queue2), mock_cb)
 
-    assert mockchannel.basic_consume.call_count == 2
-    args, kwargs = mockchannel.basic_consume.call_args
+    assert mock_pikathread.subscribe_queue.call_count == 2
+    args, kwargs = mock_pikathread.subscribe_queue.call_args
     assert not args
     assert kwargs == {
-        "queue": str(mock.sentinel.queue2),
-        "on_message_callback": mock.ANY,
         "auto_ack": True,
+        "callback": mock.ANY,
         "consumer_tag": "2",
-        "arguments": {},
+        "exclusive": False,
+        "prefetch_count": 1,
+        "queue": str(mock.sentinel.queue2),
+        "reconnectable": False,
     }
 
+    transport._CommonTransport__subscriptions[3] = {"callback": mock_cb}
     transport._subscribe(3, str(mock.sentinel.queue3), mock_cb, acknowledgement=True)
-    assert mockchannel.basic_consume.call_count == 3
-    args, kwargs = mockchannel.basic_consume.call_args
+    assert mock_pikathread.subscribe_queue.call_count == 3
+    args, kwargs = mock_pikathread.subscribe_queue.call_args
     assert not args
     assert kwargs == {
-        "queue": str(mock.sentinel.queue3),
-        "on_message_callback": mock.ANY,
         "auto_ack": False,
+        "callback": mock.ANY,
         "consumer_tag": "3",
-        "arguments": {},
+        "exclusive": False,
+        "prefetch_count": 1,
+        "queue": str(mock.sentinel.queue3),
+        "reconnectable": False,
     }
 
     transport._unsubscribe(1)
-    mockchannel.basic_cancel.assert_called_once_with(callback=None, consumer_tag=1)
+    mock_pikathread.unsubscribe.assert_called_once_with("1")
     transport._unsubscribe(2)
-    mockchannel.basic_cancel.assert_called_with(callback=None, consumer_tag=2)
+    mock_pikathread.unsubscribe.assert_called_with("2")
 
 
 @mock.patch("workflows.transport.pika_transport.pika")
-def test_subscribe_to_broadcast(mockpika):
+def test_subscribe_to_broadcast(mockpika, mock_pikathread):
     """Test subscribing to a queue (producer-consumer), callback functions and unsubscribe"""
     mock_cb = mock.Mock()
     transport = PikaTransport()
     transport.connect()
-    mockconn = mockpika.BlockingConnection
-    mockchannel = mockconn.return_value.channel.return_value
+    # mockconn = mockpika.BlockingConnection
+    # mockchannel = mockconn.return_value.channel.return_value
 
+    transport._CommonTransport__subscriptions[1] = {"callback": mock_cb}
     transport._subscribe_broadcast(1, str(mock.sentinel.queue1), mock_cb)
 
-    mockchannel.basic_consume.assert_called_once()
-    args, kwargs = mockchannel.basic_consume.call_args
+    mock_pikathread.subscribe_broadcast.assert_called_once()
+    args, kwargs = mock_pikathread.subscribe_broadcast.call_args
     assert not args
     assert kwargs == {
-        "queue": str(mock.sentinel.queue1),
-        "on_message_callback": mock.ANY,
-        "auto_ack": True,
+        "callback": mock.ANY,
+        "exchange": str(mock.sentinel.queue1),
         "consumer_tag": "1",
-        "arguments": {},
+        "reconnectable": False,
     }
 
-    transport._subscribe(
+    transport._CommonTransport__subscriptions[2] = {"callback": mock_cb}
+    transport._subscribe_broadcast(
         2,
         str(mock.sentinel.queue2),
         mock_cb,
     )
 
-    assert mockchannel.basic_consume.call_count == 2
-    args, kwargs = mockchannel.basic_consume.call_args
+    assert mock_pikathread.subscribe_broadcast.call_count == 2
+    args, kwargs = mock_pikathread.subscribe_broadcast.call_args
     assert not args
     assert kwargs == {
-        "queue": str(mock.sentinel.queue2),
-        "on_message_callback": mock.ANY,
-        "auto_ack": True,
+        "callback": mock.ANY,
+        "exchange": str(mock.sentinel.queue2),
         "consumer_tag": "2",
-        "arguments": {},
+        "reconnectable": False,
     }
 
     transport._unsubscribe(1)
-    mockchannel.basic_cancel.assert_called_once_with(callback=None, consumer_tag=1)
+    mock_pikathread.unsubscribe.assert_called_once_with("1")
     transport._unsubscribe(2)
-    mockchannel.basic_cancel.assert_called_with(callback=None, consumer_tag=2)
+    mock_pikathread.unsubscribe.assert_called_with("2")
 
 
 @mock.patch("workflows.transport.pika_transport.pika")
@@ -824,6 +825,10 @@ def test_nack_message(mockpika):
     #     "--rabbit-pass": "guest",
     #     "--rabbit-vhost": "/",
     # }
+
+
+def test_noninteger_consumer_tag():
+    assert False
 
 
 @pytest.fixture
@@ -1116,3 +1121,34 @@ def test_pikathread_bad_conn_params(connection_params):
     # Wait for it to do this reconnection wait of 1s
     thread.join(timeout=5, stop=False)
     assert not thread.is_alive()
+
+
+def test_pikathread_unsubscribe(test_channel, connection_params):
+    queue = test_channel.temporary_queue_declare()
+    thread = _PikaThread(connection_params)
+    try:
+        thread.start(wait_for_connection=True)
+
+        messages = Queue()
+
+        def _get_message(*args):
+            print(f"Got message: {pprint.pformat(args)}")
+            messages.put(args[3])
+
+        thread.subscribe_queue(
+            queue, _get_message, reconnectable=True, consumer_tag="1"
+        )
+        test_channel.basic_publish("", queue, "This is a message")
+        assert messages.get(timeout=1) == b"This is a message"
+
+        # Issue an unsubscribe then wait for confirmation
+        thread.unsubscribe("1").result()
+
+        # Send a message again
+        test_channel.basic_publish("", queue, "This is a message again")
+        # Wait a short time to make sure it does not get delivered
+        with pytest.raises(Empty):
+            messages.get(timeout=1)
+
+    finally:
+        thread.join(stop=True)
