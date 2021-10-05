@@ -804,8 +804,10 @@ def test_ack_message(mock_pikathread):
     transport = PikaTransport()
     transport.connect()
 
-    transport._ack(mock.sentinel.messageid)
-    mock_pikathread.ack.assert_called_once_with(mock.sentinel.messageid, multiple=False)
+    transport._ack(mock.sentinel.messageid, mock.sentinel.sub_id)
+    mock_pikathread.ack.assert_called_once_with(
+        mock.sentinel.messageid, mock.sentinel.sub_id, multiple=False
+    )
 
 
 def test_nack_message(mock_pikathread):
@@ -815,10 +817,10 @@ def test_nack_message(mock_pikathread):
     # mockconn = mockpika.BlockingConnection
     # mockchannel = mockconn.return_value.channel.return_value
 
-    transport._nack(mock.sentinel.messageid)
+    transport._nack(mock.sentinel.messageid, mock.sentinel.sub_id)
 
     mock_pikathread.nack.assert_called_once_with(
-        mock.sentinel.messageid, multiple=False, requeue=True
+        mock.sentinel.messageid, mock.sentinel.sub_id, multiple=False, requeue=True
     )
 
     # defaults = {

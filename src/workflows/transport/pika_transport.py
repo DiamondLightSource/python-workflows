@@ -973,28 +973,28 @@ class _PikaThread(threading.Thread):
         self._connection.add_callback_threadsafe(_send)
         return future
 
-    def ack(self, delivery_tag, *, multiple=False):
-        # Without changing the transport API, this only makes sense if
-        # we have one channel, as we don't know which channel it is from.
-        assert (
-            len(set(self._pika_channels)) == 0
-        ), "Cannot send ack without knowing which channel it came from"
+    def ack(self, delivery_tag: int, subscription_id: str, *, multiple=False):
+        subscription_id = str(subscription_id)
+        if not subscription_id in self._subscriptions:
+            raise KeyError(f"Could not find subscription {subscription_id} to ACK")
+
+        channel = self._pika_channels[subscription_id]
 
         self._connection.add_callback_threadsafe(
-            lambda: self._get_shared_channel().basic_ack(
-                delivery_tag, multiple=multiple
-            )
+            lambda: channel.basic_ack(delivery_tag, multiple=multiple)
         )
 
-    def nack(self, delivery_tag, *, multiple=False, requeue=True):
-        assert (
-            len(set(self._pika_channels)) == 0
-        ), "Cannot send ack without knowing which channel it came from"
+    def nack(
+        self, delivery_tag: int, subscription_id: str, *, multiple=False, requeue=True
+    ):
+        subscription_id = str(subscription_id)
+        if not subscription_id in self._subscriptions:
+            raise KeyError(f"Could not find subscription {subscription_id} to NACK")
+
+        channel = self._pika_channels[subscription_id]
 
         self._connection.add_callback_threadsafe(
-            lambda: self._get_shared_channel().basic_nack(
-                delivery_tag, multiple=multiple, requeue=requeue
-            )
+            lambda: channel.basic_nack(delivery_tag, multiple=multiple, requeue=requeue)
         )
 
     @property
