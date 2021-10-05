@@ -7,10 +7,8 @@ from unittest import mock
 import uuid
 import pprint
 import pika
-from pika import exchange_type
 import pytest
 import threading
-import time
 import inspect
 from queue import Queue, Empty
 
