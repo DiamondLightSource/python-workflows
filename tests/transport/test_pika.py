@@ -926,34 +926,6 @@ def test_channel(connection_params) -> pika.channel.Channel:
         conn.close()
 
 
-def test_multiple_subscribe_to_broadcast():
-    """Test multiple subscriptions to a broadcast channel"""
-    # Make an entirely separate connection to RabbitMQ
-    import pika
-
-    conn = pika.BlockingConnection()
-    side_channel = conn.channel()
-
-    # pika = PikaTransport()
-    # pika.connect()
-
-    # We create our own channel to check assumptions about multiple delivery
-    # ?    side_channel = pika._conn.channel()
-    # Make sure that the queue and exchange exists
-    side_channel.exchange_declare("transient.status", passive=True)
-    side_channel.queue_declare("transient.status", exclusive=True, auto_delete=True)
-    side_channel.queue_bind("transient.status", "transient.status")
-
-    # def _subscribe_broadcast(self, consumer_tag, queue, callback, **kwargs):
-
-    messages = []
-
-    def cb(*args, **kwargs):
-        messages.append((args, kwargs))
-
-    pika.subscribe_broadcast("transient.status", cb)
-
-
 def test_pikathread(connection_params):
     thread = _PikaThread(connection_params)
     thread.start()
