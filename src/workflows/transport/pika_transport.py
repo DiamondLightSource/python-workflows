@@ -370,13 +370,6 @@ class PikaTransport(CommonTransport):
                 "Although RabbitMQ allows anonymous subscriptions, not implemented in Transport yet"
             )
 
-        # Callback is stored on an internal property in common before
-        # calling this. Validate that it's identical to avoid mismatch errors.
-        assert (
-            sub_id is None
-            or callback == self._CommonTransport__subscriptions[sub_id]["callback"]
-        ), "Pased callback does not match stored"
-
         try:
             return self._pika_thread.subscribe_queue(
                 queue=channel,
@@ -410,22 +403,12 @@ class PikaTransport(CommonTransport):
             consumer_tag: Internal ID for this subscription
             queue: Name of the exchange to bind to
             callback:
-                Function to be called when message are received. This Is
-                ignored by some transports and so MUST be identical to
-                the internal self.__subcription[sub_id]["callback"]
-                object
+                Function to be called when message are received
             reconnectable:
                 Can we reconnect to this exchange if the connection is
                 lost. Currently, this means that messages can be missed
                 if they are sent while we are reconnecting.
         """
-        # Callback is stored on an internal property before calling this
-        # Validate that it's identical to avoid mismatch errors
-        assert (
-            consumer_tag is None
-            or callback
-            == self._CommonTransport__subscriptions[consumer_tag]["callback"]
-        ), "Pased callback does not match stored"
 
         self._pika_thread.subscribe_broadcast(
             exchange=queue,
