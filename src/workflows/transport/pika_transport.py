@@ -533,23 +533,34 @@ class PikaTransport(CommonTransport):
         raise NotImplementedError()
         self._channel.tx_commit()
 
-    def _ack(self, message_id, **kwargs):
-        """Acknowledge receipt of a message. This only makes sense when the
-        'acknowledgement' flag was set for the relevant subscription.
-        :param message_id: ID of the message to be acknowledged
-        :param **kwargs: Further parameters for the transport layer.
+    def _ack(self, message_id, multiple: bool = False, **_kwargs):
         """
-        raise NotImplementedError()
-        self._channel.basic_ack(delivery_tag=message_id)
+        Acknowledge receipt of a message.
 
-    def _nack(self, message_id, **kwargs):
-        """Reject receipt of a message. This only makes sense when the
-        'acknowledgement' flag was set for the relevant subscription.
-        :param message_id: ID of the message to be rejected
+        This only makes sense when the 'acknowledgement' flag was set
+        for the relevant subscription.
+
+        Args:
+            message_id: ID of the message to be acknowledged
+            multiple: Should multiple messages be acknowledged?
+
         :param **kwargs: Further parameters for the transport layer.
         """
-        raise NotImplementedError()
-        self._channel.basic_nack(delivery_tag=message_id)
+        self._pika_thread.ack(message_id, multiple=multiple)
+
+    def _nack(self, message_id, multiple: bool = False, requeue=True, **_kwargs):
+        """
+        Reject receipt of a message.
+
+        This only makes sense when the 'acknowledgement' flag was set
+        for the relevant subscription.
+
+        Args:
+            message_id: ID of the message to be rejected
+            multiple: Nack multiple messages. See AMQP basic.nack
+            requeue: Attempt to requeue. see AMQP basic.nack.
+        """
+        self._pika_thread.nack(message_id, multiple=multiple, requeue=requeue)
 
     @staticmethod
     def _mangle_for_sending(message):
@@ -815,6 +826,10 @@ class _PikaThread(threading.Thread):
             to an empty value upon subscription success.
         """
 
+        # Safety: Since our Ack interface doesn't ask consumer ID yet, we can't ack
+        if not auto_ack and prefetch_count != 0:
+            raise ValueError("Cannot turn on manual acknowledgements with prefetch > 0")
+
         new_sub = _PikaSubscription(
             arguments={},
             auto_ack=auto_ack,
@@ -933,6 +948,30 @@ class _PikaThread(threading.Thread):
 
         self._connection.add_callback_threadsafe(_send)
         return future
+
+    def ack(self, delivery_tag, *, multiple=False):
+        # Without changing the transport API, this only makes sense if
+        # we have one channel, as we don't know which channel it is from.
+        assert (
+            len(set(self._pika_channels)) == 0
+        ), "Cannot send ack without knowing which channel it came from"
+
+        self._connection.add_callback_threadsafe(
+            lambda: self._get_shared_channel().basic_ack(
+                delivery_tag, multiple=multiple
+            )
+        )
+
+    def nack(self, delivery_tag, *, multiple=False, requeue=True):
+        assert (
+            len(set(self._pika_channels)) == 0
+        ), "Cannot send ack without knowing which channel it came from"
+
+        self._connection.add_callback_threadsafe(
+            lambda: self._get_shared_channel().basic_nack(
+                delivery_tag, multiple=multiple, requeue=requeue
+            )
+        )
 
     @property
     def alive(self) -> bool:

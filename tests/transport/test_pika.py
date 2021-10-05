@@ -239,7 +239,6 @@ def test_broadcast_status(mockpika, mock_pikathread):
     mock_pikathread.send.assert_called_once()
     args, kwargs = mock_pikathread.send.call_args
     assert not args
-    # breakpoint()
     assert int(mockproperties.call_args[1].get("delivery_mode")) == 2
     assert int(mockproperties.return_value.expiration) == 1000 * 15
     assert kwargs == {
@@ -803,28 +802,26 @@ def test_transaction_calls(mockpika):
     mockchannel.tx_commit.assert_called_once()
 
 
-@mock.patch("workflows.transport.pika_transport.pika")
-def test_ack_message(mockpika):
-    """Test that the _ack function call is properly forwarded to pika"""
+def test_ack_message(mock_pikathread):
     transport = PikaTransport()
     transport.connect()
-    mockconn = mockpika.BlockingConnection
-    mockchannel = mockconn.return_value.channel.return_value
 
     transport._ack(mock.sentinel.messageid)
-    mockchannel.basic_ack.assert_called_once_with(delivery_tag=mock.sentinel.messageid)
+    mock_pikathread.ack.assert_called_once_with(mock.sentinel.messageid, multiple=False)
 
 
-@mock.patch("workflows.transport.pika_transport.pika")
-def test_nack_message(mockpika):
+def test_nack_message(mock_pikathread):
     """Test that the _nack function call is properly forwarded to pika"""
     transport = PikaTransport()
     transport.connect()
-    mockconn = mockpika.BlockingConnection
-    mockchannel = mockconn.return_value.channel.return_value
+    # mockconn = mockpika.BlockingConnection
+    # mockchannel = mockconn.return_value.channel.return_value
 
     transport._nack(mock.sentinel.messageid)
-    mockchannel.basic_nack.assert_called_once_with(delivery_tag=mock.sentinel.messageid)
+
+    mock_pikathread.nack.assert_called_once_with(
+        mock.sentinel.messageid, multiple=False, requeue=True
+    )
 
     # defaults = {
     #     "--rabbit-host": "localhost",
@@ -948,7 +945,6 @@ def test_multiple_subscribe_to_broadcast():
     side_channel.exchange_declare("transient.status", passive=True)
     side_channel.queue_declare("transient.status", exclusive=True, auto_delete=True)
     side_channel.queue_bind("transient.status", "transient.status")
-    breakpoint()
 
     # def _subscribe_broadcast(self, consumer_tag, queue, callback, **kwargs):
 
@@ -1160,3 +1156,7 @@ def test_pikathread_unsubscribe(test_channel, connection_params):
 
     finally:
         thread.join(stop=True)
+
+
+def test_pikathread_ack():
+    pytest.xfail("Not Implemented")
