@@ -1044,8 +1044,6 @@ class _PikaThread(threading.Thread):
 
     def _synchronize_subscriptions(self):
         """Synchronize subscriptions list with the current connection."""
-        # assert self._state == _PikaThreadStatus.CONNECTED
-
         for consumer_tag, subscription in self._subscriptions.items():
             # If we have a channel, then we've already handled
             if consumer_tag in self._pika_channels:
