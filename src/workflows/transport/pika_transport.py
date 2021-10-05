@@ -920,7 +920,7 @@ class _PikaThread(threading.Thread):
             try:
                 if result.set_running_or_notify_cancel():
                     logger.debug("Unsubscribing consumer tag '%s'", consumer_tag)
-                    self._subscriptions.remove(consumer_tag)
+                    del self._subscriptions[consumer_tag]
                     channel = self._pika_channels.pop(consumer_tag)
                     channel.basic_cancel(str(consumer_tag))
 

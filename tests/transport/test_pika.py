@@ -429,8 +429,7 @@ def test_error_handling_on_broadcast(mockpika):
     assert mockconn.call_count == 3
 
 
-@mock.patch("workflows.transport.pika_transport.pika")
-def test_messages_are_serialized_for_transport(mockpika, mock_pikathread):
+def test_messages_are_serialized_for_transport(mock_pikathread):
     banana = {"entry": [0, "banana"]}
     banana_str = '{"entry": [0, "banana"]}'
     transport = PikaTransport()
@@ -444,7 +443,7 @@ def test_messages_are_serialized_for_transport(mockpika, mock_pikathread):
         "exchange": "",
         "routing_key": str(mock.sentinel.queue1),
         "body": banana_str,
-        "properties": mock.ANY,
+        "properties": pika.BasicProperties(delivery_mode=2, headers={}),
         "mandatory": True,
     }
 
@@ -455,7 +454,7 @@ def test_messages_are_serialized_for_transport(mockpika, mock_pikathread):
         "exchange": str(mock.sentinel.queue2),
         "routing_key": "",
         "body": banana_str,
-        "properties": mock.ANY,
+        "properties": pika.BasicProperties(delivery_mode=2, headers={}),
         "mandatory": True,
     }
 
@@ -509,8 +508,7 @@ def test_messages_are_not_serialized_for_raw_transport(_mockpika, mock_pikathrea
     }
 
 
-@mock.patch("workflows.transport.pika_transport.pika")
-def test_messages_are_deserialized_after_transport(mockpika, mock_pikathread):
+def test_messages_are_deserialized_after_transport(mock_pikathread):
     """Test the message serialization."""
     banana = {"entry": [0, "banana"]}
     banana_str = '{"entry": [0, "banana"]}'
@@ -581,8 +579,7 @@ def test_messages_are_deserialized_after_transport(mockpika, mock_pikathread):
     assert args[1] == banana_str
 
 
-@mock.patch("workflows.transport.pika_transport.pika")
-def test_subscribe_to_queue(mockpika, mock_pikathread):
+def test_subscribe_to_queue(mock_pikathread):
     """Test subscribing to a queue (producer-consumer), callback functions and unsubscribe"""
     transport = PikaTransport()
     transport.connect()
@@ -639,8 +636,7 @@ def test_subscribe_to_queue(mockpika, mock_pikathread):
     mock_pikathread.unsubscribe.assert_called_with("2")
 
 
-@mock.patch("workflows.transport.pika_transport.pika")
-def test_subscribe_to_broadcast(mockpika, mock_pikathread):
+def test_subscribe_to_broadcast(mock_pikathread):
     """Test subscribing to a queue (producer-consumer), callback functions and unsubscribe"""
     mock_cb = mock.Mock()
     transport = PikaTransport()
