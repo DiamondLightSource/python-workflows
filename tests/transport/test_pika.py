@@ -772,6 +772,7 @@ def test_error_handling_on_subscribing(mockpika, mock_pikathread):
 @mock.patch("workflows.transport.pika_transport.pika")
 def test_transaction_calls(mockpika):
     """Test that calls to create, commit, abort transactions are passed to Pika properly."""
+    pytest.xfail("Transactions not implemented in pika transport yet")
     transport = PikaTransport()
     transport.connect()
     mockconn = mockpika.BlockingConnection
