@@ -377,15 +377,21 @@ class PikaTransport(CommonTransport):
             or callback == self._CommonTransport__subscriptions[sub_id]["callback"]
         ), "Pased callback does not match stored"
 
-        return self._pika_thread.subscribe_queue(
-            queue=channel,
-            callback=_rewrite_callback_to_pika(callback),
-            auto_ack=not acknowledgement,
-            exclusive=exclusive,
-            consumer_tag=str(sub_id),
-            reconnectable=reconnectable,
-            prefetch_count=prefetch_count,
-        ).result()
+        try:
+            return self._pika_thread.subscribe_queue(
+                queue=channel,
+                callback=_rewrite_callback_to_pika(callback),
+                auto_ack=not acknowledgement,
+                exclusive=exclusive,
+                consumer_tag=str(sub_id),
+                reconnectable=reconnectable,
+                prefetch_count=prefetch_count,
+            ).result()
+        except (
+            pika.exceptions.AMQPChannelError,
+            pika.exceptions.AMQPConnectionError,
+        ) as e:
+            raise workflows.Disconnected(e)
 
     def _subscribe_broadcast(
         self,

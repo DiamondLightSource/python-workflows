@@ -740,22 +740,29 @@ def test_subscribe_to_broadcast(mockpika, mock_pikathread):
 
 
 @mock.patch("workflows.transport.pika_transport.pika")
-def test_error_handling_on_subscribing(mockpika):
+def test_error_handling_on_subscribing(mockpika, mock_pikathread):
     """Unrecoverable errors during subscribing should mark the connection as disconnected."""
     mock_cb = mock.Mock()
+
     transport = PikaTransport()
     transport.connect()
-    mockconn = mockpika.BlockingConnection
-    mockchannel = mockconn.return_value.channel.return_value
-    mockchannel.start_consuming.side_effect = pika.exceptions.AMQPChannelError()
+    # mockconn = mockpika.BlockingConnection
+    # mockchannel = mockconn.return_value.channel.return_value
     mockpika.exceptions = pika.exceptions
+    mock_pikathread.alive = False
+    mock_pikathread.subscribe_queue.return_value.result.side_effect = (
+        pika.exceptions.AMQPChannelError
+    )
 
+    transport._CommonTransport__subscriptions[1] = {"callback": mock_cb}
     with pytest.raises(workflows.Disconnected):
         transport._subscribe(1, str(mock.sentinel.queue1), mock_cb)
     assert not transport.is_connected()
 
-    mockchannel.start_consuming.side_effect = pika.exceptions.AMQPConnectionError()
-    mockpika.exceptions = pika.exceptions
+    # Now try connectionError instead of ChannelError
+    mock_pikathread.subscribe_queue.return_value.result.side_effect = (
+        pika.exceptions.AMQPConnectionError
+    )
 
     with pytest.raises(workflows.Disconnected):
         transport._subscribe(1, str(mock.sentinel.queue1), mock_cb)
