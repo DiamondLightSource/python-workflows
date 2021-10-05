@@ -1001,7 +1001,7 @@ def test_pikathread_broadcast_reconnection(
         # don't want to pick up the message before it resets
         print("Terminating connection")
         thread._connected.clear()
-        thread._connection.add_callback_threadsafe(lambda: thread._connection.close())
+        thread._debug_close_connection()
         thread.wait_for_connection()
         print("Reconnected")
         # Now, make sure we still get this message
@@ -1019,8 +1019,8 @@ def test_pikathread_broadcast_reconnection(
             exchange, _got_message_2, reconnectable=False
         ).result()
 
-        # Make sure that the thread ends instead of disconnect if we force a disconnection
-        thread._connection.add_callback_threadsafe(lambda: thread._connection.close())
+        # Make sure that the thread ends instead of reconnect if we force a disconnection
+        thread._debug_close_connection()
         thread.join()
 
     finally:
@@ -1045,7 +1045,7 @@ def test_pikathread_subscribe_queue(connection_params, test_channel):
 
         print("Terminating connection")
         thread._connected.clear()
-        thread._connection.add_callback_threadsafe(lambda: thread._connection.close())
+        thread._debug_close_connection()
         thread.wait_for_connection()
         print("Reconnected")
         test_channel.basic_publish("", queue, "This is another message")
@@ -1098,7 +1098,7 @@ def test_pikathread_bad_conn_params(connection_params):
 
     # Start a working connection
     params = [copy.copy(connection_params[0])]
-    thread = _PikaThread(connection_params)
+    thread = _PikaThread(params)
     thread.start()
     # Forcibly cause a failure of reconnection by editing the inner connection dict
     # - otherwise, we can't guarantee that it will do them in the right order
@@ -1106,7 +1106,6 @@ def test_pikathread_bad_conn_params(connection_params):
     # Make sure it will fail on the next attempt
     thread._reconnection_attempt_limit = 1
     # Force a reconnection
-    print("\n\nForcing Reconnection")
     thread._debug_close_connection()
     # Wait for it to do this reconnection wait of 1s
     thread.join(timeout=5, stop=False)
