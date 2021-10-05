@@ -823,18 +823,6 @@ def test_nack_message(mock_pikathread):
         mock.sentinel.messageid, mock.sentinel.sub_id, multiple=False, requeue=True
     )
 
-    # defaults = {
-    #     "--rabbit-host": "localhost",
-    #     "--rabbit-port": 5672,
-    #     "--rabbit-user": "guest",
-    #     "--rabbit-pass": "guest",
-    #     "--rabbit-vhost": "/",
-    # }
-
-
-def test_noninteger_consumer_tag():
-    assert False
-
 
 @pytest.fixture
 def connection_params():
