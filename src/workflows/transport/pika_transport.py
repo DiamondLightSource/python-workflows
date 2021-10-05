@@ -372,7 +372,8 @@ class PikaTransport(CommonTransport):
         # Callback is stored on an internal property in common before
         # calling this. Validate that it's identical to avoid mismatch errors.
         assert (
-            callback is None or callback == self.__subscriptions[sub_id]["callback"]
+            sub_id is None
+            or callback == self._CommonTransport__subscriptions[sub_id]["callback"]
         ), "Pased callback does not match stored"
 
         return self._pika_thread.subscribe_queue(
@@ -414,13 +415,14 @@ class PikaTransport(CommonTransport):
         # Callback is stored on an internal property before calling this
         # Validate that it's identical to avoid mismatch errors
         assert (
-            callback is None
-            or callback == self.__subscriptions[consumer_tag]["callback"]
+            consumer_tag is None
+            or callback
+            == self._CommonTransport__subscriptions[consumer_tag]["callback"]
         ), "Pased callback does not match stored"
 
         self._pika_thread.subscribe_broadcast(
-            queue,
-            _rewrite_callback_to_pika(callback),
+            exchange=queue,
+            callback=_rewrite_callback_to_pika(callback),
             consumer_tag=consumer_tag,
             reconnectable=reconnectable,
         ).result()

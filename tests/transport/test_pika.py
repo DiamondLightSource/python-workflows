@@ -561,30 +561,41 @@ def test_messages_are_not_serialized_for_raw_transport(_mockpika, mock_pikathrea
 
 
 @mock.patch("workflows.transport.pika_transport.pika")
-def test_messages_are_deserialized_after_transport(mockpika):
+def test_messages_are_deserialized_after_transport(mockpika, mock_pikathread):
     """Test the message serialization."""
     banana = {"entry": [0, "banana"]}
     banana_str = '{"entry": [0, "banana"]}'
     transport = PikaTransport()
     transport.connect()
-    mockconn = mockpika.BlockingConnection
-    mockchannel = mockconn.return_value.channel.return_value
-    mockproperties = mockpika.BasicProperties
-    mockdeliver = mockpika.BasicDeliver
+    # mockconn = mockpika.BlockingConnection
+    # mockchannel = mockconn.return_value.channel.return_value
+    # mockproperties = mockpika.BasicProperties
+    # mockdeliver = mockpika.BasicDeliver
 
     # Test subscriptions
     callback = mock.Mock()
+    # transport.__subscriptions["queue"] = callback
     transport.subscribe("queue", callback)
-    message_handler = mockchannel.basic_consume.call_args[1].get("on_message_callback")
 
-    message_handler(mockchannel, mockdeliver, mockproperties, banana_str)
+    # message_handler = mockchannel.basic_consume.call_args[1].get("on_message_callback")
+    # mock_pikathread.subscribe.assert_called()
+    # Extract the function passed to pikathread, and call it
+    args, kwargs = mock_pikathread.subscribe_queue.call_args
+    message_handler = kwargs["callback"]
+    message_handler(
+        mock.Mock(),
+        mock.Mock(),
+        mock.Mock(),
+        banana_str,
+    )
+    # message_handler(mockchannel, mockdeliver, mockproperties, banana_str)
     callback.assert_called_once()
     args, kwargs = callback.call_args
     assert not kwargs
     assert args[1] == banana
 
     message_handler(
-        mockchannel, mockdeliver, mockproperties, mock.sentinel.undeserializable
+        mock.Mock(), mock.Mock(), mock.Mock(), mock.sentinel.undeserializable
     )
     args, kwargs = callback.call_args
     assert not kwargs
@@ -593,15 +604,16 @@ def test_messages_are_deserialized_after_transport(mockpika):
     # Test broadcast subscriptions
     callback = mock.Mock()
     transport.subscribe_broadcast("queue", callback)
-    message_handler = mockchannel.basic_consume.call_args[1].get("on_message_callback")
+    message_handler = mock_pikathread.subscribe_broadcast.call_args.kwargs["callback"]
 
-    message_handler(mockchannel, mockdeliver, mockproperties, banana_str)
+    message_handler(mock.Mock(), mock.Mock(), mock.Mock(), banana_str)
     callback.assert_called_once()
     args, kwargs = callback.call_args
     assert not kwargs
     assert args[1] == banana
+
     message_handler(
-        mockchannel, mockdeliver, mockproperties, mock.sentinel.undeserializable
+        mock.Mock(), mock.Mock(), mock.Mock(), mock.sentinel.undeserializable
     )
     args, kwargs = callback.call_args
     assert not kwargs
@@ -610,8 +622,8 @@ def test_messages_are_deserialized_after_transport(mockpika):
     # Test subscriptions with mangling disabled
     callback = mock.Mock()
     transport.subscribe("queue", callback, disable_mangling=True)
-    message_handler = mockchannel.basic_consume.call_args[1].get("on_message_callback")
-    message_handler(mockchannel, mockdeliver, mockproperties, banana_str)
+    message_handler = mock_pikathread.subscribe_queue.call_args.kwargs["callback"]
+    message_handler(mock.Mock(), mock.Mock(), mock.Mock(), banana_str)
     callback.assert_called_once()
     args, kwargs = callback.call_args
     assert not kwargs
@@ -620,8 +632,8 @@ def test_messages_are_deserialized_after_transport(mockpika):
     # Test broadcast subscriptions with mangling disabled
     callback = mock.Mock()
     transport.subscribe_broadcast("queue", callback, disable_mangling=True)
-    message_handler = mockchannel.basic_consume.call_args[1].get("on_message_callback")
-    message_handler(mockchannel, mockdeliver, mockproperties, banana_str)
+    message_handler = mock_pikathread.subscribe_broadcast.call_args.kwargs["callback"]
+    message_handler(mock.Mock(), mock.Mock(), mock.Mock(), banana_str)
     callback.assert_called_once()
     args, kwargs = callback.call_args
     assert not kwargs
