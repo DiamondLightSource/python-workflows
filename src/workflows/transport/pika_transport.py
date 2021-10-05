@@ -301,9 +301,11 @@ class PikaTransport(CommonTransport):
         with self._lock:
             if not self._pika_thread:
                 self._pika_thread = _PikaThread(self._generate_connection_parameters())
-                self._pika_thread.start()
+        try:
+            self._pika_thread.start(wait_for_connection=True)
+        except pika.exceptions.AMQPConnectionError as e:
+            raise workflows.Disconnected(e)
 
-        self._pika_thread.wait_for_connection()
         # This either succeeded or the entire connection failed irreversably
         return self._pika_thread.alive
 
@@ -319,12 +321,8 @@ class PikaTransport(CommonTransport):
 
     def broadcast_status(self, status):
         """Broadcast transient status information to all listeners"""
-        return  # XXX
-        self._broadcast(
-            "transient.status",
-            json.dumps(status),
-            headers={"x-message-ttl": str(int(15 + time.time()) * 1000)},
-        )
+
+        self._broadcast("transient.status", json.dumps(status), expiration=15)
 
     def _subscribe(
         self,
@@ -460,8 +458,8 @@ class PikaTransport(CommonTransport):
             properties.expiration = str(expiration * 1000)
 
         self._pika_thread.send(
-            "",
-            routing_key=destination,
+            exchange="",
+            routing_key=str(destination),
             body=message,
             properties=properties,
             mandatory=True,
@@ -483,7 +481,7 @@ class PikaTransport(CommonTransport):
             message: A string to be broadcast
             headers: Further arbitrary headers to pass to pika
             delay: Delay transport of message by this many seconds
-            expiration: Optional TTL expiration time, relative to sending time
+            expiration: Optional TTL expiration time, in seconds, relative to sending time
             kwargs: Arbitrary arguments for other transports. Ignored.
         """
         assert delay is None, "Delay Not implemented"
@@ -497,7 +495,11 @@ class PikaTransport(CommonTransport):
             properties.expiration = str(expiration * 1000)
 
         self._pika_thread.send(
-            destination, "", message, properties=properties, mandatory=True
+            exchange=destination,
+            routing_key="",
+            body=message,
+            properties=properties,
+            mandatory=True,
         ).result()
 
     def _transaction_begin(self, **kwargs):
