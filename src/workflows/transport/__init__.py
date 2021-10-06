@@ -20,6 +20,7 @@ def add_command_line_options(
 ) -> None:
     """Add command line options for all available transport layer classes."""
     if transport_argument:
+        known_transports = list(get_known_transports())
         if isinstance(parser, argparse.ArgumentParser):
             parser.add_argument(
                 "-t",
@@ -28,8 +29,9 @@ def add_command_line_options(
                 metavar="TRN",
                 default=default_transport,
                 help="Transport mechanism. Known mechanisms: "
-                + ", ".join(get_known_transports())
+                + ", ".join(known_transports)
                 + f" (default: {default_transport})",
+                choices=known_transports,
             )
         else:
             parser.add_option(
@@ -39,8 +41,10 @@ def add_command_line_options(
                 metavar="TRN",
                 default=default_transport,
                 help="Transport mechanism. Known mechanisms: "
-                + ", ".join(get_known_transports())
+                + ", ".join(known_transports)
                 + " (default: %default)",
+                type="choice",
+                choices=known_transports,
             )
     for transport in get_known_transports().values():
         transport().add_command_line_options(parser)
