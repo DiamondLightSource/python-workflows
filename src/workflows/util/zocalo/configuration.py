@@ -1,6 +1,7 @@
 from marshmallow import fields
 from zocalo.configuration import PluginSchema
 
+import workflows.transport
 from workflows.transport.pika_transport import PikaTransport
 from workflows.transport.stomp_transport import StompTransport
 
@@ -47,3 +48,14 @@ class Pika:
             ("vhost", "--rabbit-vhost"),
         ]:
             PikaTransport.defaults[target] = configuration[cfgoption]
+
+
+class DefaultTransport:
+    """A Zocalo configuration plugin to set a default transport class"""
+
+    class Schema(PluginSchema):
+        default = fields.Str(required=True)
+
+    @staticmethod
+    def activate(configuration):
+        workflows.transport.default_transport = configuration["default"]
