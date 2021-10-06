@@ -331,7 +331,14 @@ class PikaTransport(CommonTransport):
     def broadcast_status(self, status):
         """Broadcast transient status information to all listeners"""
 
-        # There might be nobody listening on the exchange
+        # Basic status checks - this is based on behaviour of status_monitor
+        # We must have: host, workflows version, status
+        missing_fields = {"host", "workflows", "status"} - status.keys()
+        if missing_fields:
+            raise ValueError(
+                f"Missing required field(s) for status broadcast: {', '.join(missing_fields)}"
+            )
+        # There might be nobody listening on the exchange, so not mandatory
         self._broadcast(
             "transient.status", json.dumps(status), expiration=15, mandatory=False
         )
