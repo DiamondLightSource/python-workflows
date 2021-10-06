@@ -728,10 +728,10 @@ class _PikaThread(threading.Thread):
         self._reconnection_attempt_limit = reconnection_attempts
         # General bookkeeping events
 
+        self._started: threading.Event
+
         # When set, requests the main loop to stop when convenient
         self._please_stop = threading.Event()
-        # Have we requested start - _started exists on Thread base class but private
-        self.__started = threading.Event()
         # Have we had an initial connection - after this, we assume reconnection or failure
         # This is also set on complete failure, to prevent clients blocking forever
         self._connected = threading.Event()
@@ -1008,7 +1008,7 @@ class _PikaThread(threading.Thread):
         a potential that this object will be reconnected in the future, even if
         the connection is lost at this point.
         """
-        return self.__started.is_set() and self._state not in (
+        return self._started.is_set() and self._state not in (
             _PikaThreadStatus.STOPPED,
             _PikaThreadStatus.STOPPING,
         )
