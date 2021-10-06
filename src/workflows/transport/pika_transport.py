@@ -51,7 +51,7 @@ def _rewrite_callback_to_pika(callback: MessageCallback) -> PikaCallback:
         properties: pika.spec.BasicProperties,
         body: bytes,
     ) -> None:
-        callback(
+        callback()(
             {
                 "consumer_tag": str(method.consumer_tag),
                 "delivery_mode": properties.delivery_mode,
@@ -60,8 +60,6 @@ def _rewrite_callback_to_pika(callback: MessageCallback) -> PikaCallback:
                 "message-id": method.delivery_tag,
                 "redelivered": method.redelivered,
                 "routing_key": method.routing_key,
-                "pika-method": method,
-                "pika-properties": properties,
                 "timestamp": properties.timestamp,
             },
             body,
@@ -399,7 +397,9 @@ class PikaTransport(CommonTransport):
         try:
             return self._pika_thread.subscribe_queue(
                 queue=channel,
-                callback=_rewrite_callback_to_pika(callback),
+                callback=_rewrite_callback_to_pika(
+                    lambda s=sub_id: self.subscription_callback(s)
+                ),
                 auto_ack=not acknowledgement,
                 exclusive=exclusive,
                 consumer_tag=str(sub_id),
@@ -439,7 +439,9 @@ class PikaTransport(CommonTransport):
 
         self._pika_thread.subscribe_broadcast(
             exchange=channel,
-            callback=_rewrite_callback_to_pika(callback),
+            callback=_rewrite_callback_to_pika(
+                lambda s=sub_id: self.subscription_callback(s)
+            ),
             consumer_tag=str(sub_id),
             reconnectable=reconnectable,
         ).result()
