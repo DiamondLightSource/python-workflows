@@ -1084,9 +1084,9 @@ class _PikaThread(threading.Thread):
                 subscription.on_message_callback,
                 auto_ack=subscription.auto_ack,
                 exclusive=subscription.exclusive,
-                consumer_tag=str(consumer_tag),
+                consumer_tag=consumer_tag,
             )
-            logger.debug("Consuming (%d) on %s", consumer_tag, subscription.queue)
+            logger.debug("Consuming (%s) on %s", consumer_tag, subscription.queue)
 
             # Record the consumer channel
             self._pika_channels[consumer_tag] = channel
