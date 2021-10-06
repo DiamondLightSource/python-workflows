@@ -56,6 +56,7 @@ def _rewrite_callback_to_pika(callback: MessageCallback) -> PikaCallback:
                 "routing_key": method.routing_key,
                 "pika-method": method,
                 "pika-properties": properties,
+                "timestamp": properties.timestamp,
             },
             body,
         )
@@ -454,7 +455,11 @@ class PikaTransport(CommonTransport):
         # if delay:
         #     headers["x-delay"] = 1000 * delay
 
-        properties = pika.BasicProperties(headers=headers, delivery_mode=2)
+        properties = pika.BasicProperties(
+            headers=headers,
+            delivery_mode=2,
+            timestamp=int(time.time()),
+        )
         if expiration:
             properties.expiration = str(expiration * 1000)
 
@@ -491,7 +496,11 @@ class PikaTransport(CommonTransport):
             headers = {}
         # if delay:
         #     headers["x-delay"] = 1000 * delay
-        properties = pika.BasicProperties(headers=headers, delivery_mode=2)
+        properties = pika.BasicProperties(
+            headers=headers,
+            delivery_mode=2,
+            timestamp=int(time.time()),
+        )
         if expiration is not None:
             properties.expiration = str(expiration * 1000)
 
