@@ -331,7 +331,10 @@ class PikaTransport(CommonTransport):
     def broadcast_status(self, status):
         """Broadcast transient status information to all listeners"""
 
-        self._broadcast("transient.status", json.dumps(status), expiration=15)
+        # There might be nobody listening on the exchange
+        self._broadcast(
+            "transient.status", json.dumps(status), expiration=15, mandatory=False
+        )
 
     def _subscribe(
         self,
@@ -478,6 +481,7 @@ class PikaTransport(CommonTransport):
         headers=None,
         delay=None,
         expiration: Optional[int] = None,
+        mandatory=True,
         **kwargs,
     ):
         """Send a message to a fanout exchange.
@@ -488,6 +492,7 @@ class PikaTransport(CommonTransport):
             headers: Further arbitrary headers to pass to pika
             delay: Delay transport of message by this many seconds
             expiration: Optional TTL expiration time, in seconds, relative to sending time
+            mandatory: Raise an error if this can't be routed
             kwargs: Arbitrary arguments for other transports. Ignored.
         """
         assert delay is None, "Delay Not implemented"
@@ -509,7 +514,7 @@ class PikaTransport(CommonTransport):
             routing_key="",
             body=message,
             properties=properties,
-            mandatory=True,
+            mandatory=mandatory,
         ).result()
 
     def _transaction_begin(self, **kwargs):
