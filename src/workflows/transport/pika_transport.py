@@ -10,7 +10,9 @@ import sys
 import threading
 import time
 import uuid
-from collections.abc import Hashable, Mapping
+from collections.abc import Hashable
+
+# from collections.abc import Mapping
 from concurrent.futures import Future
 from enum import Enum, auto
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Union
@@ -25,7 +27,9 @@ from workflows.transport.common_transport import CommonTransport, json_serialize
 logger = logging.getLogger("workflows.transport.pika_transport")
 
 # The form of callback used by this library
-MessageCallback = Callable[[Mapping[str, Any], Any], None]
+# MessageCallback = Callable[[Mapping[str, Any], Any], None]
+MessageCallback = Any
+
 # The form pika expects callbacks in
 PikaCallback = Callable[
     [pika.channel.Channel, pika.spec.Basic.Deliver, pika.spec.BasicProperties, bytes],
