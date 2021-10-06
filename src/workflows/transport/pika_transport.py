@@ -42,7 +42,7 @@ def _rewrite_callback_to_pika(callback: MessageCallback) -> PikaCallback:
     Transform a callback function into the right form for pika.
 
     This involves unwrapping the pika headers and putting them into a
-    general headers dictionaly for the workflows.transport callback.
+    general headers dictionary for the workflows.transport callback.
     """
 
     def _translate_callback(
