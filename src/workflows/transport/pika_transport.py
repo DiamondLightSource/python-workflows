@@ -317,7 +317,8 @@ class PikaTransport(CommonTransport):
             if not self._pika_thread:
                 self._pika_thread = _PikaThread(self._generate_connection_parameters())
         try:
-            self._pika_thread.start(wait_for_connection=True)
+            self._pika_thread.start()
+            self._pika_thread.wait_for_connection()
         except pika.exceptions.AMQPConnectionError as e:
             raise workflows.Disconnected(e)
 
@@ -538,22 +539,21 @@ class PikaTransport(CommonTransport):
         :param **kwargs: Further parameters for the transport layer.
         """
         raise NotImplementedError()
-
-        self._channel.tx_select()
+        # self._channel.tx_select()
 
     def _transaction_abort(self, **kwargs):
         """Abort a transaction and roll back all operations.
         :param **kwargs: Further parameters for the transport layer.
         """
         raise NotImplementedError()
-        self._channel.tx_rollback()
+        # self._channel.tx_rollback()
 
     def _transaction_commit(self, **kwargs):
         """Commit a transaction.
         :param **kwargs: Further parameters for the transport layer.
         """
         raise NotImplementedError()
-        self._channel.tx_commit()
+        # self._channel.tx_commit()
 
     def _ack(
         self, message_id, subscription_id: str, *, multiple: bool = False, **_kwargs
@@ -636,9 +636,6 @@ class _PikaThreadStatus(Enum):
     @property
     def is_end_of_life(self):
         return self in {self.STOPPING, self.STOPPED}
-
-    # class ExpectedStateError(Exception):
-    #     pass
 
 
 class _PikaSubscriptionKind(Enum):
@@ -739,35 +736,10 @@ class _PikaThread(threading.Thread):
         # This is also set on complete failure, to prevent clients blocking forever
         self._connected = threading.Event()
 
-        # General bookkeeping locks
-
-        # Make sure we cannot race condition on starting
-        self._start_lock = threading.Lock()
-
     @property
     def state(self) -> _PikaThreadStatus:
         """Read the current connection state"""
         return self._state
-
-    def start(self, *, wait_for_connection=True):
-        """Spawn the thread. Can Only call once per instance. Thread-safe."""
-
-        # Ensure we can never accidentally call this twice
-        with self._start_lock:
-            logger.info("Starting thread")
-            if self.__started.is_set():
-                raise RuntimeError("pika.thread objects are not reusable")
-            self.__started.set()
-
-        # Someone called stop() before start().... just accept
-        if self._please_stop.is_set():
-            self._state == _PikaThreadStatus.STOPPED
-            return
-
-        super().start()
-
-        if wait_for_connection:
-            self.wait_for_connection()
 
     def stop(self):
         """
@@ -1032,8 +1004,9 @@ class _PikaThread(threading.Thread):
         """
         Is the connection object connected, or in the process of reconnecting?
 
-        This will return True even if the connection is not physically
-        connected, or in the process of reconnecting.
+        This will return True if the object is connected right now, or there is
+        a potential that this object will be reconnected in the future, even if
+        the connection is lost at this point.
         """
         return self.__started.is_set() and self._state not in (
             _PikaThreadStatus.STOPPED,
@@ -1122,6 +1095,10 @@ class _PikaThread(threading.Thread):
         )
 
     def _run(self):
+        if self._please_stop.is_set():
+            # stop() was called before start()... so quit
+            self._state == _PikaThreadStatus.STOPPED
+            return
         assert self._state == _PikaThreadStatus.NEW
         assert self._reconnection_allowed, "Should be true until first synchronize"
         logger.debug("pika thread starting")
