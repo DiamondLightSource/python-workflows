@@ -203,7 +203,9 @@ def test_broadcast_status(mockpika, mock_pikathread):
 
     mockproperties = mockpika.BasicProperties
 
-    transport.broadcast_status({"status": str(mock.sentinel.status)})
+    transport.broadcast_status(
+        {"status": str(mock.sentinel.status), "host": "localhost", "workflows": True}
+    )
 
     mock_pikathread.send.assert_called_once()
     args, kwargs = mock_pikathread.send.call_args
@@ -215,7 +217,7 @@ def test_broadcast_status(mockpika, mock_pikathread):
         "routing_key": "",
         "body": mock.ANY,
         "properties": mock.ANY,
-        "mandatory": True,
+        "mandatory": False,
     }
     statusdict = json.loads(kwargs.get("body"))
     assert statusdict["status"] == str(mock.sentinel.status)
