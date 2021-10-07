@@ -1039,54 +1039,65 @@ class _PikaThread(threading.Thread):
             self._pika_shared_channel.confirm_delivery()
         return self._pika_shared_channel
 
-    def _synchronize_subscriptions(self):
-        """Synchronize subscriptions list with the current connection."""
-        for consumer_tag, subscription in self._subscriptions.items():
-            # If we have a channel, then we've already handled
-            if consumer_tag in self._pika_channels:
-                continue
+    def _recreate_subscriptions(self):
+        """Resubscribe all existing subscriptions"""
+        old_subscriptions = self._subscriptions
+        self._subscriptions = {}
 
-            # We flip reconnection to False if any subscription is not reconnectable
-            if self._reconnection_allowed and not subscription.reconnectable:
-                self._reconnection_allowed = False
-                logger.debug(
-                    f"Subscription {consumer_tag} to '{subscription.destination}' is not reconnectable. Turning reconnection off."
-                )
+        logger.debug("Setting up %d subscriptions", len(old_subscriptions))
+        try:
+            for consumer_id, subscription in old_subscriptions.items():
+                self._add_subscription(consumer_id, subscription)
+        except BaseException:
+            # If something goes (temporarily) wrong recreating, then we
+            # don't want to only partially resubscribe next time
+            self._subscriptions = old_subscriptions
+            raise
 
-            # Either open a channel (if prefetch) or use the shared one
-            if subscription.prefetch_count == 0:
-                channel = self._get_shared_channel()
-            else:
-                channel = self._connection.channel()
-                channel.confirm_delivery()
-                channel.basic_qos(prefetch_count=subscription.prefetch_count)
-
-            if subscription.kind == _PikaSubscriptionKind.FANOUT:
-                # If a FANOUT subscription, then we need to create and bind
-                # a temporary queue to receive messages from the exchange
-                queue = channel.queue_declare("", exclusive=True).method.queue
-                channel.queue_bind(queue, subscription.destination)
-                subscription.queue = queue
-            elif subscription.kind == _PikaSubscriptionKind.DIRECT:
-                subscription.queue = subscription.destination
-            else:
-                raise NotImplementedError(
-                    f"Unknown subscription kind: {subscription.kind}"
-                )
-            channel.basic_consume(
-                subscription.queue,
-                subscription.on_message_callback,
-                auto_ack=subscription.auto_ack,
-                exclusive=subscription.exclusive,
-                consumer_tag=consumer_tag,
-            )
-            logger.debug("Consuming (%s) on %s", consumer_tag, subscription.queue)
-
-            # Record the consumer channel
-            self._pika_channels[consumer_tag] = channel
         logger.debug(
-            f"Subscriptions synchronized. Reconnections allowed? - {'Yes' if self._reconnection_allowed else 'No.'}"
+            f"Subscriptions recreated. Reconnections allowed? - {'Yes' if self._reconnection_allowed else 'No.'}"
         )
+
+    def _add_subscription(self, consumer_tag: str, subscription: _PikaSubscription):
+        assert self._connection is not None
+        assert consumer_tag not in self._subscriptions
+
+        # We flip reconnection to False if any subscription is not reconnectable
+        if self._reconnection_allowed and not subscription.reconnectable:
+            self._reconnection_allowed = False
+            logger.debug(
+                f"Subscription {consumer_tag} to '{subscription.destination}' is not reconnectable. Turning reconnection off."
+            )
+
+        # Either open a channel (if prefetch) or use the shared one
+        if subscription.prefetch_count == 0:
+            channel = self._get_shared_channel()
+        else:
+            channel = self._connection.channel()
+            channel.confirm_delivery()
+            channel.basic_qos(prefetch_count=subscription.prefetch_count)
+
+        if subscription.kind == _PikaSubscriptionKind.FANOUT:
+            # If a FANOUT subscription, then we need to create and bind
+            # a temporary queue to receive messages from the exchange
+            queue = channel.queue_declare("", exclusive=True).method.queue
+            channel.queue_bind(queue, subscription.destination)
+            subscription.queue = queue
+        elif subscription.kind == _PikaSubscriptionKind.DIRECT:
+            subscription.queue = subscription.destination
+        else:
+            raise NotImplementedError(f"Unknown subscription kind: {subscription.kind}")
+        channel.basic_consume(
+            subscription.queue,
+            subscription.on_message_callback,
+            auto_ack=subscription.auto_ack,
+            exclusive=subscription.exclusive,
+            consumer_tag=consumer_tag,
+        )
+        # Only now we have subscribed successfully, add to the list
+        self._pika_channels[consumer_tag] = channel
+        self._subscriptions[consumer_tag] = subscription
+        logger.debug("Consuming (%s) on %s", consumer_tag, subscription.queue)
 
     def _run(self):
         if self._please_stop.is_set():
@@ -1145,8 +1156,8 @@ class _PikaThread(threading.Thread):
                 self._pika_shared_channel = None
 
                 # [Re]create subscriptions
-                logger.debug("Setting up subscriptions")
-                self._synchronize_subscriptions()
+                self._recreate_subscriptions()
+
                 # We set up here because we don't want to class as CONNECTED
                 # until all requested subscriptions have been actioned.
                 self._state = _PikaThreadStatus.CONNECTED
@@ -1213,7 +1224,11 @@ class _PikaThread(threading.Thread):
         subscription: _PikaSubscription,
         result: Future,
     ):
-        """Add a subscription to the pika connection, on the connection thread."""
+        """
+        Add a subscription to the pika connection.
+
+        Will be called on the connection thread.
+        """
         try:
             if result.set_running_or_notify_cancel():
                 # If not specified, generate a consumer_tag automatically
@@ -1222,8 +1237,7 @@ class _PikaThread(threading.Thread):
                 assert (
                     consumer_tag not in self._subscriptions
                 ), f"Subscription request {consumer_tag} rejected due to existing subscription {self._subscriptions[consumer_tag]}"
-                self._subscriptions[consumer_tag] = subscription
-                self._synchronize_subscriptions()
+                self._add_subscription(consumer_tag, subscription)
                 result.set_result(self._subscriptions[consumer_tag].queue)
         except BaseException as e:
             result.set_exception(e)
