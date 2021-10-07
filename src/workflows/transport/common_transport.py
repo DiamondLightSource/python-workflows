@@ -1,8 +1,10 @@
 import decimal
 import logging
-from typing import Any, Dict, Set
+from typing import Any, Callable, Dict, Mapping, Set
 
 import workflows
+
+MessageCallback = Callable[[Mapping[str, Any], Any], None]
 
 
 class CommonTransport:
@@ -143,7 +145,7 @@ class CommonTransport:
         )
         return self.__subscription_id
 
-    def subscription_callback(self, subscription):
+    def subscription_callback(self, subscription) -> MessageCallback:
         """Retrieve the callback function for a subscription. Raise a
         workflows.Error if the subscription does not exist.
         All transport callbacks can be intercepted by setting an
