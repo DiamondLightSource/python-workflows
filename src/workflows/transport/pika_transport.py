@@ -60,7 +60,6 @@ def _rewrite_callback_to_pika(callback: MessageCallback) -> PikaCallback:
                 "message-id": method.delivery_tag,
                 "redelivered": method.redelivered,
                 "routing_key": method.routing_key,
-                "timestamp": properties.timestamp,
             },
             body,
         )
@@ -471,11 +470,9 @@ class PikaTransport(CommonTransport):
         # if delay:
         #     headers["x-delay"] = 1000 * delay
 
-        # Downstream timestamp is based off getJMSTimestamp, which is ms
         properties = pika.BasicProperties(
             headers=headers,
             delivery_mode=2,
-            timestamp=int(time.time() * 1000),
         )
         if expiration:
             properties.expiration = str(expiration * 1000)
@@ -514,11 +511,9 @@ class PikaTransport(CommonTransport):
         # if delay:
         #     headers["x-delay"] = 1000 * delay
 
-        # Downstream timestamp is based off getJMSTimestamp, which is ms
         properties = pika.BasicProperties(
             headers=headers,
             delivery_mode=2,
-            timestamp=int(time.time() * 1000),
         )
         if expiration is not None:
             properties.expiration = str(expiration * 1000)
