@@ -4,6 +4,7 @@ import itertools
 import logging
 import queue
 import threading
+import time
 from typing import Any, Dict
 
 import workflows
@@ -267,6 +268,7 @@ class CommonService:
                         exc_info=True,
                     )
                     break
+                time.sleep(0.05)
         self.log.debug("Queue listener thread terminating")
 
     def __start_command_queue_listener(self):
