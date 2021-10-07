@@ -340,7 +340,7 @@ def test_send_broadcast(mockpika, mock_pikathread):
         "routing_key": "",
         "body": mock.sentinel.message,
         "properties": mock.ANY,
-        "mandatory": True,
+        "mandatory": False,
     }
 
     transport._broadcast(
@@ -359,7 +359,7 @@ def test_send_broadcast(mockpika, mock_pikathread):
         "routing_key": "",
         "body": mock.sentinel.message,
         "properties": mock.ANY,
-        "mandatory": True,
+        "mandatory": False,
     }
 
     # Delay not implemented yet
@@ -377,7 +377,7 @@ def test_send_broadcast(mockpika, mock_pikathread):
     #     "routing_key": "",
     #     "body": mock.sentinel.message,
     #     "properties": mock.ANY,
-    #     "mandatory": True,
+    #     "mandatory": False,
     # }
 
 
@@ -403,7 +403,7 @@ def test_broadcasting_message_with_expiration(mockpika, mock_pikathread):
         "routing_key": "",
         "body": mock.sentinel.message,
         "properties": mock.ANY,
-        "mandatory": True,
+        "mandatory": False,
     }
 
 
@@ -457,7 +457,7 @@ def test_messages_are_serialized_for_transport(mock_pikathread):
         "routing_key": "",
         "body": banana_str,
         "properties": pika.BasicProperties(delivery_mode=2, headers={}),
-        "mandatory": True,
+        "mandatory": False,
     }
 
     with pytest.raises(TypeError):
