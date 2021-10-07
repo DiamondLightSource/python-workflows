@@ -945,6 +945,7 @@ def test_pikathread_subscribe_queue(connection_params, test_channel):
     thread = _PikaThread(connection_params)
     try:
         thread.start()
+        thread.wait_for_connection()
 
         messages = Queue()
 
@@ -1014,6 +1015,7 @@ def test_pikathread_bad_conn_params(connection_params):
     params = [copy.copy(connection_params[0])]
     thread = _PikaThread(params)
     thread.start()
+    thread.wait_for_connection()
     # Forcibly cause a failure of reconnection by editing the inner connection dict
     # - otherwise, we can't guarantee that it will do them in the right order
     thread._connection_parameters[0].port = 1
