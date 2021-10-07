@@ -35,36 +35,6 @@ PikaCallback = Callable[
 ]
 
 
-def _rewrite_callback_to_pika(callback: MessageCallback) -> PikaCallback:
-    """
-    Transform a callback function into the right form for pika.
-
-    This involves unwrapping the pika headers and putting them into a
-    general headers dictionary for the workflows.transport callback.
-    """
-
-    def _translate_callback(
-        _channel: pika.channel.Channel,
-        method: pika.spec.Basic.Deliver,
-        properties: pika.spec.BasicProperties,
-        body: bytes,
-    ) -> None:
-        callback(
-            {
-                "consumer_tag": str(method.consumer_tag),
-                "delivery_mode": properties.delivery_mode,
-                "exchange": method.exchange,
-                "headers": properties.headers,
-                "message-id": method.delivery_tag,
-                "redelivered": method.redelivered,
-                "routing_key": method.routing_key,
-            },
-            body,
-        )
-
-    return _translate_callback
-
-
 class PikaTransport(CommonTransport):
     """Abstraction layer for messaging infrastructure for RabbitMQ via pika.
 
@@ -342,6 +312,28 @@ class PikaTransport(CommonTransport):
             )
         self._broadcast("transient.status", json.dumps(status), expiration=15)
 
+    def _call_message_callback(
+        self,
+        sub_id: str,
+        _channel: pika.channel.Channel,
+        method: pika.spec.Basic.Deliver,
+        properties: pika.spec.BasicProperties,
+        body: bytes,
+    ):
+        """Rewrite and redirect a pika callback to the subscription function"""
+        self.subscription_callback(sub_id)(
+            {
+                "consumer_tag": str(method.consumer_tag),
+                "delivery_mode": properties.delivery_mode,
+                "exchange": method.exchange,
+                "headers": properties.headers,
+                "message-id": method.delivery_tag,
+                "redelivered": method.redelivered,
+                "routing_key": method.routing_key,
+            },
+            body,
+        )
+
     def _subscribe(
         self,
         sub_id: int,
@@ -391,7 +383,7 @@ class PikaTransport(CommonTransport):
         try:
             return self._pika_thread.subscribe_queue(
                 queue=channel,
-                callback=_rewrite_callback_to_pika(self.subscription_callback(sub_id)),
+                callback=functools.partial(self._call_message_callback, sub_id),
                 auto_ack=not acknowledgement,
                 exclusive=exclusive,
                 consumer_tag=str(sub_id),
@@ -431,7 +423,7 @@ class PikaTransport(CommonTransport):
 
         self._pika_thread.subscribe_broadcast(
             exchange=channel,
-            callback=_rewrite_callback_to_pika(self.subscription_callback(sub_id)),
+            callback=functools.partial(self._call_message_callback, sub_id),
             consumer_tag=str(sub_id),
             reconnectable=reconnectable,
         ).result()
