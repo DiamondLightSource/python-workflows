@@ -11,11 +11,9 @@ import threading
 import time
 import uuid
 from collections.abc import Hashable
-
-# from collections.abc import Mapping
 from concurrent.futures import Future
 from enum import Enum, auto
-from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Tuple, Union
 
 import pika
 import pika.exceptions
@@ -27,8 +25,7 @@ from workflows.transport.common_transport import CommonTransport, json_serialize
 logger = logging.getLogger("workflows.transport.pika_transport")
 
 # The form of callback used by this library
-# MessageCallback = Callable[[Mapping[str, Any], Any], None]
-MessageCallback = Any
+MessageCallback = Callable[[Mapping[str, Any], Any], None]
 
 # The form pika expects callbacks in
 PikaCallback = Callable[
@@ -51,7 +48,7 @@ def _rewrite_callback_to_pika(callback: MessageCallback) -> PikaCallback:
         properties: pika.spec.BasicProperties,
         body: bytes,
     ) -> None:
-        callback()(
+        callback(
             {
                 "consumer_tag": str(method.consumer_tag),
                 "delivery_mode": properties.delivery_mode,
@@ -393,9 +390,7 @@ class PikaTransport(CommonTransport):
         try:
             return self._pika_thread.subscribe_queue(
                 queue=channel,
-                callback=_rewrite_callback_to_pika(
-                    lambda s=sub_id: self.subscription_callback(s)
-                ),
+                callback=_rewrite_callback_to_pika(self.subscription_callback(sub_id)),
                 auto_ack=not acknowledgement,
                 exclusive=exclusive,
                 consumer_tag=str(sub_id),
@@ -435,9 +430,7 @@ class PikaTransport(CommonTransport):
 
         self._pika_thread.subscribe_broadcast(
             exchange=channel,
-            callback=_rewrite_callback_to_pika(
-                lambda s=sub_id: self.subscription_callback(s)
-            ),
+            callback=_rewrite_callback_to_pika(self.subscription_callback(sub_id)),
             consumer_tag=str(sub_id),
             reconnectable=reconnectable,
         ).result()
