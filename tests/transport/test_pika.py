@@ -545,7 +545,7 @@ def test_messages_are_deserialized_after_transport(mock_pikathread):
     # Test broadcast subscriptions
     callback = mock.Mock()
     transport.subscribe_broadcast("queue", callback)
-    message_handler = mock_pikathread.subscribe_broadcast.call_args.kwargs["callback"]
+    message_handler = mock_pikathread.subscribe_broadcast.call_args[1]["callback"]
 
     message_handler(mock.Mock(), mock.Mock(), mock.Mock(), banana_str)
     callback.assert_called_once()
@@ -563,7 +563,7 @@ def test_messages_are_deserialized_after_transport(mock_pikathread):
     # Test subscriptions with mangling disabled
     callback = mock.Mock()
     transport.subscribe("queue", callback, disable_mangling=True)
-    message_handler = mock_pikathread.subscribe_queue.call_args.kwargs["callback"]
+    message_handler = mock_pikathread.subscribe_queue.call_args[1]["callback"]
     message_handler(mock.Mock(), mock.Mock(), mock.Mock(), banana_str)
     callback.assert_called_once()
     args, kwargs = callback.call_args
@@ -573,7 +573,7 @@ def test_messages_are_deserialized_after_transport(mock_pikathread):
     # Test broadcast subscriptions with mangling disabled
     callback = mock.Mock()
     transport.subscribe_broadcast("queue", callback, disable_mangling=True)
-    message_handler = mock_pikathread.subscribe_broadcast.call_args.kwargs["callback"]
+    message_handler = mock_pikathread.subscribe_broadcast.call_args[1]["callback"]
     message_handler(mock.Mock(), mock.Mock(), mock.Mock(), banana_str)
     callback.assert_called_once()
     args, kwargs = callback.call_args
