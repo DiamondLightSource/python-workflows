@@ -493,7 +493,7 @@ def test_messages_are_not_serialized_for_raw_transport(_mockpika, mock_pikathrea
         "routing_key": "",
         "body": banana,
         "properties": mock.ANY,
-        "mandatory": True,
+        "mandatory": False,
     }
 
     mock_pikathread.send.reset_mock()
