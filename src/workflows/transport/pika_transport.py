@@ -30,7 +30,12 @@ logger = logging.getLogger("workflows.transport.pika_transport")
 
 # The form pika expects callbacks in
 PikaCallback = Callable[
-    [pika.channel.Channel, pika.spec.Basic.Deliver, pika.spec.BasicProperties, bytes],
+    [
+        BlockingChannel,
+        pika.spec.Basic.Deliver,
+        pika.spec.BasicProperties,
+        bytes,
+    ],
     None,
 ]
 
@@ -694,7 +699,7 @@ class _PikaThread(threading.Thread):
         # The pika connection object
         self._connection: Optional[pika.BlockingConnection] = None
         # Per-subscription channels. May be pointing to the shared channel
-        self._pika_channels: Dict[str, pika.channel.Channel] = {}
+        self._pika_channels: Dict[str, BlockingChannel] = {}
         # A common, shared channel, used for non-QoS subscriptions
         self._pika_shared_channel: Optional[BlockingChannel]
         # Are we allowed to reconnect. Can only be turned off, never on
@@ -1067,6 +1072,7 @@ class _PikaThread(threading.Thread):
             # If a FANOUT subscription, then we need to create and bind
             # a temporary queue to receive messages from the exchange
             queue = channel.queue_declare("", exclusive=True).method.queue
+            assert queue is not None
             channel.queue_bind(queue, subscription.destination)
             subscription.queue = queue
         elif subscription.kind == _PikaSubscriptionKind.DIRECT:
