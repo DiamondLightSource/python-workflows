@@ -898,7 +898,8 @@ def test_pikathread_broadcast_reconnection(
 ):
     thread = _PikaThread(connection_params)
     try:
-        thread.start(wait_for_connection=True)
+        thread.start()
+        thread.wait_for_connection()
 
         got_message = threading.Event()
 
@@ -972,6 +973,7 @@ def test_pikathread_send(connection_params, test_channel):
     thread = _PikaThread(connection_params)
     try:
         thread.start()
+        thread.wait_for_connection()
         thread.send("", queue, "Test Message").result()
 
         assert test_channel.basic_get(queue, auto_ack=True)[2] == b"Test Message"
@@ -1001,7 +1003,7 @@ def test_pikathread_bad_conn_params(connection_params):
     bad_params = [copy.copy(connection_params[0])]
     bad_params[0].port = 1
     thread = _PikaThread(bad_params)
-    thread.start(wait_for_connection=False)
+    thread.start()
     thread.join(timeout=5)
     assert not thread.is_alive()
 
@@ -1028,7 +1030,8 @@ def test_pikathread_unsubscribe(test_channel, connection_params):
     queue = test_channel.temporary_queue_declare()
     thread = _PikaThread(connection_params)
     try:
-        thread.start(wait_for_connection=True)
+        thread.start()
+        thread.wait_for_connection()
 
         messages = Queue()
 

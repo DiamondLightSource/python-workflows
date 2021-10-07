@@ -760,7 +760,8 @@ class _PikaThread(threading.Thread):
         # We might be waiting for an event, so give the event loop one...
         # We might already be closed or shutting down, so ignore errors for that
         try:
-            self._connection.add_callback_threadsafe(lambda: None)
+            if self._connection:
+                self._connection.add_callback_threadsafe(lambda: None)
         except pika.exceptions.ConnectionWrongStateError:
             pass
 
