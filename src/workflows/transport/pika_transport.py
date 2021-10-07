@@ -960,6 +960,7 @@ class _PikaThread(threading.Thread):
                     future.set_result(None)
                 except BaseException as e:
                     future.set_exception(e)
+                    raise
 
         self._connection.add_callback_threadsafe(_send)
         return future
@@ -1226,3 +1227,4 @@ class _PikaThread(threading.Thread):
                 result.set_result(self._subscriptions[consumer_tag].queue)
         except BaseException as e:
             result.set_exception(e)
+            raise
