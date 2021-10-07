@@ -44,7 +44,6 @@ def check_message_handling_via_unwrapper(
         "environment": {
             "ID": mock.sentinel.GUID,
             "source": mock.sentinel.source,
-            "timestamp": mock.sentinel.timestamp,
         },
         "payload": mock.sentinel.payload,
     }
@@ -188,7 +187,6 @@ def test_wrapping_a_subscription_with_log_extension():
         "environment": {
             "ID": mock.sentinel.GUID,
             "source": mock.sentinel.source,
-            "timestamp": mock.sentinel.timestamp,
         },
         "payload": mock.sentinel.payload,
     }

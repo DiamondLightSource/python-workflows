@@ -29,7 +29,6 @@ def generate_recipe_message():
         "environment": {
             "ID": mock.sentinel.GUID,
             "source": mock.sentinel.source,
-            "timestamp": mock.sentinel.timestamp,
         },
         "payload": mock.sentinel.payload,
     }
