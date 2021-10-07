@@ -343,10 +343,7 @@ class PikaTransport(CommonTransport):
             raise ValueError(
                 f"Missing required field(s) for status broadcast: {', '.join(missing_fields)}"
             )
-        # There might be nobody listening on the exchange, so not mandatory
-        self._broadcast(
-            "transient.status", json.dumps(status), expiration=15, mandatory=False
-        )
+        self._broadcast("transient.status", json.dumps(status), expiration=15)
 
     def _subscribe(
         self,
@@ -498,7 +495,6 @@ class PikaTransport(CommonTransport):
         headers=None,
         delay=None,
         expiration: Optional[int] = None,
-        mandatory=True,
         **kwargs,
     ):
         """Send a message to a fanout exchange.
@@ -509,7 +505,6 @@ class PikaTransport(CommonTransport):
             headers: Further arbitrary headers to pass to pika
             delay: Delay transport of message by this many seconds
             expiration: Optional TTL expiration time, in seconds, relative to sending time
-            mandatory: Raise an error if this can't be routed
             kwargs: Arbitrary arguments for other transports. Ignored.
         """
         assert delay is None, "Delay Not implemented"
@@ -533,7 +528,7 @@ class PikaTransport(CommonTransport):
             routing_key="",
             body=message,
             properties=properties,
-            mandatory=mandatory,
+            mandatory=False,
         ).result()
 
     def _transaction_begin(self, **kwargs):
