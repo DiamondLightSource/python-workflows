@@ -18,18 +18,6 @@ class SampleConsumer(CommonService):
     def initializing(self):
         """Subscribe to a channel."""
         self._transport.subscribe("transient.destination", self.consume_message)
-        self.counter = 0
-        self._register_idle(3, self.create_message)
-
-    def create_message(self):
-        """Create and send a unique message for this service."""
-        self.counter += 1
-        self.log.info("Sending message #%d", self.counter)
-        self._transport.send(
-            "transient.destination",
-            "Message #%d\n++++++++Produced @%10.3f ms"
-            % (self.counter, (time.time() % 1000) * 1000),
-        )
 
     def consume_message(self, header, message):
         """Consume a message"""

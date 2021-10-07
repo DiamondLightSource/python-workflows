@@ -110,10 +110,9 @@ class Frontend:
         assert self._transport.connect(), "Could not connect to transport layer"
 
         if transport_command_channel:
-            # XXX
-            # self._transport.subscribe_broadcast(
-            #     transport_command_channel, self.process_transport_command
-            # )
+            self._transport.subscribe_broadcast(
+                transport_command_channel, self.process_transport_command
+            )
             self.log.debug("Listening for commands on transport layer")
 
         # Save environment for service starts
