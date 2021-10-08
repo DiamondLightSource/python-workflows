@@ -58,15 +58,15 @@ class Monitor:  # pragma: no cover
                     str(message), curses.color_pair(2) + curses.A_BOLD
                 )
                 self.message_box.refresh()
+            # ActiveMQ used to set timestamp in headers, but these are no longer set in RabbitMQ.
+            # In that case fall back to the current local system time.
+            receipt_time = int(header.get("timestamp", time.time() * 1000))
             if (
                 message["host"] not in self._node_status
-                or int(header["timestamp"])
-                >= self._node_status[message["host"]]["last_seen"]
+                or receipt_time >= self._node_status[message["host"]]["last_seen"]
             ):
                 self._node_status[message["host"]] = message
-                self._node_status[message["host"]]["last_seen"] = int(
-                    header["timestamp"]
-                )
+                self._node_status[message["host"]]["last_seen"] = receipt_time
 
     def run(self):
         """A wrapper for the real _run() function to cleanly enable/disable the

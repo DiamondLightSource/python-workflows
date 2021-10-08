@@ -1,22 +1,43 @@
-import collections
+from __future__ import annotations
+
 import configparser
 import dataclasses
 import functools
-import itertools
 import json
 import logging
 import random
+import sys
 import threading
 import time
-from enum import Enum
-from typing import Any, Callable, Dict, Iterable, Union
+import uuid
+from collections.abc import Hashable
+from concurrent.futures import Future
+from enum import Enum, auto
+from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Union
 
 import pika
+import pika.exceptions
+from pika.adapters.blocking_connection import BlockingChannel
 
 import workflows
-from workflows.transport.common_transport import CommonTransport, json_serializer
+from workflows.transport.common_transport import (
+    CommonTransport,
+    MessageCallback,
+    json_serializer,
+)
 
 logger = logging.getLogger("workflows.transport.pika_transport")
+
+# The form pika expects callbacks in
+PikaCallback = Callable[
+    [
+        BlockingChannel,
+        pika.spec.Basic.Deliver,
+        pika.spec.BasicProperties,
+        bytes,
+    ],
+    None,
+]
 
 
 class PikaTransport(CommonTransport):
@@ -45,8 +66,8 @@ class PikaTransport(CommonTransport):
         self._conn = None
         self._connected = False
         self._lock = threading.RLock()
+        self._pika_thread = None
         self._vhost = "/"
-        self._reconnection_allowed = True
 
     def get_namespace(self) -> str:
         """Return the RabbitMQ virtual host"""
@@ -216,358 +237,351 @@ class PikaTransport(CommonTransport):
             callback=set_parameter,
         )
 
-    def _generate_connection_parameters(self):
-        if hasattr(self, "_connection_parameters"):
-            return
+    def _generate_connection_parameters(self) -> List[pika.ConnectionParameters]:
         username = self.config.get("--rabbit-user", self.defaults.get("--rabbit-user"))
         password = self.config.get("--rabbit-pass", self.defaults.get("--rabbit-pass"))
         credentials = pika.PlainCredentials(username, password)
-        host = self.config.get("--rabbit-host", self.defaults.get("--rabbit-host"))
-        port = str(self.config.get("--rabbit-port", self.defaults.get("--rabbit-port")))
+
+        host_string = self.config.get(
+            "--rabbit-host", self.defaults.get("--rabbit-host")
+        )
+        port_string = str(
+            self.config.get("--rabbit-port", self.defaults.get("--rabbit-port"))
+        )
         vhost = self.config.get("--rabbit-vhost", self.defaults.get("--rabbit-vhost"))
-        if "," in host:
-            host = host.split(",")
+        if "," in host_string:
+            host = host_string.split(",")
         else:
-            host = [host]
-        if "," in port:
-            port = [int(p) for p in port.split(",")]
+            host = [host_string]
+        if "," in port_string:
+            port = [int(p) for p in port_string.split(",")]
         else:
-            port = [int(port)]
-        if len(port) > len(host):
+            port = [int(port_string)]
+        if len(port) == 1:
+            port = port * len(host)
+        elif len(port) > len(host):
             raise workflows.Disconnected(
                 "Invalid hostname/port specifications: cannot specify more ports than hosts"
             )
-        if len(host) != len(port) and len(port) != 1:
+        elif len(port) < len(host):
             raise workflows.Disconnected(
                 "Invalid hostname/port specifications: must either specify a single port, or one port per host"
             )
-        if len(host) > len(port):
-            port = port * len(host)
         connection_parameters = [
             pika.ConnectionParameters(
                 host=h,
                 port=p,
                 virtual_host=vhost,
                 credentials=credentials,
-                retry_delay=5,
-                connection_attempts=3,
             )
             for h, p in zip(host, port)
         ]
 
         # Randomize connection order once to spread connection attempts equally across all servers
         random.shuffle(connection_parameters)
-        self._reconnection_attempts = max(3, len(connection_parameters))
-        self._connection_parameters = itertools.cycle(connection_parameters)
+        return connection_parameters
 
     def connect(self) -> bool:
         """Ensure both connection and channel to the RabbitMQ server are open."""
-        self._reconnection_allowed = True
-        return self._reconnect()
-
-    def _reconnect(self):
-        """An internal function that ensures a connection is up and running,
-        but it will not force a reconnection when the connection state could not
-        be restored. This will be the case if any subscription has been set up."""
-        if not self._reconnection_allowed:
-            raise workflows.Disconnected("Reconnection is disallowed")
         with self._lock:
-            if self._connected:
-                return True
-            self._generate_connection_parameters()
-            failed_attempts = []
-            for connection_attempt in range(self._reconnection_attempts):
-                connection = next(self._connection_parameters)
-                logger.debug(
-                    "Attempting connection %s (%d failed previous attempts)",
-                    connection,
-                    connection_attempt,
-                )
-                try:
-                    self._conn = pika.BlockingConnection(connection)
-                except pika.exceptions.AMQPConnectionError:
-                    logger.debug(
-                        "Could not initiate connection to RabbitMQ server at %s",
-                        connection,
-                    )
-                    failed_attempts.append(("Connection Error", connection))
-                    continue
-                try:
-                    self._channel = self._conn.channel()
-                    self._channel.confirm_delivery()
-                except pika.exceptions.AMQPChannelError:
-                    self.disconnect()
-                    logger.debug(
-                        "Channel error while connecting to RabbitMQ server at %s",
-                        connection,
-                    )
-                    failed_attempts.append(("Channel Error", connection))
-                    continue
-                self._connected = True
-                break
-            else:
-                raise workflows.Disconnected(
-                    "Could not initiate connection to RabbitMQ server after %d failed attempts.\n%s",
-                    len(failed_attempts),
-                    "\n".join(f"{e[1]}: {e[0]}" for e in failed_attempts),
-                )
-        return True
+            if not self._pika_thread:
+                self._pika_thread = _PikaThread(self._generate_connection_parameters())
+        try:
+            self._pika_thread.start()
+            self._pika_thread.wait_for_connection()
+        except pika.exceptions.AMQPConnectionError as e:
+            raise workflows.Disconnected(e)
+
+        # This either succeeded or the entire connection failed irreversably
+        return self._pika_thread.connection_alive
 
     def is_connected(self) -> bool:
         """Return connection status."""
-        if (
-            self._connected
-            and self._conn
-            and self._conn.is_open
-            and self._channel
-            and self._channel.is_open
-        ):
-            return True
-        self.disconnect()
-        return False
+        # TODO: Does this question even make sense with reconnection?
+        #       Surely .connection_alive is (slightly) better?
+        return self._pika_thread and self._pika_thread.connection_alive
 
     def disconnect(self):
         """Gracefully close connection to pika server"""
-        if self._connected:
-            self._connected = False
-        if self._channel and self._channel.is_open:
-            self._channel.close()
-        if self._conn and self._conn.is_open:
-            self._conn.close()
+        self._pika_thread.join(stop=True)
 
     def broadcast_status(self, status):
         """Broadcast transient status information to all listeners"""
-        self._broadcast(
-            "transient.status",
-            json.dumps(status),
-            headers={"x-message-ttl": str(int(15 + time.time()) * 1000)},
-        )
 
-    def _subscribe(self, consumer_tag, queue, callback, **kwargs):
-        """Listen to a queue, notify via callback function.
-        :param consumer_tag: ID for this subscription in the transport layer
-        :param queue: Queue name to subscribe to
-        :param callback: Function to be called when messages are received
-        :param **kwargs: Further parameters for the transport layer. For example
-          acknowledgement:  If true receipt of each message needs to be
-                            acknowledged.
-          selector:         Only receive messages filtered by a selector. See
-                            https://activemq.apache.org/activemq-message-properties.html
-                            for potential filter criteria. Uses SQL 92 syntax.
-        """
-        headers = {}
-        auto_ack = not kwargs.get("acknowledgement")
-
-        def _redirect_callback(ch, method, properties, body):
-            callback(
-                {
-                    "consumer_tag": method.consumer_tag,
-                    "delivery_mode": properties.delivery_mode,
-                    "exchange": method.exchange,
-                    "headers": properties.headers,
-                    "message-id": method.delivery_tag,
-                    "redelivered": method.redelivered,
-                    "routing_key": method.routing_key,
-                },
-                body,
+        # Basic status checks - this is based on behaviour of status_monitor
+        # We must have: host, workflows version, status
+        missing_fields = {"host", "workflows", "status"} - status.keys()
+        if missing_fields:
+            raise ValueError(
+                f"Missing required field(s) for status broadcast: {', '.join(missing_fields)}"
             )
-            if not auto_ack:
-                self._ack(method.delivery_tag)
+        self._broadcast("transient.status", json.dumps(status), expiration=15)
 
-        self._reconnection_allowed = False
-        self._channel.basic_qos(prefetch_count=1)
-        self._channel.basic_consume(
-            queue=queue,
-            on_message_callback=_redirect_callback,
-            auto_ack=auto_ack,
-            consumer_tag=str(consumer_tag),
-            arguments=headers,
+    def _call_message_callback(
+        self,
+        sub_id: str,
+        _channel: pika.channel.Channel,
+        method: pika.spec.Basic.Deliver,
+        properties: pika.spec.BasicProperties,
+        body: bytes,
+    ):
+        """Rewrite and redirect a pika callback to the subscription function"""
+        self.subscription_callback(sub_id)(
+            {
+                "consumer_tag": str(method.consumer_tag),
+                "delivery_mode": properties.delivery_mode,
+                "exchange": method.exchange,
+                "headers": properties.headers,
+                "message-id": method.delivery_tag,
+                "redelivered": method.redelivered,
+                "routing_key": method.routing_key,
+            },
+            body,
         )
-        try:
-            self._channel.start_consuming()
-        except pika.exceptions.AMQPChannelError:
-            self.disconnect()
-            raise workflows.Disconnected("Caught a channel error")
-        except pika.exceptions.AMQPConnectionError:
-            self.disconnect()
-            raise workflows.Disconnected("Connection to RabbitMQ server was closed.")
 
-    def _subscribe_broadcast(self, consumer_tag, queue, callback, **kwargs):
-        """Listen to a queue, notify via callback function.
-        :param consumer_tag: ID for this subscription in the transport layer
-        :param queue: Queue name to subscribe to. Queue is bind to exchange
-        :param callback: Function to be called when messages are received
-        :param **kwargs: Further parameters for the transport layer. For example
-          ignore_namespace: Do not apply namespace to the destination name
-          retroactive:      Ask broker to send old messages if possible
+    def _subscribe(
+        self,
+        sub_id: int,
+        channel: str,
+        callback: MessageCallback,
+        *,
+        acknowledgement: bool = False,
+        exclusive: bool = False,
+        prefetch_count: int = 1,
+        reconnectable: bool = False,
+        **_kwargs,
+    ):
         """
+        Listen to a queue, notify via callback function.
 
-        headers = {}
+        Waits until subscription is complete.
 
-        def _redirect_callback(ch, method, properties, body):
-            callback(
-                {
-                    "message-id": method.delivery_tag,
-                    "pika-method": method,
-                    "pika-properties": properties,
-                },
-                body,
+        Args:
+            sub_id: Internal ID to keep track of this subscription.
+            channel: Queue name to subscribe to
+            callback: Function to be called when messages are received
+            acknowledgement:
+                Each message will need to be explicitly acknowledged.
+                Not compatible with reconnectable.
+            exclusive: Allow only one concurrent consumer on the queue.
+            reconnectable:
+                Allow automatic re-establishing of the subscription over
+                a new connection, in case of connection failure. This
+                cannot be used if acknowledgement is also set.
+            prefetch_count:
+                How many messages will be prefetched for the subscription.
+                This makes little difference unless acknowledgement is
+                also set.
+        """
+        if acknowledgement and reconnectable:
+            raise ValueError(
+                "Acknowledgements can't be reliably used on reconnectable connections"
             )
 
-        self._reconnection_allowed = False
-        self._channel.basic_qos(prefetch_count=1)
-        self._channel.basic_consume(
-            queue=queue,
-            on_message_callback=_redirect_callback,
-            auto_ack=True,
-            consumer_tag=str(consumer_tag),
-            arguments=headers,
-        )
+        # Technically this makes sense - we might want to do later. But not
+        # for the initial version of the transport
+        if not channel:
+            raise NotImplementedError(
+                "Although RabbitMQ allows anonymous subscriptions, not implemented in Transport yet"
+            )
+
         try:
-            self._channel.start_consuming()
-        except pika.exceptions.AMQPChannelError:
-            self.disconnect()
-            raise workflows.Disconnected("Caught a channel error")
-        except pika.exceptions.AMQPConnectionError:
-            self.disconnect()
-            raise workflows.Disconnected("Connection to RabbitMQ server was closed.")
+            return self._pika_thread.subscribe_queue(
+                queue=channel,
+                callback=functools.partial(self._call_message_callback, sub_id),
+                auto_ack=not acknowledgement,
+                exclusive=exclusive,
+                consumer_tag=str(sub_id),
+                reconnectable=reconnectable,
+                prefetch_count=prefetch_count,
+            ).result()
+        except (
+            pika.exceptions.AMQPChannelError,
+            pika.exceptions.AMQPConnectionError,
+        ) as e:
+            raise workflows.Disconnected(e)
+
+    def _subscribe_broadcast(
+        self,
+        sub_id: Hashable,
+        channel: str,
+        callback: MessageCallback,
+        *,
+        reconnectable: bool = False,
+        **_kwargs,
+    ):
+        """
+        Listen to a FANOUT exchange, notify via callback function.
+
+        Waits until subscription is complete.
+
+        Args:
+            sub_id: Internal ID for this subscription
+            channel: Name of the exchange to bind to
+            callback:
+                Function to be called when message are received
+            reconnectable:
+                Can we reconnect to this exchange if the connection is
+                lost. Currently, this means that messages can be missed
+                if they are sent while we are reconnecting.
+        """
+
+        self._pika_thread.subscribe_broadcast(
+            exchange=channel,
+            callback=functools.partial(self._call_message_callback, sub_id),
+            consumer_tag=str(sub_id),
+            reconnectable=reconnectable,
+        ).result()
 
     def _unsubscribe(self, consumer_tag):
         """Stop listening to a queue
         :param consumer_tag: Consumer Tag to cancel
         """
-        self._channel.basic_cancel(consumer_tag=consumer_tag, callback=None)
+        self._pika_thread.unsubscribe(str(consumer_tag))
+        # self._channel.basic_cancel(consumer_tag=consumer_tag, callback=None)
         # Callback reference is kept as further messages may already have been received
 
     def _send(
         self, destination, message, headers=None, delay=None, expiration=None, **kwargs
     ):
-        """Send a message to a queue.
-        :param destination: Queue name to send to
-        :param message: A string to be sent
-        :param **kwargs: Further parameters for the transport layer. For example
-          delay:            Delay transport of message by this many seconds
-          expiration:       Optional expiration time, relative to sending time
-          headers:          Optional dictionary of header entries
-          transaction:      TxID if sending the message as part of a transaction
+        """
+        Send a message to a queue.
+
+        Args:
+            destination: Queue name to send to
+            message: A string or bytes to be sent
+            headers: Further arbitrary headers to pass to pika
+            delay: Delay transport of message by this many seconds
+            expiration: Optional TTL expiration time, relative to sending time
         """
         if not headers:
             headers = {}
-        if delay:
-            headers["x-delay"] = 1000 * delay
-        if expiration:
-            headers["x-message-ttl"] = int((time.time() + expiration) * 1000)
+        assert delay is None, "Not implemented"
 
-        properties = pika.BasicProperties(headers=headers, delivery_mode=2)
-        self._reconnect()  # Ensure we are connected
-        try:
-            self._channel.basic_publish(
-                exchange="",
-                routing_key=destination,
-                body=message,
-                properties=properties,
-                mandatory=True,
-            )
-        except (pika.exceptions.AMQPChannelError, pika.exceptions.AMQPConnectionError):
-            self.disconnect()
-            self._reconnect()
-            try:
-                self._channel.basic_publish(
-                    exchange="",
-                    routing_key=destination,
-                    body=message,
-                    properties=properties,
-                    mandatory=True,
-                )
-            except (
-                pika.exceptions.AMQPChannelError,
-                pika.exceptions.AMQPConnectionError,
-            ):
-                self.disconnect()
-                raise workflows.Disconnected("Connection to RabbitMQ server lost")
+        # if delay:
+        #     headers["x-delay"] = 1000 * delay
+
+        properties = pika.BasicProperties(
+            headers=headers,
+            delivery_mode=2,
+        )
+        if expiration:
+            properties.expiration = str(expiration * 1000)
+
+        self._pika_thread.send(
+            exchange="",
+            routing_key=str(destination),
+            body=message,
+            properties=properties,
+            mandatory=True,
+        ).result()
 
     def _broadcast(
-        self, destination, message, headers=None, delay=None, expiration=None, **kwargs
+        self,
+        destination,
+        message,
+        headers=None,
+        delay=None,
+        expiration: Optional[int] = None,
+        **kwargs,
     ):
-        """Broadcast a message.
-        :param destination: Topic name to send to
-        :param message: A string to be broadcast
-        :param **kwargs: Further parameters for the transport layer. For example
-          delay:            Delay transport of message by this many seconds
-          expiration:       Optional expiration time, relative to sending time
-          headers:          Optional dictionary of header entries
-          ignore_namespace: Do not apply namespace to the destination name
-          transaction:      Transaction ID if message should be part of a
-                            transaction
+        """Send a message to a fanout exchange.
+
+        Args:
+            destination: Exchange to post to
+            message: A string to be broadcast
+            headers: Further arbitrary headers to pass to pika
+            delay: Delay transport of message by this many seconds
+            expiration: Optional TTL expiration time, in seconds, relative to sending time
+            kwargs: Arbitrary arguments for other transports. Ignored.
         """
+        assert delay is None, "Delay Not implemented"
 
         if not headers:
             headers = {}
-        if delay:
-            headers["x-delay"] = 1000 * delay
-        if expiration:
-            headers["x-message-ttl"] = int((time.time() + expiration) * 1000)
-        properties = pika.BasicProperties(headers=headers, delivery_mode=2)
-        self._reconnect()  # Ensure we are connected
-        try:
-            self._channel.basic_publish(
-                exchange=destination,
-                routing_key="",
-                body=message,
-                properties=properties,
-                mandatory=True,
-            )
-        except (pika.exceptions.AMQPChannelError, pika.exceptions.AMQPConnectionError):
-            self.disconnect()
-            self._reconnect()
-            try:
-                self._channel.basic_publish(
-                    exchange=destination,
-                    routing_key="",
-                    body=message,
-                    properties=properties,
-                    mandatory=True,
-                )
-            except (
-                pika.exceptions.AMQPChannelError,
-                pika.exceptions.AMQPConnectionError,
-            ):
-                self.disconnect()
-                raise workflows.Disconnected("Connection to RabbitMQ server lost")
+        # if delay:
+        #     headers["x-delay"] = 1000 * delay
+
+        properties = pika.BasicProperties(
+            headers=headers,
+            delivery_mode=2,
+        )
+        if expiration is not None:
+            properties.expiration = str(expiration * 1000)
+
+        self._pika_thread.send(
+            exchange=destination,
+            routing_key="",
+            body=message,
+            properties=properties,
+            mandatory=False,
+        ).result()
 
     def _transaction_begin(self, **kwargs):
         """Enter transaction mode.
         :param **kwargs: Further parameters for the transport layer.
         """
-        self._channel.tx_select()
+        raise NotImplementedError()
+        # self._channel.tx_select()
 
     def _transaction_abort(self, **kwargs):
         """Abort a transaction and roll back all operations.
         :param **kwargs: Further parameters for the transport layer.
         """
-        self._channel.tx_rollback()
+        raise NotImplementedError()
+        # self._channel.tx_rollback()
 
     def _transaction_commit(self, **kwargs):
         """Commit a transaction.
         :param **kwargs: Further parameters for the transport layer.
         """
-        self._channel.tx_commit()
+        raise NotImplementedError()
+        # self._channel.tx_commit()
 
-    def _ack(self, message_id, **kwargs):
-        """Acknowledge receipt of a message. This only makes sense when the
-        'acknowledgement' flag was set for the relevant subscription.
-        :param message_id: ID of the message to be acknowledged
+    def _ack(
+        self, message_id, subscription_id: str, *, multiple: bool = False, **_kwargs
+    ):
+        """
+        Acknowledge receipt of a message.
+
+        This only makes sense when the 'acknowledgement' flag was set
+        for the relevant subscription.
+
+        Args:
+            message_id: ID of the message to be acknowledged
+            subscription_id:
+                Internal id for the subscription this message came from
+            multiple: Should multiple messages be acknowledged?
+
         :param **kwargs: Further parameters for the transport layer.
         """
-        self._channel.basic_ack(delivery_tag=message_id)
+        self._pika_thread.ack(message_id, subscription_id, multiple=multiple)
 
-    def _nack(self, message_id, **kwargs):
-        """Reject receipt of a message. This only makes sense when the
-        'acknowledgement' flag was set for the relevant subscription.
-        :param message_id: ID of the message to be rejected
-        :param **kwargs: Further parameters for the transport layer.
+    def _nack(
+        self,
+        message_id,
+        subscription_id: str,
+        *,
+        multiple: bool = False,
+        requeue: bool = True,
+        **_kwargs,
+    ):
         """
-        self._channel.basic_nack(delivery_tag=message_id)
+        Reject receipt of a message.
+
+        This only makes sense when the 'acknowledgement' flag was set
+        for the relevant subscription.
+
+        Args:
+            message_id: ID of the message to be rejected
+            subscription_id:
+                Internal id for the subscription this message came from
+            multiple: Nack multiple messages. See AMQP basic.nack
+            requeue: Attempt to requeue. see AMQP basic.nack.
+        """
+        self._pika_thread.nack(
+            message_id, subscription_id, multiple=multiple, requeue=requeue
+        )
 
     @staticmethod
     def _mangle_for_sending(message):
@@ -592,11 +606,11 @@ class PikaTransport(CommonTransport):
 
 
 class _PikaThreadStatus(Enum):
-    NEW = 0
-    CONNECTING = 1
-    CONNECTED = 2
-    STOPPING = 3
-    STOPPED = 4
+    NEW = auto()  # The thread has not started connecting yet
+    CONNECTING = auto()
+    CONNECTED = auto()
+    STOPPING = auto()
+    STOPPED = auto()
 
     @property
     def is_new(self):
@@ -607,289 +621,618 @@ class _PikaThreadStatus(Enum):
         return self in {self.STOPPING, self.STOPPED}
 
 
+class _PikaSubscriptionKind(Enum):
+    """
+    Represents a kind of subscription, for reconnection
+
+    Attributes:
+        DIRECT: A subscription to a named exchange and queue.
+        FANOUT: A subscription to a fanout exchange. An exclusive queue is created.
+    """
+
+    DIRECT = auto()
+    FANOUT = auto()
+
+
 @dataclasses.dataclass
 class _PikaSubscription:
+    """
+    Persistently represent a subscription
+
+    Attributes:
+        arguments: Any extra arguments to pass through to pika
+        auto_ack: Should this subscription auto-acknowledge messages?
+        destination:
+            The target for subscription. This is the exchange name if
+            subscribing to broadcasts with an ephemeral queue, or the
+            queue name if subscribing to a queue directly.
+        exclusive: Should we be the only consumer?
+        kind: What type of subscription this is.
+        on_message_callback: The function called by Pika on messages
+        prefetch_count: How many messages are we allowed to prefetch
+        queue:
+            The queue this subscription is actually physically bound to
+        reconnectable: Are we allowed to reconnect to this subscription
+    """
+
     arguments: Dict[str, Any]
     auto_ack: bool
+    destination: str
     exclusive: bool
-    on_message_callback: Callable = dataclasses.field(repr=False)
+    kind: _PikaSubscriptionKind
+    on_message_callback: PikaCallback = dataclasses.field(repr=False)
     prefetch_count: int
-    queue: str
+    queue: Optional[str] = dataclasses.field(init=False, default=None)
     reconnectable: bool
-    state_channel_requested: bool = False
-    state_subscription_requested: bool = False
-    state_closing: bool = False
 
 
 class _PikaThread(threading.Thread):
-    """Internal helper thread that communicates with the pika package."""
+    """
+    Asynchronously handle a pika connection
 
-    def __init__(self, connection_parameters: Iterable[pika.ConnectionParameters]):
+    This will automatically reconnect (if appropriate), and manage
+    persistent subscriptions across reconnections.
+
+    Args:
+        connection_parameters:
+            How to connect to the AMPQ server. This is an iterable of
+            possible connections, which will be attempted in a random
+            order.
+        reconnection_attempts:
+            How many times to consecutively attempt connection before
+            giving up. Connecting successfully (and reattaching any
+            reconnectable queues) resets this counter. Successive
+            attempts will wait longer before reattempting.
+    """
+
+    def __init__(
+        self,
+        connection_parameters: Iterable[pika.ConnectionParameters],
+        reconnection_attempts=5,
+    ):
         super().__init__(
             name="workflows pika_transport", daemon=False, target=self._run
         )
         self._state: _PikaThreadStatus = _PikaThreadStatus.NEW
-        self._events: Dict[str, threading.Event] = {
-            "connected": threading.Event(),
-            "disconnected": threading.Event(),
-        }
-        self._events["disconnected"].set()
-        self._parameters = collections.deque(connection_parameters)
-        self._connection_attempt = 0
-        self._pika_channel: Dict[int, pika.channel.Channel] = {}
-        self._pika_connection: pika.SelectConnection
+        # Internal store of subscriptions, to resubscribe if necessary
+        self._subscriptions: Dict[str, _PikaSubscription] = {}
+        # The pika connection object
+        self._connection: Optional[pika.BlockingConnection] = None
+        # Per-subscription channels. May be pointing to the shared channel
+        self._pika_channels: Dict[str, BlockingChannel] = {}
+        # A common, shared channel, used for non-QoS subscriptions
+        self._pika_shared_channel: Optional[BlockingChannel]
+        # Are we allowed to reconnect. Can only be turned off, never on
         self._reconnection_allowed: bool = True
-        self._subscriptions: Dict[int, _PikaSubscription] = {}
+        # Our list of connection parameters, so we know where to connect to
+        self._connection_parameters = list(connection_parameters)
+        # If we failed with an unexpected exception
+        self._exc_info: Optional[Tuple[Any, Any, Any]] = None
+        self._reconnection_attempt_limit = reconnection_attempts
+        # General bookkeeping events
+
+        self._started: threading.Event
+
+        # When set, requests the main loop to stop when convenient
+        self._please_stop = threading.Event()
+        # Have we had an initial connection - after this, we assume reconnection or failure
+        # This is also set on complete failure, to prevent clients blocking forever
+        self._connected = threading.Event()
+
+    @property
+    def state(self) -> _PikaThreadStatus:
+        """Read the current connection state"""
+        return self._state
 
     def stop(self):
-        """Close all connections and wait for object cleanup."""
-        self._stop()
-        self.wait_for_disconnection(timeout=3)
-        self._finalize()
+        """
+        Request termination, including disconnection and cleanup if necessary.
 
-    def _stop(self):
-        """Close all connections without waiting."""
-        if self._state.is_new:
-            self._state = _PikaThreadStatus.STOPPED
-            self._finalize()
-        if self._state.is_end_of_life:
-            return
-        self._state = _PikaThreadStatus.STOPPING
-        if self._pika_connection:
-            for channel in self._pika_channel.values():
-                self._pika_connection.ioloop.add_callback_threadsafe(channel.close)
-            self._pika_connection.ioloop.add_callback_threadsafe(
-                self._pika_connection.close
-            )
-
-    @property
-    def connected(self) -> bool:
-        return self._state is _PikaThreadStatus.CONNECTED
-
-    @property
-    def alive(self) -> bool:
-        """Ensure the connection object is reasonably likely to connect at some point."""
-        return not self._state.is_new and not self._state.is_end_of_life
-
-    def wait_for_connection(self):
-        self._events["connected"].wait()
-
-    def wait_for_disconnection(self, **kwargs):
-        self._events["disconnected"].wait(**kwargs)
-
-    def _event_connected(self):
-        if self._state.is_end_of_life:
-            self._state = _PikaThreadStatus.CONNECTED
-            self._stop()
-            return
-        self._state = _PikaThreadStatus.CONNECTED
-        self._events["connected"].set()
-
-    def _event_disconnected(self):
-        self._pika_connection.ioloop.stop()
-        if self._state.is_end_of_life or not self._reconnection_allowed:
-            self._state = _PikaThreadStatus.STOPPED
-        else:
-            self._state = _PikaThreadStatus.CONNECTING
-        self._events["disconnected"].set()
-
-    def _finalize(self):
-        """Fire all events to release all waiters as the object is now dead."""
-        self._state = _PikaThreadStatus.STOPPED
-        if hasattr(self, "_pika_connection"):
-            self._pika_connection.ioloop.stop()
-        if hasattr(self, "_pika_connection"):
-            del self._pika_connection
-        self._pika_channel.clear()
-        for event in self._events.values():
-            event.set()
-
-    def start(self):
-        """Spawn the pika communication thread
-        after running a quick sanity check on the object."""
-        if not self._state.is_new:
-            raise RuntimeError("pika.thread objects are not reusable")
-        super().start()
-
-    def _run(self):
-        """This function will be called from the python threading library and
-        runs in a separate, named thread."""
-        if not self._state.is_new:
-            raise RuntimeError("pika.thread object already started")
-        logger.debug("pika.thread starting")
-        self._state = _PikaThreadStatus.CONNECTING
-        while not self._state.is_end_of_life:
-            self._parameters.rotate()
-            if self._connection_attempt > max(3, len(self._parameters)):
-                logger.error("Reached maximum connection attempts. Giving up.")
-                break
-            if self._connection_attempt > 0:
-                wait_time = 0.5 * self._connection_attempt * self._connection_attempt
-                logger.info(
-                    f"Waiting {wait_time} seconds before next connection attempt..."
-                )
-                time.sleep(wait_time)
-            self._connection_attempt += 1
-            logger.info(
-                f"Connecting to {self._parameters[0].host}:{self._parameters[0].port} (attempt {self._connection_attempt})"
-            )
-            self._connect(self._parameters[0])
-        logger.debug("pika.thread cleaning up")
-        self._stop()
-        if (
-            getattr(self, "_pika_connection", None)
-            and not self._pika_connection.is_closed
+        This will not block. Please call join() to wait until the thread
+        has terminated.
+        """
+        # Wanted to check this hadn't happened yet - but hard to do
+        # without race conditions in a thread-safe way. Check if we
+        # already failed to stop properly.
+        if not self.is_alive() and self._state not in (
+            _PikaThreadStatus.NEW,
+            _PikaThreadStatus.STOPPED,
         ):
-            self._pika_connection.ioloop.start()
-        self._finalize()
-        logger.debug("pika.thread terminating")
+            raise RuntimeError(
+                "abnormal shutdown; pika thread has terminated, but not marked itself as stopped"
+            )
 
-    def _connect(self, parameters: pika.ConnectionParameters):
-        self._state = _PikaThreadStatus.CONNECTING
-        self._events["connected"].clear()
-        self._events["disconnected"].clear()
-        self._pika_connection = pika.SelectConnection(
-            parameters,
-            on_open_callback=self.on_open_connection_callback,
-            on_open_error_callback=self.on_open_error_callback,
-            on_close_callback=self.on_close_callback,
+        self._please_stop.set()
+        # We might be waiting for an event, so give the event loop one...
+        # We might already be closed or shutting down, so ignore errors for that
+        try:
+            if self._connection:
+                self._connection.add_callback_threadsafe(lambda: None)
+        except pika.exceptions.ConnectionWrongStateError:
+            pass
+
+    def join(
+        self, timeout: Optional[float] = None, *, re_raise: bool = False, stop=False
+    ):
+        """Wait until the thread terminates.
+
+        Args:
+            timeout:
+                When not None, a floating point number specifying a
+                timeout for the operation in seconds (or fractions thereof).
+            re_raise:
+                If the thread terminated due to an exception, then raise
+                this exception in the callers thread. Equivalent to calling
+                'raise_if_exception' after 'join()'.
+            stop:
+                Call .stop() to request termination.
+        """
+        if stop:
+            self.stop()
+        super().join(timeout)
+        if re_raise:
+            self.raise_if_exception()
+
+    def wait_for_connection(self, timeout=None):
+        """
+        Safely wait until the thread has connected and is communicating with the server.
+
+        When the timeout argument is present and not None, it should be
+        a floating point number specifying a timeout for the operation
+        in seconds (or fractions thereof).
+        """
+        if not self.connection_alive:
+            raise RuntimeError("Connection stopped or failed")
+        self._connected.wait(timeout)
+        self.raise_if_exception()
+
+    def raise_if_exception(self):
+        """If the thread has failed with an exception, raise it in the callers thread."""
+        exception = self._exc_info
+        if exception:
+            raise exception[0] from exception[0].with_traceback(
+                exception[1], exception[2]
+            )
+
+    def subscribe_queue(
+        self,
+        queue: str,
+        callback: PikaCallback,
+        *,
+        auto_ack: bool = True,
+        consumer_tag: Optional[str] = None,
+        exclusive: bool = False,
+        prefetch_count: int = 1,
+        reconnectable: bool = False,
+    ) -> Future[None]:
+        """
+        Subscribe to a queue. Thread-safe.
+
+        Args:
+            consumer_tag: Internal ID representing this subscription
+            queue: The queue to listen for messages on
+            callback: The function to call when receiving messages on this queue
+            auto_ack: Should this subscription auto-acknowledge messages?
+            exclusive: Should we be the only consumer?
+            prefetch_count: How many messages are we allowed to prefetch
+            reconnectable: Are we allowed to reconnect to this subscription
+
+        Returns:
+            A Future representing the subscription state. It will be set
+            to an empty value upon subscription success.
+        """
+
+        if not self._connection:
+            raise RuntimeError("Cannot subscribe to unstarted connection")
+
+        # Safety: Since our Ack interface doesn't ask consumer ID yet, we can't ack
+        if not auto_ack and prefetch_count != 0:
+            raise ValueError("Cannot turn on manual acknowledgements with prefetch > 0")
+
+        new_sub = _PikaSubscription(
+            arguments={},
+            auto_ack=auto_ack,
+            destination=queue,
+            exclusive=exclusive,
+            kind=_PikaSubscriptionKind.DIRECT,
+            on_message_callback=callback,
+            prefetch_count=prefetch_count,
+            reconnectable=reconnectable,
         )
-        logger.info("pika.thread entering IO loop")
-        self._pika_connection.ioloop.start()  # pika thread blocks here for the duration of the connection
-        logger.info("pika.thread leaving IO loop")
-
-    def on_open_connection_callback(self, connection):
-        logger.info(f"Connection established {connection}")
-        # open channel 0 immediately to allow sending messages
-        self._pika_channel[0] = self._pika_connection.channel(
-            on_open_callback=functools.partial(
-                self.on_open_channel_callback, channel_id=0
+        result: Future[None] = Future()
+        self._connection.add_callback_threadsafe(
+            functools.partial(
+                self._add_subscription_in_thread, consumer_tag, new_sub, result
             )
         )
-        self._pika_connection.ioloop.add_callback_threadsafe(self.update_subscriptions)
+        return result
 
-    def on_open_channel_callback(self, channel, *, channel_id: int):
-        logger.info(f"Channel opened, {channel}")
-        channel.add_on_close_callback(self.on_closed_channel_callback)
-        if channel_id == 0:
-            # now we're open for business
-            self._event_connected()
-        else:
-            # set up channel according to subscription requirements
-            if self._subscriptions[channel_id].prefetch_count:
-                channel.basic_qos(
-                    prefetch_count=self._subscriptions[channel_id].prefetch_count
-                )
-        self._pika_connection.ioloop.add_callback_threadsafe(self.update_subscriptions)
+    def subscribe_broadcast(
+        self,
+        exchange: str,
+        callback: PikaCallback,
+        *,
+        auto_ack: bool = True,
+        consumer_tag: Optional[str] = None,
+        reconnectable: bool = False,
+        prefetch_count: int = 0,
+    ) -> Future[None]:
+        """
+        Subscribe to a broadcast exchange. Thread-safe.
 
-    def on_closed_channel_callback(self, channel, reason):
-        if reason.reply_code in (200, 0):
-            logger.debug(
-                f"Closed channel {channel} with {reason.reply_code}: {reason.reply_text}"
+        Args:
+            exchange: The queue to listen for messages on
+            callback: The function to call when receiving messages on this queue
+            auto_ack: Should this subscription auto-acknowledge messages?
+            consumer_tag: Internal ID representing this subscription. Generated if unspecified.
+            prefetch_count: How many messages are we allowed to prefetch
+            reconnectable:
+                Are we allowed to reconnect to this subscription?
+                **Warning**: Reconnecting to broadcast exchanges has the
+                    potential for dropping messages sent while disconnected.
+
+        Returns:
+            A Future representing the subscription state. It will be set
+            to an empty value upon subscription success.
+        """
+        if not self._connection:
+            raise RuntimeError("Cannot subscribe to unstarted connection")
+
+        new_sub = _PikaSubscription(
+            arguments={},
+            auto_ack=auto_ack,
+            destination=exchange,
+            exclusive=True,
+            kind=_PikaSubscriptionKind.FANOUT,
+            on_message_callback=callback,
+            prefetch_count=prefetch_count,
+            reconnectable=reconnectable,
+        )
+        result: Future[None] = Future()
+        self._connection.add_callback_threadsafe(
+            functools.partial(
+                self._add_subscription_in_thread, consumer_tag, new_sub, result
             )
-        else:
-            logger.error(
-                f"Channel {channel} unexpectedly closed with {reason.reply_code}: {reason.reply_text}"
-            )
-            self._stop()
+        )
+        return result
 
-    def on_open_error_callback(self, *args, **kwargs):
-        logger.info(f"open error callback {args}  {kwargs}")
-        self._event_disconnected()
+    def unsubscribe(self, consumer_tag: str) -> Future[None]:
+        if consumer_tag not in self._subscriptions:
+            raise KeyError(f"No such subscription with consumer tag '{consumer_tag}'")
 
-    def on_close_callback(self, connection, reason):
-        logger.info(f"Closed connection {connection} with {reason}")
-        self._event_disconnected()
+        assert self._connection is not None
+
+        result: Future[None] = Future()
+
+        def _unsubscribe():
+            try:
+                if result.set_running_or_notify_cancel():
+                    logger.debug("Unsubscribing consumer tag '%s'", consumer_tag)
+                    del self._subscriptions[consumer_tag]
+                    channel = self._pika_channels.pop(consumer_tag)
+                    channel.basic_cancel(str(consumer_tag))
+
+                    # Close the channel if nobody else is using it
+                    if channel not in self._pika_channels.values():
+                        logger.debug("Closing channel that is now unused")
+                        channel.close()
+
+                    result.set_result(None)
+            except BaseException as e:
+                result.set_exception(e)
+
+        self._connection.add_callback_threadsafe(_unsubscribe)
+
+        return result
 
     def send(
         self,
         exchange: str,
         routing_key: str,
         body: Union[str, bytes],
-        properties: Any,
+        properties: pika.spec.BasicProperties = None,
         mandatory: bool = True,
-    ):
-        if (
-            not self.connected
-            or 0 not in self._pika_channel
-            or not self._pika_channel[0].is_open
-        ):
-            raise workflows.Disconnected("Connection not ready for sending")
-        # Opportunity for race condition below. Does this matter?
-        # How should we handle connection loss after send?
-        send_call = functools.partial(
-            self._pika_channel[0].basic_publish,
-            exchange=exchange,
-            routing_key=routing_key,
-            body=body,
-            properties=properties,
-            mandatory=mandatory,
-        )
-        self._pika_connection.ioloop.add_callback_threadsafe(send_call)
+    ) -> Future[None]:
+        """Send a message. Thread-safe."""
 
-    def subscribe_queue(
-        self,
-        *,
-        consumer_tag: int,
-        queue: str,
-        callback,
-        auto_ack: bool,
-        reconnectable: bool,
-        exclusive: bool,
-        prefetch_count: int,
-    ):
-        assert (
-            consumer_tag not in self._subscriptions
-        ), f"Subscription request {consumer_tag} rejected due to existing subscription {self._subscriptions[consumer_tag]}"
-        self._subscriptions[consumer_tag] = _PikaSubscription(
-            arguments={},
-            auto_ack=auto_ack,
-            exclusive=exclusive,
-            prefetch_count=prefetch_count,
-            on_message_callback=callback,
-            queue=queue,
-            reconnectable=reconnectable,
-        )
-        self._pika_connection.ioloop.add_callback_threadsafe(self.update_subscriptions)
+        if not self._connection:
+            raise RuntimeError("Cannot send on unstarted connection")
 
-    def update_subscriptions(self):
-        if not self.connected:
-            pass  # TODO: handle case
-        for consumer_tag, subscription in self._subscriptions.items():
-            if subscription.prefetch_count == 0:
-                channel_id = 0  # use shared channel
-            else:
-                channel_id = consumer_tag
-            if subscription.state_closing:
-                continue  # TODO implement
-            if not subscription.state_channel_requested:
-                if channel_id not in self._pika_channel:
-                    self._pika_channel[channel_id] = self._pika_connection.channel(
-                        on_open_callback=functools.partial(
-                            self.on_open_channel_callback, channel_id=channel_id
-                        )
+        future: Future[None] = Future()
+
+        def _send():
+            if future.set_running_or_notify_cancel():
+                try:
+                    self._get_shared_channel().basic_publish(
+                        exchange=exchange,
+                        routing_key=routing_key,
+                        body=body,
+                        properties=properties,
+                        mandatory=mandatory,
                     )
-                subscription.state_channel_requested = True
-            if not subscription.state_subscription_requested:
-                if self._pika_channel[channel_id].is_open:
-                    self._pika_channel[channel_id].basic_consume(
-                        queue=subscription.queue,
-                        on_message_callback=subscription.on_message_callback,
-                        auto_ack=subscription.auto_ack,
-                        consumer_tag=str(consumer_tag),
-                        arguments=subscription.arguments,
-                        exclusive=subscription.exclusive,
-                    )
-                    subscription.state_subscription_requested = True
+                    future.set_result(None)
+                except BaseException as e:
+                    future.set_exception(e)
+                    raise
 
-    def _on_message(self, frame):
-        headers = frame.headers
-        body = frame.body
-        subscription_id = int(headers.get("subscription"))
-        target_function = self.subscription_callback(subscription_id)
-        if target_function:
-            target_function(headers, body)
-        else:
-            raise workflows.Error(
-                "Unhandled message {} {}".format(repr(headers), repr(body))
+        self._connection.add_callback_threadsafe(_send)
+        return future
+
+    def ack(self, delivery_tag: int, subscription_id: str, *, multiple=False):
+        subscription_id = str(subscription_id)
+        if subscription_id not in self._subscriptions:
+            raise KeyError(f"Could not find subscription {subscription_id} to ACK")
+
+        channel = self._pika_channels[subscription_id]
+
+        assert self._connection is not None
+
+        self._connection.add_callback_threadsafe(
+            lambda: channel.basic_ack(delivery_tag, multiple=multiple)
+        )
+
+    def nack(
+        self, delivery_tag: int, subscription_id: str, *, multiple=False, requeue=True
+    ):
+        subscription_id = str(subscription_id)
+        if subscription_id not in self._subscriptions:
+            raise KeyError(f"Could not find subscription {subscription_id} to NACK")
+
+        channel = self._pika_channels[subscription_id]
+
+        assert self._connection is not None
+
+        self._connection.add_callback_threadsafe(
+            lambda: channel.basic_nack(delivery_tag, multiple=multiple, requeue=requeue)
+        )
+
+    @property
+    def connection_alive(self) -> bool:
+        """
+        Is the connection object connected, or in the process of reconnecting?
+
+        This will return True if the object is connected right now, or there is
+        a potential that this object will be reconnected in the future, even if
+        the connection is lost at this point.
+        """
+        return self._started.is_set() and self._state not in (
+            _PikaThreadStatus.STOPPED,
+            _PikaThreadStatus.STOPPING,
+        )
+
+    # NOTE: With reconnection lifecycle this probably doesn't make sense
+    #       on it's own. It might make sense to add this returning a
+    #       connection-specific 'token' - presumably the user might want
+    #       to ensure that a connection is still the same connection
+    #       and thus adhering to various within-connection guarantees.
+    #       Remove this until we understand where it might be necessary.
+    # @property
+    # def connected(self):
+    #     """
+    #     Has a connection been successfully started at least once, and isn't in the process of shutting down.
+
+    #     Note that this might have changed by the time that you make a
+    #     decision based on this property.
+    #     """
+    #     return self.connection_alive and self._connected.is_set()
+
+    ####################################################################
+    # PikaThread Internal methods
+
+    def _debug_close_connection(self):
+        self._connection.add_callback_threadsafe(lambda: self._connection.close())
+
+    def _get_shared_channel(self) -> BlockingChannel:
+        """Get the shared (no prefetch) channel. Create if necessary."""
+
+        assert self._connection is not None
+
+        if not self._pika_shared_channel:
+            self._pika_shared_channel = self._connection.channel()
+            self._pika_shared_channel.confirm_delivery()
+        return self._pika_shared_channel
+
+    def _recreate_subscriptions(self):
+        """Resubscribe all existing subscriptions"""
+        old_subscriptions = self._subscriptions
+        self._subscriptions = {}
+
+        logger.debug("Setting up %d subscriptions", len(old_subscriptions))
+        try:
+            for consumer_id, subscription in old_subscriptions.items():
+                self._add_subscription(consumer_id, subscription)
+        except BaseException:
+            # If something goes (temporarily) wrong recreating, then we
+            # don't want to only partially resubscribe next time
+            self._subscriptions = old_subscriptions
+            raise
+
+        logger.debug(
+            f"Subscriptions recreated. Reconnections allowed? - {'Yes' if self._reconnection_allowed else 'No.'}"
+        )
+
+    def _add_subscription(self, consumer_tag: str, subscription: _PikaSubscription):
+        assert self._connection is not None
+        assert consumer_tag not in self._subscriptions
+
+        # We flip reconnection to False if any subscription is not reconnectable
+        if self._reconnection_allowed and not subscription.reconnectable:
+            self._reconnection_allowed = False
+            logger.debug(
+                f"Subscription {consumer_tag} to '{subscription.destination}' is not reconnectable. Turning reconnection off."
             )
+
+        # Either open a channel (if prefetch) or use the shared one
+        if subscription.prefetch_count == 0:
+            channel = self._get_shared_channel()
+        else:
+            channel = self._connection.channel()
+            channel.confirm_delivery()
+            channel.basic_qos(prefetch_count=subscription.prefetch_count)
+
+        if subscription.kind == _PikaSubscriptionKind.FANOUT:
+            # If a FANOUT subscription, then we need to create and bind
+            # a temporary queue to receive messages from the exchange
+            queue = channel.queue_declare("", exclusive=True).method.queue
+            assert queue is not None
+            channel.queue_bind(queue, subscription.destination)
+            subscription.queue = queue
+        elif subscription.kind == _PikaSubscriptionKind.DIRECT:
+            subscription.queue = subscription.destination
+        else:
+            raise NotImplementedError(f"Unknown subscription kind: {subscription.kind}")
+        channel.basic_consume(
+            subscription.queue,
+            subscription.on_message_callback,
+            auto_ack=subscription.auto_ack,
+            exclusive=subscription.exclusive,
+            consumer_tag=consumer_tag,
+        )
+        # Only now we have subscribed successfully, add to the list
+        self._pika_channels[consumer_tag] = channel
+        self._subscriptions[consumer_tag] = subscription
+        logger.debug("Consuming (%s) on %s", consumer_tag, subscription.queue)
+
+    def _run(self):
+        if self._please_stop.is_set():
+            # stop() was called before start()... so quit
+            self._state == _PikaThreadStatus.STOPPED
+            return
+        assert self._state == _PikaThreadStatus.NEW
+        assert self._reconnection_allowed, "Should be true until first synchronize"
+        logger.debug("pika thread starting")
+        connection_counter = 0
+        connection_attempts_since_last_connection = 0
+
+        # Loop until we either can't, or are asked not to
+        while (
+            connection_counter == 0 or self._reconnection_allowed
+        ) and not self._please_stop.is_set():
+            try:
+                # If we've reconnecting to the limit, give up
+                if (
+                    self._reconnection_attempt_limit
+                    and connection_attempts_since_last_connection
+                    > self._reconnection_attempt_limit
+                ):
+                    logger.error(
+                        "Failed to establish connection after %d attempts; giving up"
+                    )
+                    break
+                # If we are hitting repeat reconnections without success, sleep for a bit and hope
+                # that the server comes back
+                if connection_attempts_since_last_connection > 0:
+                    sleep_time = 2 ** (connection_attempts_since_last_connection - 1)
+                    logger.info(
+                        "Failed to connect on attempt %d - sleeping %ds",
+                        connection_attempts_since_last_connection,
+                        sleep_time,
+                    )
+                    time.sleep(sleep_time)
+
+                connection_attempts_since_last_connection += 1
+                if connection_counter == 0:
+                    logger.debug("Connecting to AMPQ")
+                else:
+                    logger.debug(f"Reconnecting to AMPQ #{connection_counter}")
+                # Clear any exceptions from past connections
+                self._exc_info = None
+                self._state = _PikaThreadStatus.CONNECTING
+
+                # Make sure we don't always connect to the same server first
+                random.shuffle(self._connection_parameters)
+                self._connection = pika.BlockingConnection(self._connection_parameters)
+                logger.debug(f"Connection #{connection_counter} connected")
+                connection_counter += 1
+
+                # Clear the channels because this might be a reconnect
+                self._pika_channels = {}
+                self._pika_shared_channel = None
+
+                # [Re]create subscriptions
+                self._recreate_subscriptions()
+
+                # We set up here because we don't want to class as CONNECTED
+                # until all requested subscriptions have been actioned.
+                self._state = _PikaThreadStatus.CONNECTED
+                self._connected.set()
+                # Since we are properly reconnected, reset the fail count
+                connection_attempts_since_last_connection = 0
+                logger.debug("Waiting for events")
+
+                # Run until we are asked to stop, or fail
+                while not self._please_stop.is_set():
+                    self._connection.process_data_events(None)
+            except pika.exceptions.ConnectionClosed:
+                self._exc_info = sys.exc_info()
+                if self._please_stop.is_set():
+                    logger.info("Connection closed on request")
+                else:
+                    logger.error("Connection closed unexpectedly")
+            except pika.exceptions.ChannelClosed as e:
+                logger.error("Channel closed: %r", e)
+                self._exc_info = sys.exc_info()
+            except pika.exceptions.ConnectionWrongStateError:
+                logger.debug(
+                    "Got ConnectionWrongStateError - connection closed by other means?"
+                )
+                self._exc_info = sys.exc_info()
+            except pika.exceptions.AMQPConnectionError as e:
+                self._exc_info = sys.exc_info()
+                # Connection failed. Are we the first?
+                if connection_counter == 0:
+                    logger.error("Initial connection failed: %r", e)
+                    break
+                logger.error("Connection %d failed: %s", connection_counter, repr(e))
+            except BaseException as e:
+                logger.error(f"Connection failed for unknown reason: {e!r}")
+                self._exc_info = sys.exc_info()
+                break
+            # Make sure our connection is closed before reconnecting
+            if not self._connection.is_closed:
+                logger.info("Connection not closed. Closing.")
+                self._connection.close()
+
+        logger.debug(f"Shutting down thread. Requested? {self._please_stop.is_set()}")
+        # We're shutting down. Do this cleanly.
+        self._state = _PikaThreadStatus.STOPPING
+
+        # Make sure the connection is closed
+        if self._connection and not self._connection.is_closed:
+            self._connection.close()
+
+        self._state = _PikaThreadStatus.STOPPED
+        self._please_stop.set()
+
+        # We might not have successfully connected - but we might be waiting
+        # on a connection somewhere. So now we've actually marked ourselves
+        # as disconnected, mark all other outstanding events as "complete"
+        # to resolve deadlocks.
+        self._connected.set()
+
+        logger.debug("Leaving PikaThread runloop")
+
+    def _add_subscription_in_thread(
+        self,
+        consumer_tag: Optional[str],
+        subscription: _PikaSubscription,
+        result: Future,
+    ):
+        """
+        Add a subscription to the pika connection.
+
+        Will be called on the connection thread.
+        """
+        try:
+            if result.set_running_or_notify_cancel():
+                # If not specified, generate a consumer_tag automatically
+                if consumer_tag is None:
+                    consumer_tag = str(uuid.uuid4())
+                assert (
+                    consumer_tag not in self._subscriptions
+                ), f"Subscription request {consumer_tag} rejected due to existing subscription {self._subscriptions[consumer_tag]}"
+                self._add_subscription(consumer_tag, subscription)
+                result.set_result(self._subscriptions[consumer_tag].queue)
+        except BaseException as e:
+            result.set_exception(e)
+            raise
