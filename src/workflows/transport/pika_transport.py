@@ -790,7 +790,9 @@ class _PikaThread(threading.Thread):
         """If the thread has failed with an exception, raise it in the callers thread."""
         exception = self._exc_info
         if exception:
-            raise exception[0].with_traceback(exception[1], exception[2])
+            raise exception[0] from exception[0].with_traceback(
+                exception[1], exception[2]
+            )
 
     def subscribe_queue(
         self,
