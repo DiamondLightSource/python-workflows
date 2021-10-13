@@ -882,7 +882,7 @@ def test_pikathread_broadcast_subscribe(connection_params, test_channel):
 
     # Make a subscription and wait for it to be valid
     thread.subscribe_broadcast(
-        exchange, _callback, consumer_tag=0, reconnectable=True
+        exchange, _callback, subscription_id=1, reconnectable=True
     ).result()
 
     test_channel.basic_publish(exchange, routing_key="", body="A Message")
@@ -907,7 +907,9 @@ def test_pikathread_broadcast_reconnection(
             got_message.set()
 
         exchange = test_channel.temporary_exchange_declare(exchange_type="fanout")
-        thread.subscribe_broadcast(exchange, _got_message, reconnectable=True).result()
+        thread.subscribe_broadcast(
+            exchange, _got_message, reconnectable=True, subscription_id=1
+        ).result()
 
         # Force reconnection - normally we want this to be transparent, but
         # let's twiddle the internals so we can wait for reconnection as we
@@ -929,7 +931,10 @@ def test_pikathread_broadcast_reconnection(
             got_message_2.set()
 
         thread.subscribe_broadcast(
-            exchange, _got_message_2, reconnectable=False
+            exchange,
+            _got_message_2,
+            reconnectable=False,
+            subscription_id=2,
         ).result()
 
         # Make sure that the thread ends instead of reconnect if we force a disconnection
@@ -953,7 +958,9 @@ def test_pikathread_subscribe_queue(connection_params, test_channel):
             print(f"Got message: {pprint.pformat(args)}")
             messages.put(args[3])
 
-        thread.subscribe_queue(queue, _get_message, reconnectable=True)
+        thread.subscribe_queue(
+            queue, _get_message, reconnectable=True, subscription_id=1
+        )
         test_channel.basic_publish("", queue, "This is a message")
         assert messages.get(timeout=2) == b"This is a message"
 
@@ -1042,13 +1049,13 @@ def test_pikathread_unsubscribe(test_channel, connection_params):
             messages.put(args[3])
 
         thread.subscribe_queue(
-            queue, _get_message, reconnectable=True, consumer_tag="1"
+            queue, _get_message, reconnectable=True, subscription_id=1
         )
         test_channel.basic_publish("", queue, "This is a message")
         assert messages.get(timeout=1) == b"This is a message"
 
         # Issue an unsubscribe then wait for confirmation
-        thread.unsubscribe("1").result()
+        thread.unsubscribe(1).result()
 
         # Send a message again
         test_channel.basic_publish("", queue, "This is a message again")
