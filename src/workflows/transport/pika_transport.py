@@ -695,6 +695,7 @@ class _PikaThread(threading.Thread):
         self._state: _PikaThreadStatus = _PikaThreadStatus.NEW
         # Internal store of subscriptions, to resubscribe if necessary. Keys are
         # unique and auto-generated, and known as subscription IDs or consumer tags
+        # (strictly: pika/AMQP consumer tags are strings, not integers)
         self._subscriptions: Dict[int, _PikaSubscription] = {}
         # The pika connection object
         self._connection: Optional[pika.BlockingConnection] = None
