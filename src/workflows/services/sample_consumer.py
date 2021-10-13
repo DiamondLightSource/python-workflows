@@ -24,13 +24,13 @@ class SampleConsumer(CommonService):
         t = (time.time() % 1000) * 1000
 
         if header:
-            header = json.dumps(header, indent=2) + "\n" + "----------------" + "\n"
+            header_str = json.dumps(header, indent=2) + "\n" + "----------------" + "\n"
         else:
-            header = ""
+            header_str = ""
         if isinstance(message, dict):
             message = json.dumps(message, indent=2) + "\n" + "----------------" + "\n"
 
         self.log.info(
-            f"=== Consume ====\n{header}{message}\nReceived message @{t:10.3f} ms"
+            f"=== Consume ====\n{header_str}{message}\nReceived message @{t:10.3f} ms"
         )
         time.sleep(0.1)

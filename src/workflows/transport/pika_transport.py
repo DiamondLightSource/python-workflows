@@ -826,10 +826,6 @@ class _PikaThread(threading.Thread):
         if not self._connection:
             raise RuntimeError("Cannot subscribe to unstarted connection")
 
-        # Safety: Since our Ack interface doesn't ask consumer ID yet, we can't ack
-        if not auto_ack and prefetch_count != 0:
-            raise ValueError("Cannot turn on manual acknowledgements with prefetch > 0")
-
         new_sub = _PikaSubscription(
             arguments={},
             auto_ack=auto_ack,
