@@ -596,7 +596,7 @@ def test_subscribe_to_queue(mock_pikathread):
     assert kwargs == {
         "auto_ack": True,
         "callback": mock.ANY,
-        "consumer_tag": "1",
+        "subscription_id": 1,
         "exclusive": False,
         "prefetch_count": 1,
         "queue": str(mock.sentinel.queue1),
@@ -611,7 +611,7 @@ def test_subscribe_to_queue(mock_pikathread):
     assert kwargs == {
         "auto_ack": True,
         "callback": mock.ANY,
-        "consumer_tag": "2",
+        "subscription_id": 2,
         "exclusive": False,
         "prefetch_count": 1,
         "queue": str(mock.sentinel.queue2),
@@ -625,7 +625,7 @@ def test_subscribe_to_queue(mock_pikathread):
     assert kwargs == {
         "auto_ack": False,
         "callback": mock.ANY,
-        "consumer_tag": "3",
+        "subscription_id": 3,
         "exclusive": False,
         "prefetch_count": 1,
         "queue": str(mock.sentinel.queue3),
@@ -633,9 +633,9 @@ def test_subscribe_to_queue(mock_pikathread):
     }
 
     transport._unsubscribe(1)
-    mock_pikathread.unsubscribe.assert_called_once_with("1")
+    mock_pikathread.unsubscribe.assert_called_once_with(1)
     transport._unsubscribe(2)
-    mock_pikathread.unsubscribe.assert_called_with("2")
+    mock_pikathread.unsubscribe.assert_called_with(2)
 
 
 def test_subscribe_to_broadcast(mock_pikathread):
@@ -652,7 +652,7 @@ def test_subscribe_to_broadcast(mock_pikathread):
     assert kwargs == {
         "callback": mock.ANY,
         "exchange": str(mock.sentinel.queue1),
-        "consumer_tag": "1",
+        "subscription_id": 1,
         "reconnectable": False,
     }
 
@@ -668,14 +668,14 @@ def test_subscribe_to_broadcast(mock_pikathread):
     assert kwargs == {
         "callback": mock.ANY,
         "exchange": str(mock.sentinel.queue2),
-        "consumer_tag": "2",
+        "subscription_id": 2,
         "reconnectable": False,
     }
 
     transport._unsubscribe(1)
-    mock_pikathread.unsubscribe.assert_called_once_with("1")
+    mock_pikathread.unsubscribe.assert_called_once_with(1)
     transport._unsubscribe(2)
-    mock_pikathread.unsubscribe.assert_called_with("2")
+    mock_pikathread.unsubscribe.assert_called_with(2)
 
 
 @mock.patch("workflows.transport.pika_transport.pika")
