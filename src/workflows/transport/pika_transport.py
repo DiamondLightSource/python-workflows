@@ -9,8 +9,6 @@ import random
 import sys
 import threading
 import time
-import uuid
-from collections.abc import Hashable
 from concurrent.futures import Future
 from enum import Enum, auto
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Union
@@ -319,14 +317,14 @@ class PikaTransport(CommonTransport):
 
     def _call_message_callback(
         self,
-        sub_id: str,
+        subscription_id: int,
         _channel: pika.channel.Channel,
         method: pika.spec.Basic.Deliver,
         properties: pika.spec.BasicProperties,
         body: bytes,
     ):
         """Rewrite and redirect a pika callback to the subscription function"""
-        self.subscription_callback(sub_id)(
+        self.subscription_callback(subscription_id)(
             {
                 "consumer_tag": str(method.consumer_tag),
                 "delivery_mode": properties.delivery_mode,
@@ -335,6 +333,7 @@ class PikaTransport(CommonTransport):
                 "message-id": method.delivery_tag,
                 "redelivered": method.redelivered,
                 "routing_key": method.routing_key,
+                "subscription": subscription_id,
             },
             body,
         )
@@ -391,7 +390,7 @@ class PikaTransport(CommonTransport):
                 callback=functools.partial(self._call_message_callback, sub_id),
                 auto_ack=not acknowledgement,
                 exclusive=exclusive,
-                consumer_tag=str(sub_id),
+                subscription_id=sub_id,
                 reconnectable=reconnectable,
                 prefetch_count=prefetch_count,
             ).result()
@@ -403,7 +402,7 @@ class PikaTransport(CommonTransport):
 
     def _subscribe_broadcast(
         self,
-        sub_id: Hashable,
+        sub_id: int,
         channel: str,
         callback: MessageCallback,
         *,
@@ -429,15 +428,15 @@ class PikaTransport(CommonTransport):
         self._pika_thread.subscribe_broadcast(
             exchange=channel,
             callback=functools.partial(self._call_message_callback, sub_id),
-            consumer_tag=str(sub_id),
+            subscription_id=sub_id,
             reconnectable=reconnectable,
         ).result()
 
-    def _unsubscribe(self, consumer_tag):
+    def _unsubscribe(self, sub_id: int, **kwargs):
         """Stop listening to a queue
-        :param consumer_tag: Consumer Tag to cancel
+        :param sub_id: Consumer Tag to cancel
         """
-        self._pika_thread.unsubscribe(str(consumer_tag))
+        self._pika_thread.unsubscribe(sub_id)
         # self._channel.basic_cancel(consumer_tag=consumer_tag, callback=None)
         # Callback reference is kept as further messages may already have been received
 
@@ -539,7 +538,7 @@ class PikaTransport(CommonTransport):
         # self._channel.tx_commit()
 
     def _ack(
-        self, message_id, subscription_id: str, *, multiple: bool = False, **_kwargs
+        self, message_id, subscription_id: int, *, multiple: bool = False, **_kwargs
     ):
         """
         Acknowledge receipt of a message.
@@ -560,7 +559,7 @@ class PikaTransport(CommonTransport):
     def _nack(
         self,
         message_id,
-        subscription_id: str,
+        subscription_id: int,
         *,
         multiple: bool = False,
         requeue: bool = True,
@@ -694,12 +693,14 @@ class _PikaThread(threading.Thread):
             name="workflows pika_transport", daemon=False, target=self._run
         )
         self._state: _PikaThreadStatus = _PikaThreadStatus.NEW
-        # Internal store of subscriptions, to resubscribe if necessary
-        self._subscriptions: Dict[str, _PikaSubscription] = {}
+        # Internal store of subscriptions, to resubscribe if necessary. Keys are
+        # unique and auto-generated, and known as subscription IDs or consumer tags
+        # (strictly: pika/AMQP consumer tags are strings, not integers)
+        self._subscriptions: Dict[int, _PikaSubscription] = {}
         # The pika connection object
         self._connection: Optional[pika.BlockingConnection] = None
         # Per-subscription channels. May be pointing to the shared channel
-        self._pika_channels: Dict[str, BlockingChannel] = {}
+        self._pika_channels: Dict[int, BlockingChannel] = {}
         # A common, shared channel, used for non-QoS subscriptions
         self._pika_shared_channel: Optional[BlockingChannel]
         # Are we allowed to reconnect. Can only be turned off, never on
@@ -798,9 +799,9 @@ class _PikaThread(threading.Thread):
         self,
         queue: str,
         callback: PikaCallback,
+        subscription_id: int,
         *,
         auto_ack: bool = True,
-        consumer_tag: Optional[str] = None,
         exclusive: bool = False,
         prefetch_count: int = 1,
         reconnectable: bool = False,
@@ -809,9 +810,9 @@ class _PikaThread(threading.Thread):
         Subscribe to a queue. Thread-safe.
 
         Args:
-            consumer_tag: Internal ID representing this subscription
             queue: The queue to listen for messages on
             callback: The function to call when receiving messages on this queue
+            subscription_id: Internal ID representing this subscription.
             auto_ack: Should this subscription auto-acknowledge messages?
             exclusive: Should we be the only consumer?
             prefetch_count: How many messages are we allowed to prefetch
@@ -824,10 +825,6 @@ class _PikaThread(threading.Thread):
 
         if not self._connection:
             raise RuntimeError("Cannot subscribe to unstarted connection")
-
-        # Safety: Since our Ack interface doesn't ask consumer ID yet, we can't ack
-        if not auto_ack and prefetch_count != 0:
-            raise ValueError("Cannot turn on manual acknowledgements with prefetch > 0")
 
         new_sub = _PikaSubscription(
             arguments={},
@@ -842,7 +839,7 @@ class _PikaThread(threading.Thread):
         result: Future[None] = Future()
         self._connection.add_callback_threadsafe(
             functools.partial(
-                self._add_subscription_in_thread, consumer_tag, new_sub, result
+                self._add_subscription_in_thread, subscription_id, new_sub, result
             )
         )
         return result
@@ -851,9 +848,9 @@ class _PikaThread(threading.Thread):
         self,
         exchange: str,
         callback: PikaCallback,
+        subscription_id: int,
         *,
         auto_ack: bool = True,
-        consumer_tag: Optional[str] = None,
         reconnectable: bool = False,
         prefetch_count: int = 0,
     ) -> Future[None]:
@@ -864,7 +861,7 @@ class _PikaThread(threading.Thread):
             exchange: The queue to listen for messages on
             callback: The function to call when receiving messages on this queue
             auto_ack: Should this subscription auto-acknowledge messages?
-            consumer_tag: Internal ID representing this subscription. Generated if unspecified.
+            subscription_id: Internal ID representing this subscription.
             prefetch_count: How many messages are we allowed to prefetch
             reconnectable:
                 Are we allowed to reconnect to this subscription?
@@ -891,14 +888,16 @@ class _PikaThread(threading.Thread):
         result: Future[None] = Future()
         self._connection.add_callback_threadsafe(
             functools.partial(
-                self._add_subscription_in_thread, consumer_tag, new_sub, result
+                self._add_subscription_in_thread, subscription_id, new_sub, result
             )
         )
         return result
 
-    def unsubscribe(self, consumer_tag: str) -> Future[None]:
-        if consumer_tag not in self._subscriptions:
-            raise KeyError(f"No such subscription with consumer tag '{consumer_tag}'")
+    def unsubscribe(self, subscription_id: int) -> Future[None]:
+        if subscription_id not in self._subscriptions:
+            raise KeyError(
+                f"No subscription with ID {subscription_id} to unsubscribe from"
+            )
 
         assert self._connection is not None
 
@@ -907,10 +906,10 @@ class _PikaThread(threading.Thread):
         def _unsubscribe():
             try:
                 if result.set_running_or_notify_cancel():
-                    logger.debug("Unsubscribing consumer tag '%s'", consumer_tag)
-                    del self._subscriptions[consumer_tag]
-                    channel = self._pika_channels.pop(consumer_tag)
-                    channel.basic_cancel(str(consumer_tag))
+                    logger.debug("Unsubscribing from subscription %d", subscription_id)
+                    del self._subscriptions[subscription_id]
+                    channel = self._pika_channels.pop(subscription_id)
+                    channel.basic_cancel(str(subscription_id))
 
                     # Close the channel if nobody else is using it
                     if channel not in self._pika_channels.values():
@@ -958,8 +957,7 @@ class _PikaThread(threading.Thread):
         self._connection.add_callback_threadsafe(_send)
         return future
 
-    def ack(self, delivery_tag: int, subscription_id: str, *, multiple=False):
-        subscription_id = str(subscription_id)
+    def ack(self, delivery_tag: int, subscription_id: int, *, multiple=False):
         if subscription_id not in self._subscriptions:
             raise KeyError(f"Could not find subscription {subscription_id} to ACK")
 
@@ -972,9 +970,8 @@ class _PikaThread(threading.Thread):
         )
 
     def nack(
-        self, delivery_tag: int, subscription_id: str, *, multiple=False, requeue=True
+        self, delivery_tag: int, subscription_id: int, *, multiple=False, requeue=True
     ):
-        subscription_id = str(subscription_id)
         if subscription_id not in self._subscriptions:
             raise KeyError(f"Could not find subscription {subscription_id} to NACK")
 
@@ -1039,8 +1036,8 @@ class _PikaThread(threading.Thread):
 
         logger.debug("Setting up %d subscriptions", len(old_subscriptions))
         try:
-            for consumer_id, subscription in old_subscriptions.items():
-                self._add_subscription(consumer_id, subscription)
+            for subscription_id, subscription in old_subscriptions.items():
+                self._add_subscription(subscription_id, subscription)
         except BaseException:
             # If something goes (temporarily) wrong recreating, then we
             # don't want to only partially resubscribe next time
@@ -1051,15 +1048,15 @@ class _PikaThread(threading.Thread):
             f"Subscriptions recreated. Reconnections allowed? - {'Yes' if self._reconnection_allowed else 'No.'}"
         )
 
-    def _add_subscription(self, consumer_tag: str, subscription: _PikaSubscription):
+    def _add_subscription(self, subscription_id: int, subscription: _PikaSubscription):
         assert self._connection is not None
-        assert consumer_tag not in self._subscriptions
+        assert subscription_id not in self._subscriptions
 
         # We flip reconnection to False if any subscription is not reconnectable
         if self._reconnection_allowed and not subscription.reconnectable:
             self._reconnection_allowed = False
             logger.debug(
-                f"Subscription {consumer_tag} to '{subscription.destination}' is not reconnectable. Turning reconnection off."
+                f"Subscription {subscription_id} to '{subscription.destination}' is not reconnectable. Turning reconnection off."
             )
 
         # Either open a channel (if prefetch) or use the shared one
@@ -1086,12 +1083,12 @@ class _PikaThread(threading.Thread):
             subscription.on_message_callback,
             auto_ack=subscription.auto_ack,
             exclusive=subscription.exclusive,
-            consumer_tag=consumer_tag,
+            consumer_tag=str(subscription_id),
         )
         # Only now we have subscribed successfully, add to the list
-        self._pika_channels[consumer_tag] = channel
-        self._subscriptions[consumer_tag] = subscription
-        logger.debug("Consuming (%s) on %s", consumer_tag, subscription.queue)
+        self._pika_channels[subscription_id] = channel
+        self._subscriptions[subscription_id] = subscription
+        logger.debug("Consuming (%d) on %s", subscription_id, subscription.queue)
 
     def _run(self):
         if self._please_stop.is_set():
@@ -1214,7 +1211,7 @@ class _PikaThread(threading.Thread):
 
     def _add_subscription_in_thread(
         self,
-        consumer_tag: Optional[str],
+        subscription_id: int,
         subscription: _PikaSubscription,
         result: Future,
     ):
@@ -1225,14 +1222,11 @@ class _PikaThread(threading.Thread):
         """
         try:
             if result.set_running_or_notify_cancel():
-                # If not specified, generate a consumer_tag automatically
-                if consumer_tag is None:
-                    consumer_tag = str(uuid.uuid4())
                 assert (
-                    consumer_tag not in self._subscriptions
-                ), f"Subscription request {consumer_tag} rejected due to existing subscription {self._subscriptions[consumer_tag]}"
-                self._add_subscription(consumer_tag, subscription)
-                result.set_result(self._subscriptions[consumer_tag].queue)
+                    subscription_id not in self._subscriptions
+                ), f"Subscription request {subscription_id} rejected due to existing subscription {self._subscriptions[subscription_id]}"
+                self._add_subscription(subscription_id, subscription)
+                result.set_result(self._subscriptions[subscription_id].queue)
         except BaseException as e:
             result.set_exception(e)
             raise

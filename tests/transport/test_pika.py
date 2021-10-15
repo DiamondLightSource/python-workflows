@@ -596,7 +596,7 @@ def test_subscribe_to_queue(mock_pikathread):
     assert kwargs == {
         "auto_ack": True,
         "callback": mock.ANY,
-        "consumer_tag": "1",
+        "subscription_id": 1,
         "exclusive": False,
         "prefetch_count": 1,
         "queue": str(mock.sentinel.queue1),
@@ -611,7 +611,7 @@ def test_subscribe_to_queue(mock_pikathread):
     assert kwargs == {
         "auto_ack": True,
         "callback": mock.ANY,
-        "consumer_tag": "2",
+        "subscription_id": 2,
         "exclusive": False,
         "prefetch_count": 1,
         "queue": str(mock.sentinel.queue2),
@@ -625,7 +625,7 @@ def test_subscribe_to_queue(mock_pikathread):
     assert kwargs == {
         "auto_ack": False,
         "callback": mock.ANY,
-        "consumer_tag": "3",
+        "subscription_id": 3,
         "exclusive": False,
         "prefetch_count": 1,
         "queue": str(mock.sentinel.queue3),
@@ -633,9 +633,9 @@ def test_subscribe_to_queue(mock_pikathread):
     }
 
     transport._unsubscribe(1)
-    mock_pikathread.unsubscribe.assert_called_once_with("1")
+    mock_pikathread.unsubscribe.assert_called_once_with(1)
     transport._unsubscribe(2)
-    mock_pikathread.unsubscribe.assert_called_with("2")
+    mock_pikathread.unsubscribe.assert_called_with(2)
 
 
 def test_subscribe_to_broadcast(mock_pikathread):
@@ -652,7 +652,7 @@ def test_subscribe_to_broadcast(mock_pikathread):
     assert kwargs == {
         "callback": mock.ANY,
         "exchange": str(mock.sentinel.queue1),
-        "consumer_tag": "1",
+        "subscription_id": 1,
         "reconnectable": False,
     }
 
@@ -668,14 +668,14 @@ def test_subscribe_to_broadcast(mock_pikathread):
     assert kwargs == {
         "callback": mock.ANY,
         "exchange": str(mock.sentinel.queue2),
-        "consumer_tag": "2",
+        "subscription_id": 2,
         "reconnectable": False,
     }
 
     transport._unsubscribe(1)
-    mock_pikathread.unsubscribe.assert_called_once_with("1")
+    mock_pikathread.unsubscribe.assert_called_once_with(1)
     transport._unsubscribe(2)
-    mock_pikathread.unsubscribe.assert_called_with("2")
+    mock_pikathread.unsubscribe.assert_called_with(2)
 
 
 @mock.patch("workflows.transport.pika_transport.pika")
@@ -882,7 +882,7 @@ def test_pikathread_broadcast_subscribe(connection_params, test_channel):
 
     # Make a subscription and wait for it to be valid
     thread.subscribe_broadcast(
-        exchange, _callback, consumer_tag=0, reconnectable=True
+        exchange, _callback, subscription_id=1, reconnectable=True
     ).result()
 
     test_channel.basic_publish(exchange, routing_key="", body="A Message")
@@ -907,7 +907,9 @@ def test_pikathread_broadcast_reconnection(
             got_message.set()
 
         exchange = test_channel.temporary_exchange_declare(exchange_type="fanout")
-        thread.subscribe_broadcast(exchange, _got_message, reconnectable=True).result()
+        thread.subscribe_broadcast(
+            exchange, _got_message, reconnectable=True, subscription_id=1
+        ).result()
 
         # Force reconnection - normally we want this to be transparent, but
         # let's twiddle the internals so we can wait for reconnection as we
@@ -929,7 +931,10 @@ def test_pikathread_broadcast_reconnection(
             got_message_2.set()
 
         thread.subscribe_broadcast(
-            exchange, _got_message_2, reconnectable=False
+            exchange,
+            _got_message_2,
+            reconnectable=False,
+            subscription_id=2,
         ).result()
 
         # Make sure that the thread ends instead of reconnect if we force a disconnection
@@ -953,7 +958,9 @@ def test_pikathread_subscribe_queue(connection_params, test_channel):
             print(f"Got message: {pprint.pformat(args)}")
             messages.put(args[3])
 
-        thread.subscribe_queue(queue, _get_message, reconnectable=True)
+        thread.subscribe_queue(
+            queue, _get_message, reconnectable=True, subscription_id=1
+        )
         test_channel.basic_publish("", queue, "This is a message")
         assert messages.get(timeout=2) == b"This is a message"
 
@@ -1042,13 +1049,13 @@ def test_pikathread_unsubscribe(test_channel, connection_params):
             messages.put(args[3])
 
         thread.subscribe_queue(
-            queue, _get_message, reconnectable=True, consumer_tag="1"
+            queue, _get_message, reconnectable=True, subscription_id=1
         )
         test_channel.basic_publish("", queue, "This is a message")
         assert messages.get(timeout=1) == b"This is a message"
 
         # Issue an unsubscribe then wait for confirmation
-        thread.unsubscribe("1").result()
+        thread.unsubscribe(1).result()
 
         # Send a message again
         test_channel.basic_publish("", queue, "This is a message again")
