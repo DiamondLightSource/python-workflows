@@ -17,7 +17,10 @@ class SampleTxn(CommonService):
     def initializing(self):
         """Subscribe to a channel. Received messages must be acknowledged."""
         self.subid = self._transport.subscribe(
-            "transient.transaction", self.receive_message, acknowledgement=True
+            "transient.transaction",
+            self.receive_message,
+            acknowledgement=True,
+            prefetch_count=1000,
         )
 
     @staticmethod
