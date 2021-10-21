@@ -632,7 +632,7 @@ def test_subscribe_to_queue(mock_pikathread):
         "reconnectable": False,
     }
 
-    transport._subscribe(4, str(mock.sentinel.queue4), mock_cb, temporary=True)
+    transport._subscribe(4, str(mock.sentinel.queue4), mock_cb, auto_delete=True)
     assert mock_pikathread.subscribe_queue.call_count == 4
     args, kwargs = mock_pikathread.subscribe_queue.call_args
     assert kwargs == {
