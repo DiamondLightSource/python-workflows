@@ -595,6 +595,7 @@ def test_subscribe_to_queue(mock_pikathread):
     assert not args
     assert kwargs == {
         "auto_ack": True,
+        "auto_delete": False,
         "callback": mock.ANY,
         "subscription_id": 1,
         "prefetch_count": 1,
@@ -609,6 +610,7 @@ def test_subscribe_to_queue(mock_pikathread):
     assert not args
     assert kwargs == {
         "auto_ack": True,
+        "auto_delete": False,
         "callback": mock.ANY,
         "subscription_id": 2,
         "prefetch_count": 1,
@@ -622,10 +624,25 @@ def test_subscribe_to_queue(mock_pikathread):
     assert not args
     assert kwargs == {
         "auto_ack": False,
+        "auto_delete": False,
         "callback": mock.ANY,
         "subscription_id": 3,
         "prefetch_count": 1,
         "queue": str(mock.sentinel.queue3),
+        "reconnectable": False,
+    }
+
+    transport._subscribe(4, str(mock.sentinel.queue4), mock_cb, temporary=True)
+    assert mock_pikathread.subscribe_queue.call_count == 4
+    args, kwargs = mock_pikathread.subscribe_queue.call_args
+    assert kwargs == {
+        "auto_ack": True,
+        "auto_delete": True,
+        "callback": mock.ANY,
+        "subscription_id": 4,
+        "exclusive": False,
+        "prefetch_count": 1,
+        "queue": str(mock.sentinel.queue4),
         "reconnectable": False,
     }
 
