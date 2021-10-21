@@ -447,6 +447,12 @@ class StompTransport(CommonTransport):
         """
         self._conn.nack(message_id, subscription_id, **kwargs)
 
+    def _queue_declare(self, queue: str = "", **kwargs) -> str:
+        """Declare a queue with optional name, returning the name of the queue."""
+        if not queue:
+            raise workflows.Error("StompTransport does not support empty queue name")
+        return queue
+
     @staticmethod
     def _mangle_for_sending(message):
         """Function that any message will pass through before it being forwarded to

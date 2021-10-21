@@ -582,6 +582,27 @@ class PikaTransport(CommonTransport):
             message_id, subscription_id, multiple=multiple, requeue=requeue
         )
 
+    def _queue_declare(
+        self,
+        queue: str = "",
+        *,
+        passive: bool = False,
+        durable: bool = False,
+        exclusive: bool = False,
+        auto_delete: bool = False,
+        arguments: Optional[dict] = None,
+        **_kwargs,
+    ) -> str:
+        """Declare a queue with optional name, returning the name of the queue."""
+        return self._pika_thread.queue_declare(
+            queue=queue,
+            passive=passive,
+            durable=durable,
+            exclusive=exclusive,
+            auto_delete=auto_delete,
+            arguments=arguments,
+        )
+
     @staticmethod
     def _mangle_for_sending(message):
         """Function that any message will pass through before it being forwarded to
@@ -1081,6 +1102,30 @@ class _PikaThread(threading.Thread):
 
         self._connection.add_callback_threadsafe(_tx_commit)
         return future
+    def queue_declare(
+        self,
+        queue: str = "",
+        *,
+        passive: bool = False,
+        durable: bool = False,
+        exclusive: bool = False,
+        auto_delete: bool = False,
+        arguments: Optional[dict] = None,
+        **_kwargs,
+    ) -> str:
+        assert self._connection is not None
+        channel = self._connection.channel()
+        result = channel.queue_declare(
+            queue=queue,
+            passive=passive,
+            durable=durable,
+            exclusive=exclusive,
+            auto_delete=auto_delete,
+            arguments=arguments,
+        )
+
+        # channel.queue_bind(queue, queue)
+        return result.method.queue
 
     @property
     def connection_alive(self) -> bool:
@@ -1165,14 +1210,14 @@ class _PikaThread(threading.Thread):
         if subscription.kind is _PikaSubscriptionKind.FANOUT:
             # If a FANOUT subscription, then we need to create and bind
             # a temporary queue to receive messages from the exchange
-            queue = channel.queue_declare("", exclusive=True).method.queue
+            queue = self.queue_declare("", exclusive=True)
             assert queue is not None
             channel.queue_bind(queue, subscription.destination)
             subscription.queue = queue
         elif subscription.kind is _PikaSubscriptionKind.DIRECT:
             subscription.queue = subscription.destination
             if subscription.auto_delete:
-                channel.queue_declare(subscription.queue, auto_delete=True)
+                self.queue_declare(subscription.queue, auto_delete=True)
         else:
             raise NotImplementedError(f"Unknown subscription kind: {subscription.kind}")
         channel.basic_consume(

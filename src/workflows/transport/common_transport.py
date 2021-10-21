@@ -336,6 +336,10 @@ class CommonTransport:
         supported. There must not be any active subscriptions or transactions."""
         return not self.__subscriptions and not self.__transactions
 
+    def queue_declare(self, queue: str = "", **kwargs) -> str:
+        """Declare a queue with optional name, returning the name of the queue."""
+        return self._queue_declare(queue, **kwargs)
+
     #
     # -- Low level communication calls to be implemented by subclass -----------
     #
@@ -436,6 +440,10 @@ class CommonTransport:
         :param **kwargs: Further parameters for the transport layer.
         """
         raise NotImplementedError("Transport interface not implemented")
+
+    def _queue_declare(self, queue: str = "", **kwargs) -> str:
+        """Declare a queue with optional name, returning the name of the queue."""
+        raise NotImplementedError("Queue declaration interface not implemented")
 
     #
     # -- Internal message mangling functions -----------------------------------
