@@ -348,7 +348,7 @@ class PikaTransport(CommonTransport):
         exclusive: bool = False,
         prefetch_count: int = 1,
         reconnectable: bool = False,
-        temporary: bool = False,
+        auto_delete: bool = False,
         **_kwargs,
     ):
         """
@@ -372,6 +372,7 @@ class PikaTransport(CommonTransport):
                 How many messages will be prefetched for the subscription.
                 This makes little difference unless acknowledgement is
                 also set.
+            auto_delete: Delete after consumer cancels or disconnects
         """
         if acknowledgement and reconnectable:
             raise ValueError(
@@ -390,7 +391,7 @@ class PikaTransport(CommonTransport):
                 queue=channel,
                 callback=functools.partial(self._call_message_callback, sub_id),
                 auto_ack=not acknowledgement,
-                auto_delete=temporary,
+                auto_delete=auto_delete,
                 exclusive=exclusive,
                 subscription_id=sub_id,
                 reconnectable=reconnectable,
