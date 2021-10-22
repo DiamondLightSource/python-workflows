@@ -702,12 +702,12 @@ class _PikaThread(threading.Thread):
         self._subscriptions: Dict[int, _PikaSubscription] = {}
         # The pika connection object
         self._connection: Optional[pika.BlockingConnection] = None
-        # Per-subscription channels. May be pointing to the shared channel
+        # Index of per-subscription channels.
         self._pika_channels: Dict[int, BlockingChannel] = {}
         # Bidirectional index of all ongoing transactions. May include the shared channel
         self._transactions_by_id: Dict[int, BlockingChannel] = {}
         self._transactions_by_channel: Dict[BlockingChannel, int] = {}
-        # A common, shared channel, used for non-QoS subscriptions
+        # A common, shared channel, used for sending messages outside of transactions.
         self._pika_shared_channel: Optional[BlockingChannel]
         # Are we allowed to reconnect. Can only be turned off, never on
         self._reconnection_allowed: bool = True
@@ -1103,7 +1103,7 @@ class _PikaThread(threading.Thread):
         )
 
     # NOTE: With reconnection lifecycle this probably doesn't make sense
-    #       on it's own. It might make sense to add this returning a
+    #       on its own. It might make sense to add this returning a
     #       connection-specific 'token' - presumably the user might want
     #       to ensure that a connection is still the same connection
     #       and thus adhering to various within-connection guarantees.
@@ -1164,22 +1164,18 @@ class _PikaThread(threading.Thread):
                 f"Subscription {subscription_id} to '{subscription.destination}' is not reconnectable. Turning reconnection off."
             )
 
-        # Either open a channel (if prefetch) or use the shared one
-        if subscription.prefetch_count == 0:
-            channel = self._get_shared_channel()
-        else:
-            channel = self._connection.channel()
-            ##### channel.confirm_delivery()
-            channel.basic_qos(prefetch_count=subscription.prefetch_count)
+        # Open a dedicated channel for this subscription
+        channel = self._connection.channel()
+        channel.basic_qos(prefetch_count=subscription.prefetch_count)
 
-        if subscription.kind == _PikaSubscriptionKind.FANOUT:
+        if subscription.kind is _PikaSubscriptionKind.FANOUT:
             # If a FANOUT subscription, then we need to create and bind
             # a temporary queue to receive messages from the exchange
             queue = channel.queue_declare("", exclusive=True).method.queue
             assert queue is not None
             channel.queue_bind(queue, subscription.destination)
             subscription.queue = queue
-        elif subscription.kind == _PikaSubscriptionKind.DIRECT:
+        elif subscription.kind is _PikaSubscriptionKind.DIRECT:
             subscription.queue = subscription.destination
         else:
             raise NotImplementedError(f"Unknown subscription kind: {subscription.kind}")
