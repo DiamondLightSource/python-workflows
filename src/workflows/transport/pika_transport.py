@@ -345,7 +345,6 @@ class PikaTransport(CommonTransport):
         callback: MessageCallback,
         *,
         acknowledgement: bool = False,
-        exclusive: bool = False,
         prefetch_count: int = 1,
         reconnectable: bool = False,
         **_kwargs,
@@ -362,7 +361,6 @@ class PikaTransport(CommonTransport):
             acknowledgement:
                 Each message will need to be explicitly acknowledged.
                 Not compatible with reconnectable.
-            exclusive: Allow only one concurrent consumer on the queue.
             reconnectable:
                 Allow automatic re-establishing of the subscription over
                 a new connection, in case of connection failure. This
@@ -389,7 +387,6 @@ class PikaTransport(CommonTransport):
                 queue=channel,
                 callback=functools.partial(self._call_message_callback, sub_id),
                 auto_ack=not acknowledgement,
-                exclusive=exclusive,
                 subscription_id=sub_id,
                 reconnectable=reconnectable,
                 prefetch_count=prefetch_count,
@@ -645,7 +642,6 @@ class _PikaSubscription:
             The target for subscription. This is the exchange name if
             subscribing to broadcasts with an ephemeral queue, or the
             queue name if subscribing to a queue directly.
-        exclusive: Should we be the only consumer?
         kind: What type of subscription this is.
         on_message_callback: The function called by Pika on messages
         prefetch_count: How many messages are we allowed to prefetch
@@ -657,7 +653,6 @@ class _PikaSubscription:
     arguments: Dict[str, Any]
     auto_ack: bool
     destination: str
-    exclusive: bool
     kind: _PikaSubscriptionKind
     on_message_callback: PikaCallback = dataclasses.field(repr=False)
     prefetch_count: int
@@ -802,7 +797,6 @@ class _PikaThread(threading.Thread):
         subscription_id: int,
         *,
         auto_ack: bool = True,
-        exclusive: bool = False,
         prefetch_count: int = 1,
         reconnectable: bool = False,
     ) -> Future[None]:
@@ -814,7 +808,6 @@ class _PikaThread(threading.Thread):
             callback: The function to call when receiving messages on this queue
             subscription_id: Internal ID representing this subscription.
             auto_ack: Should this subscription auto-acknowledge messages?
-            exclusive: Should we be the only consumer?
             prefetch_count: How many messages are we allowed to prefetch
             reconnectable: Are we allowed to reconnect to this subscription
 
@@ -830,7 +823,6 @@ class _PikaThread(threading.Thread):
             arguments={},
             auto_ack=auto_ack,
             destination=queue,
-            exclusive=exclusive,
             kind=_PikaSubscriptionKind.DIRECT,
             on_message_callback=callback,
             prefetch_count=prefetch_count,
@@ -879,7 +871,6 @@ class _PikaThread(threading.Thread):
             arguments={},
             auto_ack=auto_ack,
             destination=exchange,
-            exclusive=True,
             kind=_PikaSubscriptionKind.FANOUT,
             on_message_callback=callback,
             prefetch_count=prefetch_count,
@@ -1082,7 +1073,6 @@ class _PikaThread(threading.Thread):
             subscription.queue,
             subscription.on_message_callback,
             auto_ack=subscription.auto_ack,
-            exclusive=subscription.exclusive,
             consumer_tag=str(subscription_id),
         )
         # Only now we have subscribed successfully, add to the list
