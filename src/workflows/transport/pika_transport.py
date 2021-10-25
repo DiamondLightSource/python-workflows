@@ -601,7 +601,7 @@ class PikaTransport(CommonTransport):
             exclusive=exclusive,
             auto_delete=auto_delete,
             arguments=arguments,
-        )
+        ).result()
 
     @staticmethod
     def _mangle_for_sending(message):
@@ -1112,20 +1112,25 @@ class _PikaThread(threading.Thread):
         auto_delete: bool = False,
         arguments: Optional[dict] = None,
         **_kwargs,
-    ) -> str:
-        assert self._connection is not None
-        channel = self._connection.channel()
-        result = channel.queue_declare(
-            queue=queue,
-            passive=passive,
-            durable=durable,
-            exclusive=exclusive,
-            auto_delete=auto_delete,
-            arguments=arguments,
-        )
+    ) -> Future[str]:
 
-        # channel.queue_bind(queue, queue)
-        return result.method.queue
+        if not self._connection:
+            raise RuntimeError("Cannot subscribe to unstarted connection")
+
+        result: Future[str] = Future()
+        self._connection.add_callback_threadsafe(
+            functools.partial(
+                self._declare_queue_in_thread,
+                result,
+                queue=queue,
+                passive=passive,
+                durable=durable,
+                exclusive=exclusive,
+                auto_delete=auto_delete,
+                arguments=arguments,
+            )
+        )
+        return result
 
     @property
     def connection_alive(self) -> bool:
@@ -1210,14 +1215,14 @@ class _PikaThread(threading.Thread):
         if subscription.kind is _PikaSubscriptionKind.FANOUT:
             # If a FANOUT subscription, then we need to create and bind
             # a temporary queue to receive messages from the exchange
-            queue = self.queue_declare("", exclusive=True)
+            queue = self.queue_declare("", exclusive=True).result()
             assert queue is not None
             channel.queue_bind(queue, subscription.destination)
             subscription.queue = queue
         elif subscription.kind is _PikaSubscriptionKind.DIRECT:
             subscription.queue = subscription.destination
             if subscription.auto_delete:
-                self.queue_declare(subscription.queue, auto_delete=True)
+                self.queue_declare(subscription.queue, auto_delete=True).result()
         else:
             raise NotImplementedError(f"Unknown subscription kind: {subscription.kind}")
         channel.basic_consume(
@@ -1368,6 +1373,38 @@ class _PikaThread(threading.Thread):
                 ), f"Subscription request {subscription_id} rejected due to existing subscription {self._subscriptions[subscription_id]}"
                 self._add_subscription(subscription_id, subscription)
                 result.set_result(self._subscriptions[subscription_id].queue)
+        except BaseException as e:
+            result.set_exception(e)
+            raise
+
+    def _declare_queue_in_thread(
+        self,
+        result: Future,
+        queue: str = "",
+        passive: bool = False,
+        durable: bool = False,
+        exclusive: bool = False,
+        auto_delete: bool = False,
+        arguments: Optional[dict] = None,
+    ):
+        """
+        Declare a queue.
+
+        Will be called on the connection thread.
+        """
+        try:
+            if result.set_running_or_notify_cancel():
+                assert self._connection is not None
+                channel = self._connection.channel()
+                qresult = channel.queue_declare(
+                    queue=queue,
+                    passive=passive,
+                    durable=durable,
+                    exclusive=exclusive,
+                    auto_delete=auto_delete,
+                    arguments=arguments,
+                )
+                result.set_result(qresult.method.queue)
         except BaseException as e:
             result.set_exception(e)
             raise
