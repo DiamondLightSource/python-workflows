@@ -1,6 +1,6 @@
 pytest==6.2.5
 pytest-cov==3.0.0
-pytest-timeout==1.4.2
+pytest-timeout==2.0.1
 setuptools==58.2.0
 stomp.py==7.0.0
 pika==1.2.0
