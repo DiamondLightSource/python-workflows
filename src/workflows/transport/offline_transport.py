@@ -66,7 +66,7 @@ class OfflineTransport(CommonTransport):
     ):
         self._output(f"Broadcasting {len(message)} bytes to {destination}", message)
 
-    def _transaction_begin(self, transaction_id, subscription_id, **kwargs):
+    def _transaction_begin(self, transaction_id, **kwargs):
         self._output(f"Starting transaction {transaction_id}")
 
     def _transaction_abort(self, transaction_id, **kwargs):

@@ -517,26 +517,23 @@ class PikaTransport(CommonTransport):
         ).result()
 
     def _transaction_begin(
-        self, transaction_id: int, subscription_id: Optional[int] = None, **kwargs
+        self, transaction_id: int, *, subscription_id: Optional[int] = None, **kwargs
     ) -> None:
         """Start a new transaction.
         :param transaction_id: ID for this transaction in the transport layer.
         :param subscription_id: Tie the transaction to a specific channel containing this subscription.
-        :param **kwargs: Further parameters for the transport layer.
         """
         self._pika_thread.tx_select(transaction_id, subscription_id)
 
     def _transaction_abort(self, transaction_id: int, **kwargs) -> None:
         """Abort a transaction and roll back all operations.
         :param transaction_id: ID of transaction to be aborted.
-        :param **kwargs: Further parameters for the transport layer.
         """
         self._pika_thread.tx_rollback(transaction_id)
 
     def _transaction_commit(self, transaction_id: int, **kwargs) -> None:
         """Commit a transaction.
         :param transaction_id: ID of transaction to be committed.
-        :param **kwargs: Further parameters for the transport layer.
         """
         self._pika_thread.tx_commit(transaction_id)
 

@@ -303,7 +303,9 @@ class CommonTransport:
             )
         else:
             self.log.debug("Starting transaction with ID %d", self.__transaction_id)
-        self._transaction_begin(self.__transaction_id, subscription_id, **kwargs)
+        self._transaction_begin(
+            self.__transaction_id, subscription_id=subscription_id, **kwargs
+        )
         return self.__transaction_id
 
     def transaction_abort(self, transaction_id: int, **kwargs):
@@ -413,7 +415,7 @@ class CommonTransport:
         raise NotImplementedError("Transport interface not implemented")
 
     def _transaction_begin(
-        self, transaction_id: int, subscription_id: Optional[int] = None, **kwargs
+        self, transaction_id: int, *, subscription_id: Optional[int] = None, **kwargs
     ) -> None:
         """Start a new transaction.
         :param transaction_id: ID for this transaction in the transport layer.
