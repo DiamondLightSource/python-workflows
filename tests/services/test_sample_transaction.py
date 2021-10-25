@@ -52,7 +52,7 @@ def test_txnservice_subscribes_to_channel():
     p.initializing()
 
     mock_transport.subscribe.assert_called_once_with(
-        mock.ANY, p.receive_message, acknowledgement=True
+        mock.ANY, p.receive_message, acknowledgement=True, prefetch_count=1000
     )
 
 
