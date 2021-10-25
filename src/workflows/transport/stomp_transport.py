@@ -407,7 +407,7 @@ class StompTransport(CommonTransport):
             self._connected = False
             raise workflows.Disconnected("No connection to stomp host")
 
-    def _transaction_begin(self, transaction_id, **kwargs):
+    def _transaction_begin(self, transaction_id, subscription_id, **kwargs):
         """Start a new transaction.
         :param transaction_id: ID for this transaction in the transport layer.
         :param **kwargs: Further parameters for the transport layer.

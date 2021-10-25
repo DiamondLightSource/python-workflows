@@ -288,15 +288,22 @@ class CommonTransport:
         )
         self._nack(message_id, subscription_id=subscription_id, **kwargs)
 
-    def transaction_begin(self, **kwargs) -> int:
+    def transaction_begin(self, subscription_id: Optional[int] = None, **kwargs) -> int:
         """Start a new transaction.
-        :param **kwargs: Further parameters for the transport layer. For example
+        :param **kwargs: Further parameters for the transport layer.
         :return: A transaction ID that can be passed to other functions.
         """
         self.__transaction_id += 1
         self.__transactions.add(self.__transaction_id)
-        self.log.debug("Starting transaction with ID %d", self.__subscription_id)
-        self._transaction_begin(self.__transaction_id, **kwargs)
+        if subscription_id:
+            self.log.debug(
+                "Starting transaction with ID %d on subscription %d",
+                self.__transaction_id,
+                subscription_id,
+            )
+        else:
+            self.log.debug("Starting transaction with ID %d", self.__transaction_id)
+        self._transaction_begin(self.__transaction_id, subscription_id, **kwargs)
         return self.__transaction_id
 
     def transaction_abort(self, transaction_id: int, **kwargs):
@@ -405,21 +412,23 @@ class CommonTransport:
         """
         raise NotImplementedError("Transport interface not implemented")
 
-    def _transaction_begin(self, transaction_id, **kwargs):
+    def _transaction_begin(
+        self, transaction_id: int, subscription_id: Optional[int] = None, **kwargs
+    ) -> None:
         """Start a new transaction.
         :param transaction_id: ID for this transaction in the transport layer.
         :param **kwargs: Further parameters for the transport layer.
         """
         raise NotImplementedError("Transport interface not implemented")
 
-    def _transaction_abort(self, transaction_id, **kwargs):
+    def _transaction_abort(self, transaction_id: int, **kwargs) -> None:
         """Abort a transaction and roll back all operations.
         :param transaction_id: ID of transaction to be aborted.
         :param **kwargs: Further parameters for the transport layer.
         """
         raise NotImplementedError("Transport interface not implemented")
 
-    def _transaction_commit(self, transaction_id, **kwargs):
+    def _transaction_commit(self, transaction_id: int, **kwargs) -> None:
         """Commit a transaction.
         :param transaction_id: ID of transaction to be committed.
         :param **kwargs: Further parameters for the transport layer.
