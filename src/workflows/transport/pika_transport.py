@@ -1376,26 +1376,6 @@ class _PikaThread(threading.Thread):
             result.set_exception(e)
             raise
 
-    def _queue_declare(
-        self,
-        queue: str = "",
-        passive: bool = False,
-        durable: bool = False,
-        exclusive: bool = False,
-        auto_delete: bool = False,
-        arguments: Optional[dict] = None,
-    ):
-        """Declare a queue."""
-        qresult = self._get_shared_channel().queue_declare(
-            queue=queue,
-            passive=passive,
-            durable=durable,
-            exclusive=exclusive,
-            auto_delete=auto_delete,
-            arguments=arguments,
-        )
-        return qresult.method.queue
-
     def _declare_queue_in_thread(
         self,
         result: Future,
@@ -1413,13 +1393,17 @@ class _PikaThread(threading.Thread):
         """
         try:
             if result.set_running_or_notify_cancel():
-                queue = self._queue_declare(
-                    queue=queue,
-                    passive=passive,
-                    durable=durable,
-                    exclusive=exclusive,
-                    auto_delete=auto_delete,
-                    arguments=arguments,
+                queue = (
+                    self._get_shared_channel()
+                    .queue_declare(
+                        queue=queue,
+                        passive=passive,
+                        durable=durable,
+                        exclusive=exclusive,
+                        auto_delete=auto_delete,
+                        arguments=arguments,
+                    )
+                    .method.queue
                 )
                 result.set_result(queue)
         except BaseException as e:
