@@ -640,7 +640,6 @@ def test_subscribe_to_queue(mock_pikathread):
         "auto_delete": True,
         "callback": mock.ANY,
         "subscription_id": 4,
-        "exclusive": False,
         "prefetch_count": 1,
         "queue": str(mock.sentinel.queue4),
         "reconnectable": False,

@@ -1102,6 +1102,7 @@ class _PikaThread(threading.Thread):
 
         self._connection.add_callback_threadsafe(_tx_commit)
         return future
+
     def queue_declare(
         self,
         queue: str = "",
@@ -1215,14 +1216,14 @@ class _PikaThread(threading.Thread):
         if subscription.kind is _PikaSubscriptionKind.FANOUT:
             # If a FANOUT subscription, then we need to create and bind
             # a temporary queue to receive messages from the exchange
-            queue = self.queue_declare("", exclusive=True).result()
+            queue = self._queue_declare("", exclusive=True)
             assert queue is not None
             channel.queue_bind(queue, subscription.destination)
             subscription.queue = queue
         elif subscription.kind is _PikaSubscriptionKind.DIRECT:
             subscription.queue = subscription.destination
             if subscription.auto_delete:
-                self.queue_declare(subscription.queue, auto_delete=True).result()
+                self._queue_declare(subscription.queue, auto_delete=True)
         else:
             raise NotImplementedError(f"Unknown subscription kind: {subscription.kind}")
         channel.basic_consume(
@@ -1374,8 +1375,31 @@ class _PikaThread(threading.Thread):
                 self._add_subscription(subscription_id, subscription)
                 result.set_result(self._subscriptions[subscription_id].queue)
         except BaseException as e:
+            print(result)
             result.set_exception(e)
             raise
+
+    def _queue_declare(
+        self,
+        queue: str = "",
+        passive: bool = False,
+        durable: bool = False,
+        exclusive: bool = False,
+        auto_delete: bool = False,
+        arguments: Optional[dict] = None,
+    ):
+        """Declare a queue."""
+        assert self._connection is not None
+        channel = self._connection.channel()
+        qresult = channel.queue_declare(
+            queue=queue,
+            passive=passive,
+            durable=durable,
+            exclusive=exclusive,
+            auto_delete=auto_delete,
+            arguments=arguments,
+        )
+        return qresult.method.queue
 
     def _declare_queue_in_thread(
         self,
@@ -1394,9 +1418,7 @@ class _PikaThread(threading.Thread):
         """
         try:
             if result.set_running_or_notify_cancel():
-                assert self._connection is not None
-                channel = self._connection.channel()
-                qresult = channel.queue_declare(
+                queue = self._queue_declare(
                     queue=queue,
                     passive=passive,
                     durable=durable,
@@ -1404,7 +1426,7 @@ class _PikaThread(threading.Thread):
                     auto_delete=auto_delete,
                     arguments=arguments,
                 )
-                result.set_result(qresult.method.queue)
+                result.set_result(queue)
         except BaseException as e:
             result.set_exception(e)
             raise
