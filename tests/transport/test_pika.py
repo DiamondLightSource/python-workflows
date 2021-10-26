@@ -691,6 +691,35 @@ def test_subscribe_to_broadcast(mock_pikathread):
     mock_pikathread.unsubscribe.assert_called_with(2)
 
 
+def test_queue_declare(mock_pikathread):
+    """Test declaring a queue"""
+    transport = PikaTransport()
+    transport.connect()
+
+    # With default args
+    transport.queue_declare()
+    mock_pikathread.queue_declare.assert_called_once_with(
+        queue="",
+        passive=False,
+        durable=False,
+        exclusive=False,
+        auto_delete=False,
+        arguments=None,
+    )
+
+    # kwargs should be passed through to pikathread.queue_declare
+    kwargs = {
+        "queue": "foo",
+        "passive": True,
+        "durable": True,
+        "exclusive": True,
+        "auto_delete": True,
+        "arguments": {"foo": "bar"},
+    }
+    transport.queue_declare(**kwargs)
+    mock_pikathread.queue_declare.assert_called_with(**kwargs)
+
+
 @mock.patch("workflows.transport.pika_transport.pika")
 def test_error_handling_on_subscribing(mockpika, mock_pikathread):
     """Unrecoverable errors during subscribing should mark the connection as disconnected."""
@@ -1075,6 +1104,40 @@ def test_pikathread_unsubscribe(test_channel, connection_params):
         # Wait a short time to make sure it does not get delivered
         with pytest.raises(Empty):
             messages.get(timeout=1)
+
+    finally:
+        thread.join(stop=True)
+
+
+@pytest.mark.parametrize("queue", ["", "transient.T-" + str(uuid.uuid4())])
+def test_pikathread_queue_declare(queue, connection_params, test_channel):
+    """Test _PikaThread.queue_declare()
+
+    Test with server-generated queue name and with pre-determined queue name.
+
+    1. Declare the queue and then subscribe to the queue both within _PikaThread.
+    2. Publish a message to this queue via the test_channel and veriry it was
+       received by the callback.
+    """
+    thread = _PikaThread(connection_params)
+    try:
+        thread.start()
+        thread.wait_for_connection()
+
+        queue = thread.queue_declare(queue=queue, auto_delete=True).result()
+        print(f"queue: {queue}")
+
+        messages = Queue()
+
+        def _get_message(*args):
+            print(f"Got message: {pprint.pformat(args)}")
+            messages.put(args[3])
+
+        thread.subscribe_queue(
+            queue, _get_message, reconnectable=True, subscription_id=1
+        )
+        test_channel.basic_publish("", queue, "This is a message")
+        assert messages.get(timeout=2) == b"This is a message"
 
     finally:
         thread.join(stop=True)
