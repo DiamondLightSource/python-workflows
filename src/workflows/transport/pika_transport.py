@@ -438,7 +438,14 @@ class PikaTransport(CommonTransport):
         # Callback reference is kept as further messages may already have been received
 
     def _send(
-        self, destination, message, headers=None, delay=None, expiration=None, **kwargs
+        self,
+        destination,
+        message,
+        headers=None,
+        delay=None,
+        expiration=None,
+        transaction: Optional[int] = None,
+        **kwargs,
     ):
         """
         Send a message to a queue.
@@ -449,6 +456,7 @@ class PikaTransport(CommonTransport):
             headers: Further arbitrary headers to pass to pika
             delay: Delay transport of message by this many seconds
             expiration: Optional TTL expiration time, relative to sending time
+            transaction: Transaction ID if message should be part of a transaction
         """
         if not headers:
             headers = {}
@@ -470,6 +478,7 @@ class PikaTransport(CommonTransport):
             body=message,
             properties=properties,
             mandatory=True,
+            transaction_id=transaction,
         ).result()
 
     def _broadcast(
@@ -479,6 +488,7 @@ class PikaTransport(CommonTransport):
         headers=None,
         delay=None,
         expiration: Optional[int] = None,
+        transaction: Optional[int] = None,
         **kwargs,
     ):
         """Send a message to a fanout exchange.
@@ -489,6 +499,7 @@ class PikaTransport(CommonTransport):
             headers: Further arbitrary headers to pass to pika
             delay: Delay transport of message by this many seconds
             expiration: Optional TTL expiration time, in seconds, relative to sending time
+            transaction: Transaction ID if message should be part of a transaction
             kwargs: Arbitrary arguments for other transports. Ignored.
         """
         assert delay is None, "Delay Not implemented"
@@ -511,6 +522,7 @@ class PikaTransport(CommonTransport):
             body=message,
             properties=properties,
             mandatory=False,
+            transaction_id=transaction,
         ).result()
 
     def _transaction_begin(
@@ -930,6 +942,7 @@ class _PikaThread(threading.Thread):
         body: Union[str, bytes],
         properties: pika.spec.BasicProperties = None,
         mandatory: bool = True,
+        transaction_id: Optional[int] = None,
     ) -> Future[None]:
         """Send a message. Thread-safe."""
 
@@ -941,7 +954,11 @@ class _PikaThread(threading.Thread):
         def _send():
             if future.set_running_or_notify_cancel():
                 try:
-                    self._get_shared_channel().basic_publish(
+                    if transaction_id:
+                        channel = self._transactions_by_id[transaction_id]
+                    else:
+                        channel = self._get_shared_channel()
+                    channel.basic_publish(
                         exchange=exchange,
                         routing_key=routing_key,
                         body=body,
