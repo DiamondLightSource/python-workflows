@@ -1118,18 +1118,28 @@ class _PikaThread(threading.Thread):
             raise RuntimeError("Cannot subscribe to unstarted connection")
 
         result: Future[str] = Future()
-        self._connection.add_callback_threadsafe(
-            functools.partial(
-                self._declare_queue_in_thread,
-                result,
-                queue=queue,
-                passive=passive,
-                durable=durable,
-                exclusive=exclusive,
-                auto_delete=auto_delete,
-                arguments=arguments,
-            )
-        )
+
+        def declare_queue_in_thread():
+            try:
+                if result.set_running_or_notify_cancel():
+                    qname = (
+                        self._get_shared_channel()
+                        .queue_declare(
+                            queue=queue,
+                            passive=passive,
+                            durable=durable,
+                            exclusive=exclusive,
+                            auto_delete=auto_delete,
+                            arguments=arguments,
+                        )
+                        .method.queue
+                    )
+                    result.set_result(qname)
+            except BaseException as e:
+                result.set_exception(e)
+                raise
+
+        self._connection.add_callback_threadsafe(declare_queue_in_thread)
         return result
 
     @property
@@ -1373,39 +1383,5 @@ class _PikaThread(threading.Thread):
                 result.set_result(self._subscriptions[subscription_id].queue)
         except BaseException as e:
             print(result)
-            result.set_exception(e)
-            raise
-
-    def _declare_queue_in_thread(
-        self,
-        result: Future,
-        queue: str = "",
-        passive: bool = False,
-        durable: bool = False,
-        exclusive: bool = False,
-        auto_delete: bool = False,
-        arguments: Optional[dict] = None,
-    ):
-        """
-        Declare a queue.
-
-        Will be called on the connection thread.
-        """
-        try:
-            if result.set_running_or_notify_cancel():
-                queue = (
-                    self._get_shared_channel()
-                    .queue_declare(
-                        queue=queue,
-                        passive=passive,
-                        durable=durable,
-                        exclusive=exclusive,
-                        auto_delete=auto_delete,
-                        arguments=arguments,
-                    )
-                    .method.queue
-                )
-                result.set_result(queue)
-        except BaseException as e:
             result.set_exception(e)
             raise
