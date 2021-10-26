@@ -248,7 +248,7 @@ def test_create_and_destroy_transactions():
     t = ct.transaction_begin()
 
     assert t
-    ct._transaction_begin.assert_called_once_with(t)
+    ct._transaction_begin.assert_called_once_with(t, subscription_id=None)
 
     ct.transaction_abort(t)
     with pytest.raises(workflows.Error):

@@ -513,26 +513,26 @@ class PikaTransport(CommonTransport):
             mandatory=False,
         ).result()
 
-    def _transaction_begin(self, **kwargs):
-        """Enter transaction mode.
-        :param **kwargs: Further parameters for the transport layer.
+    def _transaction_begin(
+        self, transaction_id: int, *, subscription_id: Optional[int] = None, **kwargs
+    ) -> None:
+        """Start a new transaction.
+        :param transaction_id: ID for this transaction in the transport layer.
+        :param subscription_id: Tie the transaction to a specific channel containing this subscription.
         """
-        raise NotImplementedError()
-        # self._channel.tx_select()
+        self._pika_thread.tx_select(transaction_id, subscription_id)
 
-    def _transaction_abort(self, **kwargs):
+    def _transaction_abort(self, transaction_id: int, **kwargs) -> None:
         """Abort a transaction and roll back all operations.
-        :param **kwargs: Further parameters for the transport layer.
+        :param transaction_id: ID of transaction to be aborted.
         """
-        raise NotImplementedError()
-        # self._channel.tx_rollback()
+        self._pika_thread.tx_rollback(transaction_id)
 
-    def _transaction_commit(self, **kwargs):
+    def _transaction_commit(self, transaction_id: int, **kwargs) -> None:
         """Commit a transaction.
-        :param **kwargs: Further parameters for the transport layer.
+        :param transaction_id: ID of transaction to be committed.
         """
-        raise NotImplementedError()
-        # self._channel.tx_commit()
+        self._pika_thread.tx_commit(transaction_id)
 
     def _ack(
         self, message_id, subscription_id: int, *, multiple: bool = False, **_kwargs
@@ -694,9 +694,12 @@ class _PikaThread(threading.Thread):
         self._subscriptions: Dict[int, _PikaSubscription] = {}
         # The pika connection object
         self._connection: Optional[pika.BlockingConnection] = None
-        # Per-subscription channels. May be pointing to the shared channel
+        # Index of per-subscription channels.
         self._pika_channels: Dict[int, BlockingChannel] = {}
-        # A common, shared channel, used for non-QoS subscriptions
+        # Bidirectional index of all ongoing transactions. May include the shared channel
+        self._transactions_by_id: Dict[int, BlockingChannel] = {}
+        self._transactions_by_channel: Dict[BlockingChannel, int] = {}
+        # A common, shared channel, used for sending messages outside of transactions.
         self._pika_shared_channel: Optional[BlockingChannel]
         # Are we allowed to reconnect. Can only be turned off, never on
         self._reconnection_allowed: bool = True
@@ -907,6 +910,11 @@ class _PikaThread(threading.Thread):
                         logger.debug("Closing channel that is now unused")
                         channel.close()
 
+                        # Forget about any ongoing transactions on the channel
+                        if channel in self._transactions_by_channel:
+                            transaction_id = self._transactions_by_channel.pop(channel)
+                            self._transactions_by_id.pop(transaction_id)
+
                     result.set_result(None)
             except BaseException as e:
                 result.set_exception(e)
@@ -974,6 +982,100 @@ class _PikaThread(threading.Thread):
             lambda: channel.basic_nack(delivery_tag, multiple=multiple, requeue=requeue)
         )
 
+    def tx_select(
+        self, transaction_id: int, subscription_id: Optional[int]
+    ) -> Future[None]:
+        """Set a channel to transaction mode. Thread-safe.
+        :param transaction_id: ID for this transaction in the transport layer.
+        :param subscription_id: Tie the transaction to a specific channel containing this subscription.
+        """
+
+        if not self._connection:
+            raise RuntimeError("Cannot transact on unstarted connection")
+
+        future: Future[None] = Future()
+
+        def _tx_select():
+            if future.set_running_or_notify_cancel():
+                try:
+                    if subscription_id:
+                        if subscription_id not in self._pika_channels:
+                            raise KeyError(
+                                f"Could not find subscription {subscription_id} to begin transaction"
+                            )
+                        channel = self._pika_channels[subscription_id]
+                    else:
+                        channel = self._get_shared_channel()
+                    if channel in self._transactions_by_channel:
+                        raise KeyError(
+                            f"Channel {channel} is already running transaction {self._transactions_by_channel[channel]}, so can't start transaction {transaction_id}"
+                        )
+                    channel.tx_select()
+                    self._transactions_by_channel[channel] = transaction_id
+                    self._transactions_by_id[transaction_id] = channel
+
+                    future.set_result(None)
+                except BaseException as e:
+                    future.set_exception(e)
+                    raise
+
+        self._connection.add_callback_threadsafe(_tx_select)
+        return future
+
+    def tx_rollback(self, transaction_id: int) -> Future[None]:
+        """Abort a transaction and roll back all operations. Thread-safe.
+        :param transaction_id: ID of transaction to be aborted.
+        """
+        if not self._connection:
+            raise RuntimeError("Cannot transact on unstarted connection")
+
+        future: Future[None] = Future()
+
+        def _tx_rollback():
+            if future.set_running_or_notify_cancel():
+                try:
+                    channel = self._transactions_by_id.pop(transaction_id, None)
+                    if not channel:
+                        raise KeyError(
+                            f"Could not find transaction {transaction_id} to roll back"
+                        )
+                    self._transactions_by_channel.pop(channel)
+                    channel.tx_rollback()
+                    future.set_result(None)
+                except BaseException as e:
+                    future.set_exception(e)
+                    raise
+
+        self._connection.add_callback_threadsafe(_tx_rollback)
+        return future
+
+    def tx_commit(self, transaction_id: int) -> Future[None]:
+        """Commit a transaction.
+        :param transaction_id: ID of transaction to be committed. Thread-safe..
+        """
+        if not self._connection:
+            raise RuntimeError("Cannot transact on unstarted connection")
+
+        future: Future[None] = Future()
+
+        def _tx_commit():
+            if future.set_running_or_notify_cancel():
+                try:
+                    channel = self._transactions_by_id.pop(transaction_id, None)
+                    if not channel:
+                        raise KeyError(
+                            f"Could not find transaction {transaction_id} to commit"
+                        )
+                    self._transactions_by_channel.pop(channel)
+                    channel.tx_commit()
+                    future.set_result(None)
+                except BaseException as e:
+                    future.set_exception(e)
+                    raise
+
+        self._connection.add_callback_threadsafe(_tx_commit)
+        return future
+
     @property
     def connection_alive(self) -> bool:
         """
@@ -989,7 +1091,7 @@ class _PikaThread(threading.Thread):
         )
 
     # NOTE: With reconnection lifecycle this probably doesn't make sense
-    #       on it's own. It might make sense to add this returning a
+    #       on its own. It might make sense to add this returning a
     #       connection-specific 'token' - presumably the user might want
     #       to ensure that a connection is still the same connection
     #       and thus adhering to various within-connection guarantees.
@@ -1017,7 +1119,7 @@ class _PikaThread(threading.Thread):
 
         if not self._pika_shared_channel:
             self._pika_shared_channel = self._connection.channel()
-            self._pika_shared_channel.confirm_delivery()
+            ##### self._pika_shared_channel.confirm_delivery()
         return self._pika_shared_channel
 
     def _recreate_subscriptions(self):
@@ -1050,22 +1152,18 @@ class _PikaThread(threading.Thread):
                 f"Subscription {subscription_id} to '{subscription.destination}' is not reconnectable. Turning reconnection off."
             )
 
-        # Either open a channel (if prefetch) or use the shared one
-        if subscription.prefetch_count == 0:
-            channel = self._get_shared_channel()
-        else:
-            channel = self._connection.channel()
-            channel.confirm_delivery()
-            channel.basic_qos(prefetch_count=subscription.prefetch_count)
+        # Open a dedicated channel for this subscription
+        channel = self._connection.channel()
+        channel.basic_qos(prefetch_count=subscription.prefetch_count)
 
-        if subscription.kind == _PikaSubscriptionKind.FANOUT:
+        if subscription.kind is _PikaSubscriptionKind.FANOUT:
             # If a FANOUT subscription, then we need to create and bind
             # a temporary queue to receive messages from the exchange
             queue = channel.queue_declare("", exclusive=True).method.queue
             assert queue is not None
             channel.queue_bind(queue, subscription.destination)
             subscription.queue = queue
-        elif subscription.kind == _PikaSubscriptionKind.DIRECT:
+        elif subscription.kind is _PikaSubscriptionKind.DIRECT:
             subscription.queue = subscription.destination
         else:
             raise NotImplementedError(f"Unknown subscription kind: {subscription.kind}")

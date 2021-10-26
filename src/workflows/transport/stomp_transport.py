@@ -410,21 +410,18 @@ class StompTransport(CommonTransport):
     def _transaction_begin(self, transaction_id, **kwargs):
         """Start a new transaction.
         :param transaction_id: ID for this transaction in the transport layer.
-        :param **kwargs: Further parameters for the transport layer.
         """
         self._conn.begin(transaction=transaction_id)
 
     def _transaction_abort(self, transaction_id, **kwargs):
         """Abort a transaction and roll back all operations.
         :param transaction_id: ID of transaction to be aborted.
-        :param **kwargs: Further parameters for the transport layer.
         """
         self._conn.abort(transaction_id)
 
     def _transaction_commit(self, transaction_id, **kwargs):
         """Commit a transaction.
         :param transaction_id: ID of transaction to be committed.
-        :param **kwargs: Further parameters for the transport layer.
         """
         self._conn.commit(transaction_id)
 
