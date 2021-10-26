@@ -1386,9 +1386,7 @@ class _PikaThread(threading.Thread):
         arguments: Optional[dict] = None,
     ):
         """Declare a queue."""
-        assert self._connection is not None
-        channel = self._connection.channel()
-        qresult = channel.queue_declare(
+        qresult = self._get_shared_channel().queue_declare(
             queue=queue,
             passive=passive,
             durable=durable,
