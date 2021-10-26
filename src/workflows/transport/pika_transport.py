@@ -1114,6 +1114,10 @@ class _PikaThread(threading.Thread):
         arguments: Optional[dict] = None,
         **_kwargs,
     ) -> Future[str]:
+        """Declare a queue. Thread-safe.
+
+        Warning: this should only be used for declaring temporary queues.
+        """
 
         if not self._connection:
             raise RuntimeError("Cannot subscribe to unstarted connection")
