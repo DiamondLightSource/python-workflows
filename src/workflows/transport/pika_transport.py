@@ -347,7 +347,6 @@ class PikaTransport(CommonTransport):
         acknowledgement: bool = False,
         prefetch_count: int = 1,
         reconnectable: bool = False,
-        auto_delete: bool = False,
         **_kwargs,
     ):
         """
@@ -389,7 +388,6 @@ class PikaTransport(CommonTransport):
                 queue=channel,
                 callback=functools.partial(self._call_message_callback, sub_id),
                 auto_ack=not acknowledgement,
-                auto_delete=auto_delete,
                 subscription_id=sub_id,
                 reconnectable=reconnectable,
                 prefetch_count=prefetch_count,
@@ -682,7 +680,6 @@ class _PikaSubscription:
     prefetch_count: int
     queue: Optional[str] = dataclasses.field(init=False, default=None)
     reconnectable: bool
-    auto_delete: bool = False
 
 
 class _PikaThread(threading.Thread):
@@ -827,7 +824,6 @@ class _PikaThread(threading.Thread):
         auto_ack: bool = True,
         prefetch_count: int = 1,
         reconnectable: bool = False,
-        auto_delete: bool = False,
     ) -> Future[None]:
         """
         Subscribe to a queue. Thread-safe.
@@ -851,7 +847,6 @@ class _PikaThread(threading.Thread):
         new_sub = _PikaSubscription(
             arguments={},
             auto_ack=auto_ack,
-            auto_delete=auto_delete,
             destination=queue,
             kind=_PikaSubscriptionKind.DIRECT,
             on_message_callback=callback,
@@ -1226,8 +1221,6 @@ class _PikaThread(threading.Thread):
             subscription.queue = queue
         elif subscription.kind is _PikaSubscriptionKind.DIRECT:
             subscription.queue = subscription.destination
-            if subscription.auto_delete:
-                self._queue_declare(subscription.queue, auto_delete=True)
         else:
             raise NotImplementedError(f"Unknown subscription kind: {subscription.kind}")
         channel.basic_consume(
