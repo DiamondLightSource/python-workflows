@@ -1215,7 +1215,7 @@ class _PikaThread(threading.Thread):
         if subscription.kind is _PikaSubscriptionKind.FANOUT:
             # If a FANOUT subscription, then we need to create and bind
             # a temporary queue to receive messages from the exchange
-            queue = self._queue_declare("", exclusive=True)
+            queue = channel.queue_declare("", exclusive=True).method.queue
             assert queue is not None
             channel.queue_bind(queue, subscription.destination)
             subscription.queue = queue
