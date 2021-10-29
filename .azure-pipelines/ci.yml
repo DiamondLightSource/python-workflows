@@ -63,6 +63,8 @@ steps:
   workingDirectory: $(Pipeline.Workspace)/src
   timeoutInMinutes: 2
 
-- script: docker logs rabbitmq
+- script: |
+    docker logs rabbitmq
+    docker stop rabbitmq
   displayName: Show RabbitMQ logs
   condition: succeededOrFailed()
