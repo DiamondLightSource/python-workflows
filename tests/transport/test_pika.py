@@ -93,16 +93,16 @@ def test_check_config_file_behaviour(mockpika, mock_pikathread, tmp_path):
         cfgfile = tmp_path / "config"
         cfgfile.write_text(
             """
-    # An example pika configuration file
-    # Only lines in the [pika] block will be interpreted
+            # An example pika configuration file
+            # Only lines in the [pika] block will be interpreted
 
-    [rabbit]
-    host = localhost
-    port = 5672
-    username = someuser
-    password = somesecret
-    vhost = namespace
-    """
+            [rabbit]
+            host = localhost
+            port = 5672
+            username = someuser
+            password = somesecret
+            vhost = namespace
+            """
         )
 
         parser.parse_args(
@@ -218,6 +218,7 @@ def test_broadcast_status(mockpika, mock_pikathread):
         "body": mock.ANY,
         "properties": mock.ANY,
         "mandatory": False,
+        "transaction_id": None,
     }
     statusdict = json.loads(kwargs.get("body"))
     assert statusdict["status"] == str(mock.sentinel.status)
@@ -242,6 +243,7 @@ def test_send_message(mockpika, mock_pikathread):
         "body": mock.sentinel.message,
         "mandatory": True,
         "properties": mock.ANY,
+        "transaction_id": None,
     }
     assert mockproperties.call_args[1].get("headers") == {}
     assert int(mockproperties.call_args[1].get("delivery_mode")) == 2
@@ -291,6 +293,7 @@ def test_sending_message_with_expiration(mockpika, mock_pikathread):
         "body": mock.sentinel.message,
         "mandatory": True,
         "properties": mock.ANY,
+        "transaction_id": None,
     }
     assert int(mockproperties.return_value.expiration) == 120 * 1000
 
@@ -341,6 +344,7 @@ def test_send_broadcast(mockpika, mock_pikathread):
         "body": mock.sentinel.message,
         "properties": mock.ANY,
         "mandatory": False,
+        "transaction_id": None,
     }
 
     transport._broadcast(
@@ -360,6 +364,7 @@ def test_send_broadcast(mockpika, mock_pikathread):
         "body": mock.sentinel.message,
         "properties": mock.ANY,
         "mandatory": False,
+        "transaction_id": None,
     }
 
     # Delay not implemented yet
@@ -404,6 +409,7 @@ def test_broadcasting_message_with_expiration(mockpika, mock_pikathread):
         "body": mock.sentinel.message,
         "properties": mock.ANY,
         "mandatory": False,
+        "transaction_id": None,
     }
 
 
@@ -447,6 +453,7 @@ def test_messages_are_serialized_for_transport(mock_pikathread):
         "body": banana_str,
         "properties": pika.BasicProperties(delivery_mode=2, headers={}),
         "mandatory": True,
+        "transaction_id": None,
     }
 
     transport.broadcast(str(mock.sentinel.queue2), banana)
@@ -458,6 +465,7 @@ def test_messages_are_serialized_for_transport(mock_pikathread):
         "body": banana_str,
         "properties": pika.BasicProperties(delivery_mode=2, headers={}),
         "mandatory": False,
+        "transaction_id": None,
     }
 
     with pytest.raises(TypeError):
@@ -481,6 +489,7 @@ def test_messages_are_not_serialized_for_raw_transport(_mockpika, mock_pikathrea
         "body": banana,
         "mandatory": True,
         "properties": mock.ANY,
+        "transaction_id": None,
     }
 
     mock_pikathread.send.reset_mock()
@@ -494,6 +503,7 @@ def test_messages_are_not_serialized_for_raw_transport(_mockpika, mock_pikathrea
         "body": banana,
         "properties": mock.ANY,
         "mandatory": False,
+        "transaction_id": None,
     }
 
     mock_pikathread.send.reset_mock()
@@ -507,6 +517,7 @@ def test_messages_are_not_serialized_for_raw_transport(_mockpika, mock_pikathrea
         "body": mock.sentinel.unserializable,
         "mandatory": True,
         "properties": mock.ANY,
+        "transaction_id": None,
     }
 
 
@@ -818,7 +829,6 @@ def test_channel(connection_params) -> pika.channel.Channel:
             ):
                 """
                 Declare an auto-named queue that is automatically deleted on test end.
-
                 """
                 queue = self.channel.queue_declare(
                     "", auto_delete=auto_delete, exclusive=exclusive, **kwargs
@@ -994,6 +1004,7 @@ def test_pikathread_send(connection_params, test_channel):
         ).result()
 
         # But should fail with it declared
+        pytest.xfail("UnroutableError is not raised without publisher confirms, #96")
         with pytest.raises(pika.exceptions.UnroutableError):
             thread.send(
                 "", "unroutable-missing-queue", "Another Message", mandatory=True
