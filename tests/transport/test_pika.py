@@ -28,6 +28,25 @@ def mock_pikathread(monkeypatch):
     return instance
 
 
+@pytest.fixture
+def revert_classvariables():
+    """
+    PikaTransport.config and .defaults are class variables, and so are
+    changed by various tests. This fixture ensures the class is restored
+    to its original state at the end of the test.
+    """
+    config = PikaTransport.config
+    defaults = PikaTransport.defaults
+
+    PikaTransport.config = config.copy()
+    PikaTransport.defaults = defaults.copy()
+
+    yield
+
+    PikaTransport.config = config
+    PikaTransport.defaults = defaults
+
+
 def test_lookup_and_initialize_pika_transport_layer():
     """Find the pika transport layer via the lookup mechanism and
     run its constructor with default settings
@@ -78,7 +97,9 @@ def test_adding_arguments_to_argparser():
 
 
 @mock.patch("workflows.transport.pika_transport.pika")
-def test_check_config_file_behaviour(mockpika, mock_pikathread, tmp_path):
+def test_check_config_file_behaviour(
+    mockpika, mock_pikathread, tmp_path, revert_classvariables
+):
     """Check that a specified configuration file is read, that command line
     parameters have precedence and are passed on to the pika layer."""
 
@@ -86,55 +107,45 @@ def test_check_config_file_behaviour(mockpika, mock_pikathread, tmp_path):
     transport = PikaTransport()
     transport.add_command_line_options(parser)
 
-    try:
-        stored_defaults = transport.defaults.copy()
-        stored_config = transport.config.copy()
+    cfgfile = tmp_path / "config"
+    cfgfile.write_text(
+        """
+        # An example pika configuration file
+        # Only lines in the [pika] block will be interpreted
 
-        cfgfile = tmp_path / "config"
-        cfgfile.write_text(
-            """
-            # An example pika configuration file
-            # Only lines in the [pika] block will be interpreted
+        [rabbit]
+        host = localhost
+        port = 5672
+        username = someuser
+        password = somesecret
+        vhost = namespace
+        """
+    )
 
-            [rabbit]
-            host = localhost
-            port = 5672
-            username = someuser
-            password = somesecret
-            vhost = namespace
-            """
-        )
+    parser.parse_args(
+        ["--rabbit-conf", str(cfgfile), "--rabbit-user", mock.sentinel.user]
+    )
 
-        parser.parse_args(
-            ["--rabbit-conf", str(cfgfile), "--rabbit-user", mock.sentinel.user]
-        )
+    transport = PikaTransport()
+    transport.connect()
 
-        transport = PikaTransport()
-        transport.connect()
+    mock_pikathread.start.assert_called_once()
+    mockpika.PlainCredentials.assert_called_once_with(mock.sentinel.user, "somesecret")
+    args, kwargs = mockpika.ConnectionParameters.call_args
+    assert not args
+    assert kwargs == {
+        "host": "localhost",
+        "port": 5672,
+        "virtual_host": "namespace",
+        "credentials": mockpika.PlainCredentials.return_value,
+    }
 
-        mock_pikathread.start.assert_called_once()
-        mockpika.PlainCredentials.assert_called_once_with(
-            mock.sentinel.user, "somesecret"
-        )
-        args, kwargs = mockpika.ConnectionParameters.call_args
-        assert not args
-        assert kwargs == {
-            "host": "localhost",
-            "port": 5672,
-            "virtual_host": "namespace",
-            "credentials": mockpika.PlainCredentials.return_value,
-        }
-
-        with pytest.raises(workflows.Error):
-            parser.parse_args(["--rabbit-conf", ""])
-
-    finally:
-        transport.defaults = stored_defaults
-        transport.config = stored_config
+    with pytest.raises(workflows.Error):
+        parser.parse_args(["--rabbit-conf", ""])
 
 
 @mock.patch("workflows.transport.pika_transport.pika")
-def test_anonymous_connection(mockpika, mock_pikathread):
+def test_anonymous_connection(mockpika, mock_pikathread, revert_classvariables):
     """check that a specified configuration file is read, that command line
     parameters have precedence and are passed on the pika layer"""
 
