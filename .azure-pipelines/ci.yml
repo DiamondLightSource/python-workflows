@@ -1,6 +1,28 @@
 steps:
 - checkout: none
 
+- bash: |
+    set -eux
+    mkdir rabbitmq-docker && cd rabbitmq-docker
+
+    cat <<EOF >rabbitmq.conf
+    # allowing remote connections for default user is highly discouraged
+    # as it dramatically decreases the security of the system. Delete the user
+    # instead and create a new one with generated secure credentials.
+    loopback_users = none
+    EOF
+
+    cat <<EOF >Dockerfile
+    FROM rabbitmq:3.9-management
+    COPY rabbitmq.conf /etc/rabbitmq/rabbitmq.conf
+    EOF
+
+    docker build -t azure-rabbitmq .
+    docker run --detach --name rabbitmq -p 127.0.0.1:5672:5672 -p 127.0.0.1:15672:15672 azure-rabbitmq
+    docker container list -a
+  displayName: Start RabbitMQ container
+  workingDirectory: $(Pipeline.Workspace)
+
 - task: UsePythonVersion@0
   inputs:
     versionSpec: '$(PYTHON_VERSION)'
@@ -27,6 +49,10 @@ steps:
   displayName: Install package
 
 - script: |
+    wget -t 10 -w 1 http://127.0.0.1:15672 -O -
+  displayName: Check RabbitMQ is alive
+
+- script: |
     PYTHONDEVMODE=1 pytest -v -ra --cov=workflows --cov-report=xml --cov-branch
   displayName: Run tests
   workingDirectory: $(Pipeline.Workspace)/src
@@ -36,3 +62,9 @@ steps:
   continueOnError: True
   workingDirectory: $(Pipeline.Workspace)/src
   timeoutInMinutes: 2
+
+- script: |
+    docker logs rabbitmq
+    docker stop rabbitmq
+  displayName: Show RabbitMQ logs
+  condition: succeededOrFailed()
