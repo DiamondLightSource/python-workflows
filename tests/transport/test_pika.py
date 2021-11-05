@@ -787,7 +787,7 @@ def test_nack_message(mock_pikathread):
     )
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def connection_params():
     """Connection Parameters for connecting to a physical RabbitMQ server"""
     params = [
