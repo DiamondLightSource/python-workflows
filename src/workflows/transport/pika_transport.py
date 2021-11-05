@@ -15,6 +15,7 @@ from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Union
 
 import pika
 import pika.exceptions
+from bidict import bidict
 from pika.adapters.blocking_connection import BlockingChannel
 
 import workflows
@@ -707,10 +708,9 @@ class _PikaThread(threading.Thread):
         # The pika connection object
         self._connection: Optional[pika.BlockingConnection] = None
         # Index of per-subscription channels.
-        self._pika_channels: Dict[int, BlockingChannel] = {}
+        self._pika_channels: bidict[int, BlockingChannel] = bidict()
         # Bidirectional index of all ongoing transactions. May include the shared channel
-        self._transactions_by_id: Dict[int, BlockingChannel] = {}
-        self._transactions_by_channel: Dict[BlockingChannel, int] = {}
+        self._transaction_on_channel: Dict[BlockingChannel, int] = bidict()
         # A common, shared channel, used for sending messages outside of transactions.
         self._pika_shared_channel: Optional[BlockingChannel]
         # Are we allowed to reconnect. Can only be turned off, never on
@@ -923,9 +923,7 @@ class _PikaThread(threading.Thread):
                         channel.close()
 
                         # Forget about any ongoing transactions on the channel
-                        if channel in self._transactions_by_channel:
-                            transaction_id = self._transactions_by_channel.pop(channel)
-                            self._transactions_by_id.pop(transaction_id)
+                        self._transaction_on_channel.pop(channel, None)
 
                     result.set_result(None)
             except BaseException as e:
@@ -955,7 +953,7 @@ class _PikaThread(threading.Thread):
             if future.set_running_or_notify_cancel():
                 try:
                     if transaction_id:
-                        channel = self._transactions_by_id[transaction_id]
+                        channel = self._transaction_on_channel.inverse[transaction_id]
                     else:
                         channel = self._get_shared_channel()
                     channel.basic_publish(
@@ -1023,13 +1021,12 @@ class _PikaThread(threading.Thread):
                         channel = self._pika_channels[subscription_id]
                     else:
                         channel = self._get_shared_channel()
-                    if channel in self._transactions_by_channel:
+                    if channel in self._transaction_on_channel:
                         raise KeyError(
-                            f"Channel {channel} is already running transaction {self._transactions_by_channel[channel]}, so can't start transaction {transaction_id}"
+                            f"Channel {channel} is already running transaction {self._transaction_on_channel[channel]}, so can't start transaction {transaction_id}"
                         )
                     channel.tx_select()
-                    self._transactions_by_channel[channel] = transaction_id
-                    self._transactions_by_id[transaction_id] = channel
+                    self._transaction_on_channel[channel] = transaction_id
 
                     future.set_result(None)
                 except BaseException as e:
@@ -1051,12 +1048,13 @@ class _PikaThread(threading.Thread):
         def _tx_rollback():
             if future.set_running_or_notify_cancel():
                 try:
-                    channel = self._transactions_by_id.pop(transaction_id, None)
+                    channel = self._transaction_on_channel.inverse.pop(
+                        transaction_id, None
+                    )
                     if not channel:
                         raise KeyError(
                             f"Could not find transaction {transaction_id} to roll back"
                         )
-                    self._transactions_by_channel.pop(channel)
                     channel.tx_rollback()
                     future.set_result(None)
                 except BaseException as e:
@@ -1078,12 +1076,13 @@ class _PikaThread(threading.Thread):
         def _tx_commit():
             if future.set_running_or_notify_cancel():
                 try:
-                    channel = self._transactions_by_id.pop(transaction_id, None)
+                    channel = self._transaction_on_channel.inverse.pop(
+                        transaction_id, None
+                    )
                     if not channel:
                         raise KeyError(
                             f"Could not find transaction {transaction_id} to commit"
                         )
-                    self._transactions_by_channel.pop(channel)
                     channel.tx_commit()
                     future.set_result(None)
                 except BaseException as e:
