@@ -564,7 +564,12 @@ class PikaTransport(CommonTransport):
 
         :param **kwargs: Further parameters for the transport layer.
         """
-        self._pika_thread.ack(message_id, subscription_id, multiple=multiple)
+        self._pika_thread.ack(
+            message_id,
+            subscription_id,
+            multiple=multiple,
+            transaction_id=_kwargs.get("transaction"),
+        )
 
     def _nack(
         self,
@@ -589,7 +594,11 @@ class PikaTransport(CommonTransport):
             requeue: Attempt to requeue. see AMQP basic.nack.
         """
         self._pika_thread.nack(
-            message_id, subscription_id, multiple=multiple, requeue=requeue
+            message_id,
+            subscription_id,
+            multiple=multiple,
+            requeue=requeue,
+            transaction_id=_kwargs.get("transaction"),
         )
 
     @staticmethod
@@ -971,7 +980,14 @@ class _PikaThread(threading.Thread):
         self._connection.add_callback_threadsafe(_send)
         return future
 
-    def ack(self, delivery_tag: int, subscription_id: int, *, multiple=False):
+    def ack(
+        self,
+        delivery_tag: int,
+        subscription_id: int,
+        *,
+        multiple=False,
+        transaction_id: Optional[int],
+    ):
         if subscription_id not in self._subscriptions:
             raise KeyError(f"Could not find subscription {subscription_id} to ACK")
 
@@ -984,7 +1000,13 @@ class _PikaThread(threading.Thread):
         )
 
     def nack(
-        self, delivery_tag: int, subscription_id: int, *, multiple=False, requeue=True
+        self,
+        delivery_tag: int,
+        subscription_id: int,
+        *,
+        multiple=False,
+        requeue=True,
+        transaction_id: Optional[int],
     ):
         if subscription_id not in self._subscriptions:
             raise KeyError(f"Could not find subscription {subscription_id} to NACK")
