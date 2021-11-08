@@ -704,3 +704,26 @@ def test_namespace_is_used_correctly(mockstomp):
 
     stomp.broadcast_status("some status")
     assert mockconn.send.call_args[0] == ("/topic/ns.transient.status", '"some status"')
+
+
+@mock.patch("workflows.transport.stomp_transport.stomp")
+def test_queue_declare(mockstomp):
+    """Test the broadcast sending function."""
+    stomp = StompTransport()
+    stomp.connect()
+
+    # Declare 10 queues and assert they all have unique queue names
+    # of the form "transient.*"
+    queues = {stomp._queue_declare() for i in range(10)}
+    assert len(queues) == 10
+    assert all(q.startswith("transient.") for q in queues)
+
+    # Declare 10 queues and assert they all have unique queue names
+    # of the form "transient.foo.*"
+    queues = {stomp._queue_declare("foo") for i in range(10)}
+    assert len(queues) == 10
+    assert all(q.startswith("transient.foo.") for q in queues)
+
+    # Explicit queue name should be returned as-is
+    queue = "transient.foo.12345"
+    assert stomp._queue_declare(queue) == queue

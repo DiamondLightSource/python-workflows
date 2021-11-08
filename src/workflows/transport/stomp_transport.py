@@ -2,6 +2,7 @@ import configparser
 import json
 import threading
 import time
+import uuid
 from typing import Any, Dict
 
 import stomp
@@ -447,10 +448,22 @@ class StompTransport(CommonTransport):
         """
         self._conn.nack(message_id, subscription_id, **kwargs)
 
-    def _queue_declare(self, queue: str = "", **kwargs) -> str:
-        """Declare a queue with optional name, returning the name of the queue."""
+    def _queue_declare(self, queue: str = "", temporary: bool = True, **kwargs) -> str:
+        """Declare a queue with optional name, returning the name of the queue.
+
+        If a queue name is not provided, then a unique queue name with the "transient."
+        prefix will be generated.
+        If a queue name is provided starting with "transient." then the queue name will
+        be used as-is.
+        Otherwise, the provided queue name will be prefixed with "transient." suffixed to
+        ensure uniqueness.
+        """
         if not queue:
-            raise workflows.Error("StompTransport does not support empty queue name")
+            # Generate a unique temporary queue name
+            queue = f"transient.{uuid.uuid4()}"
+        elif not queue.startswith("transient."):
+            # Uniquify the queue name and add the "transient." prefix
+            queue = f"transient.{queue}.{uuid.uuid4()}"
         return queue
 
     @staticmethod
