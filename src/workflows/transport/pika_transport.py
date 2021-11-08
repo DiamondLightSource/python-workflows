@@ -719,7 +719,9 @@ class _PikaThread(threading.Thread):
         # Index of per-subscription channels.
         self._pika_channels: bidict[int, BlockingChannel] = bidict()
         # Bidirectional index of all ongoing transactions. May include the shared channel
-        self._transaction_on_channel: Dict[BlockingChannel, int] = bidict()
+        self._transaction_on_channel: bidict[BlockingChannel, int] = bidict()
+        # Information on whether a channel has uncommitted messages
+        self._channel_has_active_tx: Dict[BlockingChannel, bool] = {}
         # A common, shared channel, used for sending messages outside of transactions.
         self._pika_shared_channel: Optional[BlockingChannel]
         # Are we allowed to reconnect. Can only be turned off, never on
@@ -963,6 +965,7 @@ class _PikaThread(threading.Thread):
                 try:
                     if transaction_id:
                         channel = self._transaction_on_channel.inverse[transaction_id]
+                        self._channel_has_active_tx[channel] = True
                     else:
                         channel = self._get_shared_channel()
                     channel.basic_publish(
@@ -995,9 +998,26 @@ class _PikaThread(threading.Thread):
 
         assert self._connection is not None
 
-        self._connection.add_callback_threadsafe(
-            lambda: channel.basic_ack(delivery_tag, multiple=multiple)
-        )
+        # Check if channel is in tx mode
+        transaction = self._transaction_on_channel.get(channel)
+        if transaction == transaction_id:
+            # Matching transaction IDs - perfect
+            self._channel_has_active_tx[channel] |= transaction is not None
+            self._connection.add_callback_threadsafe(
+                lambda: channel.basic_ack(delivery_tag, multiple=multiple)
+            )
+        elif transaction_id is None and not self._channel_has_active_tx[channel]:
+
+            def _ack_callback():
+                channel.basic_ack(delivery_tag, multiple=multiple)
+                channel.tx_commit()
+
+            self._connection.add_callback_threadsafe(_ack_callback)
+        else:
+            raise workflows.Error(
+                "Transaction state mismatch. "
+                f"Call assumes transaction {transaction_id}, channel has transaction {transaction}"
+            )
 
     def nack(
         self,
@@ -1015,9 +1035,28 @@ class _PikaThread(threading.Thread):
 
         assert self._connection is not None
 
-        self._connection.add_callback_threadsafe(
-            lambda: channel.basic_nack(delivery_tag, multiple=multiple, requeue=requeue)
-        )
+        # Check if channel is in tx mode
+        transaction = self._transaction_on_channel.get(channel)
+        if transaction == transaction_id:
+            # Matching transaction IDs - perfect
+            self._channel_has_active_tx[channel] |= transaction is not None
+            self._connection.add_callback_threadsafe(
+                lambda: channel.basic_nack(
+                    delivery_tag, multiple=multiple, requeue=requeue
+                )
+            )
+        elif transaction_id is None and not self._channel_has_active_tx[channel]:
+
+            def _nack_callback():
+                channel.basic_nack(delivery_tag, multiple=multiple, requeue=requeue)
+                channel.tx_commit()
+
+            self._connection.add_callback_threadsafe(_nack_callback)
+        else:
+            raise workflows.Error(
+                "Transaction state mismatch. "
+                f"Call assumes transaction {transaction_id}, channel has transaction {transaction}"
+            )
 
     def tx_select(
         self, transaction_id: int, subscription_id: Optional[int]
@@ -1078,6 +1117,7 @@ class _PikaThread(threading.Thread):
                             f"Could not find transaction {transaction_id} to roll back"
                         )
                     channel.tx_rollback()
+                    self._channel_has_active_tx.pop(channel, None)
                     future.set_result(None)
                 except BaseException as e:
                     future.set_exception(e)
@@ -1106,6 +1146,7 @@ class _PikaThread(threading.Thread):
                             f"Could not find transaction {transaction_id} to commit"
                         )
                     channel.tx_commit()
+                    self._channel_has_active_tx.pop(channel, None)
                     future.set_result(None)
                 except BaseException as e:
                     future.set_exception(e)
