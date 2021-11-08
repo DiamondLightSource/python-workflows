@@ -699,21 +699,12 @@ def test_queue_declare(mock_pikathread):
         passive=False,
         durable=False,
         exclusive=False,
-        auto_delete=False,
+        auto_delete=True,
         arguments=None,
     )
 
-    # kwargs should be passed through to pikathread.queue_declare
-    kwargs = {
-        "queue": "foo",
-        "passive": True,
-        "durable": True,
-        "exclusive": True,
-        "auto_delete": True,
-        "arguments": {"foo": "bar"},
-    }
-    transport.queue_declare(**kwargs)
-    mock_pikathread.queue_declare.assert_called_with(**kwargs)
+    with pytest.raises(NotImplementedError):
+        transport.queue_declare(temporary=False)
 
 
 @mock.patch("workflows.transport.pika_transport.pika")

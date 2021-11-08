@@ -583,11 +583,11 @@ class PikaTransport(CommonTransport):
     def _queue_declare(
         self,
         queue: str = "",
+        temporary: bool = True,
         *,
         passive: bool = False,
         durable: bool = False,
         exclusive: bool = False,
-        auto_delete: bool = False,
         arguments: Optional[dict] = None,
         **_kwargs,
     ) -> str:
@@ -597,7 +597,7 @@ class PikaTransport(CommonTransport):
             passive=passive,
             durable=durable,
             exclusive=exclusive,
-            auto_delete=auto_delete,
+            auto_delete=temporary,
             arguments=arguments,
         ).result()
 
@@ -1105,7 +1105,7 @@ class _PikaThread(threading.Thread):
         passive: bool = False,
         durable: bool = False,
         exclusive: bool = False,
-        auto_delete: bool = False,
+        auto_delete: bool = True,
         arguments: Optional[dict] = None,
         **_kwargs,
     ) -> Future[str]:
@@ -1113,7 +1113,6 @@ class _PikaThread(threading.Thread):
 
         Warning: this should only be used for declaring temporary queues.
         """
-
         if not self._connection:
             raise RuntimeError("Cannot subscribe to unstarted connection")
 

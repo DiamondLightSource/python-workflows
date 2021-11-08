@@ -336,9 +336,13 @@ class CommonTransport:
         supported. There must not be any active subscriptions or transactions."""
         return not self.__subscriptions and not self.__transactions
 
-    def queue_declare(self, queue: str = "", **kwargs) -> str:
+    def queue_declare(self, queue: str = "", temporary: bool = True, **kwargs) -> str:
         """Declare a queue with optional name, returning the name of the queue."""
-        return self._queue_declare(queue, **kwargs)
+        if not temporary:
+            raise NotImplementedError(
+                "Only declaration of temporary queues is currently supported."
+            )
+        return self._queue_declare(queue=queue, temporary=temporary, **kwargs)
 
     #
     # -- Low level communication calls to be implemented by subclass -----------
@@ -441,7 +445,7 @@ class CommonTransport:
         """
         raise NotImplementedError("Transport interface not implemented")
 
-    def _queue_declare(self, queue: str = "", **kwargs) -> str:
+    def _queue_declare(self, queue: str = "", temporary: bool = True, **kwargs) -> str:
         """Declare a queue with optional name, returning the name of the queue."""
         raise NotImplementedError("Queue declaration interface not implemented")
 
