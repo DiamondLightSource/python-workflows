@@ -696,9 +696,7 @@ class _PikaThread(threading.Thread):
         connection_parameters: Iterable[pika.ConnectionParameters],
         reconnection_attempts=5,
     ):
-        super().__init__(
-            name="workflows pika_transport", daemon=False, target=self._run
-        )
+        super().__init__(name="workflows pika_transport", daemon=True, target=self._run)
         self._state: _PikaThreadStatus = _PikaThreadStatus.NEW
         # Internal store of subscriptions, to resubscribe if necessary. Keys are
         # unique and auto-generated, and known as subscription IDs or consumer tags
