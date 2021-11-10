@@ -1239,8 +1239,6 @@ class _PikaThread(threading.Thread):
                 self._exc_info = None
                 self._state = _PikaThreadStatus.CONNECTING
 
-                # Make sure we don't always connect to the same server first
-                random.shuffle(self._connection_parameters)
                 self._connection = pika.BlockingConnection(self._connection_parameters)
                 logger.debug(f"Connection #{connection_counter} connected")
                 connection_counter += 1
