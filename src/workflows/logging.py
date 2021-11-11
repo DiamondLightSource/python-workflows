@@ -62,16 +62,20 @@ class CallbackHandler(logging.Handler):
         for serialization."""
         try:
             self._callback(self.prepare(record))
+        except Exception:
+            self.handleError(record)
+
+    def handleError(self, record):
+        t, v, _ = sys.exc_info()
+        try:
+            sys.stderr.write(
+                f"--- Logging error --- {t.__name__}: {v}\n"
+                "Could not forward log message from service to frontend process\n"
+                f"Message: {record.msg}\n"
+                f"Level: {record.levelno} - Thread: {record.threadName} - Arguments: {record.args}\n"
+            )
         except Exception as e:
-            try:
-                sys.stderr.write(
-                    f"--- Logging error --- Exception: {e!r}\n"
-                    "Could not forward log message from service to frontend process\n"
-                    f"Message: {record.msg}\n"
-                    f"Level: {record.levelno} - Thread: {record.threadName} - Arguments: {record.args}\n"
-                )
-            except Exception as e:
-                sys.stderr.write(
-                    "--- Logging error ---\n"
-                    f"Encountered exception {e!r} during exception handling\n"
-                )
+            sys.stderr.write(
+                "--- Logging error ---\n"
+                f"Encountered exception {e!r} during exception handling\n"
+            )
