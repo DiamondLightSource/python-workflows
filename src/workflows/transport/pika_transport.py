@@ -394,7 +394,7 @@ class PikaTransport(CommonTransport):
             pika.exceptions.AMQPChannelError,
             pika.exceptions.AMQPConnectionError,
         ) as e:
-            raise workflows.Disconnected(e)
+            raise workflows.Disconnected(repr(e)) from None
 
     def _subscribe_broadcast(
         self,
