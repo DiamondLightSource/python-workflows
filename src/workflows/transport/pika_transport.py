@@ -1133,11 +1133,11 @@ class _PikaThread(threading.Thread):
 
         if not self._pika_shared_channel:
             self._pika_shared_channel = self._connection.channel()
-            self._pika_shared_channel.add_on_close_callback(
-                self._callback_on_channel_close
-            )
+        #           self._pika_shared_channel.add_on_close_callback(
+        #               self._callback_on_channel_close
+        #           )
 
-            ##### self._pika_shared_channel.confirm_delivery()
+        ##### self._pika_shared_channel.confirm_delivery()
         return self._pika_shared_channel
 
     def _callback_on_channel_close(
@@ -1180,7 +1180,7 @@ class _PikaThread(threading.Thread):
 
         # Open a dedicated channel for this subscription
         channel = self._connection.channel()
-        channel.add_on_close_callback(self._callback_on_channel_close)
+        #       channel.add_on_close_callback(self._callback_on_channel_close)
         channel.basic_qos(prefetch_count=subscription.prefetch_count)
 
         if subscription.kind is _PikaSubscriptionKind.FANOUT:
