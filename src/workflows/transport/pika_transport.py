@@ -13,7 +13,6 @@ from concurrent.futures import Future
 from enum import Enum, auto
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Union
 
-import pika
 import pika.exceptions
 from pika.adapters.blocking_connection import BlockingChannel
 
@@ -395,7 +394,7 @@ class PikaTransport(CommonTransport):
             pika.exceptions.AMQPChannelError,
             pika.exceptions.AMQPConnectionError,
         ) as e:
-            raise workflows.Disconnected(e)
+            raise workflows.Disconnected(repr(e)) from None
 
     def _subscribe_broadcast(
         self,

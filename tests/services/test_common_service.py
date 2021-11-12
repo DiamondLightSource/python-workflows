@@ -220,7 +220,7 @@ def test_observe_shutdown_command():
     # Check startup/shutdown sequence
     service.initializing.assert_called_once()
     service.in_shutdown.assert_called_once()
-    main_queue.get.assert_called_once_with()
+    main_queue.get.assert_called_once_with(True, 2)
     messages = []
     while fe_pipe_out.poll():
         message = fe_pipe_out.recv()
