@@ -8,6 +8,13 @@ import workflows
 
 MessageCallback = Callable[[Mapping[str, Any], Any], None]
 
+from typing import NamedTuple
+
+
+class TemporarySubscription(NamedTuple):
+    subscription_id: int
+    queue_name: str
+
 
 class CommonTransport:
     """A common transport class, containing e.g. the logic to manage
@@ -77,6 +84,50 @@ class CommonTransport:
         self.log.debug("Subscribing to %s with ID %d", channel, self.__subscription_id)
         self._subscribe(self.__subscription_id, channel, mangled_callback, **kwargs)
         return self.__subscription_id
+
+    def subscribe_temporary(
+        self, channel_hint: Optional[str], callback: MessageCallback, **kwargs
+    ) -> TemporarySubscription:
+        """Listen to a new queue that is specifically created for this connection,
+        and has a limited lifetime. Notify for messages via callback function.
+        :param channel_hint: Suggested queue name to subscribe to, the actual
+                             queue name will be decided by both transport layer
+                             and server.
+        :param callback: Function to be called when messages are received.
+                         The callback will pass two arguments, the header as a
+                         dictionary structure, and the message.
+        :param **kwargs: Further parameters for the transport layer. For example
+               disable_mangling: Receive messages as unprocessed strings.
+               acknowledgement: If true receipt of each message needs to be
+                                acknowledged.
+        :return: A named tuple containing a unique subscription ID and the actual
+                 queue name which can then be referenced by other senders.
+        """
+        self.__subscription_id += 1
+
+        def mangled_callback(header: Mapping[str, Any], message: Any, /) -> None:
+            callback(header, self._mangle_for_receiving(message))
+
+        if "disable_mangling" in kwargs:
+            if kwargs["disable_mangling"]:
+                mangled_callback = callback  # noqa:F811
+            del kwargs["disable_mangling"]
+        self.__subscriptions[self.__subscription_id] = {
+            # "channel": channel,
+            "callback": mangled_callback,
+            "ack": kwargs.get("acknowledgement"),
+            "unsubscribed": False,
+        }
+        self.log.debug(
+            "Subscribing to temporary queue (name hint: %r) with ID %d",
+            channel_hint,
+            self.__subscription_id,
+        )
+        # self._subscribe(self.__subscription_id, channel, mangled_callback, **kwargs)
+
+        return TemporarySubscription(
+            subscription_id=self.__subscription_id, queue_name=""
+        )
 
     def unsubscribe(self, subscription: int, drop_callback_reference=False, **kwargs):
         """Stop listening to a queue or a broadcast
