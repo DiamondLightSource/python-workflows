@@ -764,7 +764,10 @@ def test_ack_message(mock_pikathread):
 
     transport._ack(mock.sentinel.messageid, mock.sentinel.sub_id)
     mock_pikathread.ack.assert_called_once_with(
-        mock.sentinel.messageid, mock.sentinel.sub_id, multiple=False
+        mock.sentinel.messageid,
+        mock.sentinel.sub_id,
+        multiple=False,
+        transaction_id=None,
     )
 
 
@@ -776,11 +779,15 @@ def test_nack_message(mock_pikathread):
     transport._nack(mock.sentinel.messageid, mock.sentinel.sub_id)
 
     mock_pikathread.nack.assert_called_once_with(
-        mock.sentinel.messageid, mock.sentinel.sub_id, multiple=False, requeue=True
+        mock.sentinel.messageid,
+        mock.sentinel.sub_id,
+        multiple=False,
+        requeue=True,
+        transaction_id=None,
     )
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def connection_params():
     """Connection Parameters for connecting to a physical RabbitMQ server"""
     params = [
