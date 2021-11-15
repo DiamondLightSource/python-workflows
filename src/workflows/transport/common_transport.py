@@ -123,10 +123,12 @@ class CommonTransport:
             channel_hint,
             self.__subscription_id,
         )
-        # self._subscribe(self.__subscription_id, channel, mangled_callback, **kwargs)
+        queue_name = self._subscribe_temporary(
+            self.__subscription_id, channel_hint, mangled_callback, **kwargs
+        )
 
         return TemporarySubscription(
-            subscription_id=self.__subscription_id, queue_name=""
+            subscription_id=self.__subscription_id, queue_name=queue_name
         )
 
     def unsubscribe(self, subscription: int, drop_callback_reference=False, **kwargs):
@@ -410,6 +412,24 @@ class CommonTransport:
         :param callback: Function to be called when messages are received
         :param **kwargs: Further parameters for the transport layer. For example
                retroactive: Ask broker to send old messages if possible
+        """
+        raise NotImplementedError("Transport interface not implemented")
+
+    def _subscribe_temporary(
+        self,
+        sub_id: int,
+        channel_hint: Optional[str],
+        callback: MessageCallback,
+        **kwargs,
+    ) -> str:
+        """Create and then listen to a temporary queue, notify via callback function.
+        :param sub_id: ID for this subscription in the transport layer
+        :param channel_hint: Name suggestion for the temporary queue
+        :param callback: Function to be called when messages are received
+        :param **kwargs: Further parameters for the transport layer. For example
+               acknowledgement: If true receipt of each message needs to be
+                                acknowledged.
+        :returns: The name of the temporary queue
         """
         raise NotImplementedError("Transport interface not implemented")
 
