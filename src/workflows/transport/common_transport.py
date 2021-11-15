@@ -2,13 +2,11 @@ from __future__ import annotations
 
 import decimal
 import logging
-from typing import Any, Callable, Dict, Mapping, Optional, Set
+from typing import Any, Callable, Dict, Mapping, NamedTuple, Optional, Set
 
 import workflows
 
 MessageCallback = Callable[[Mapping[str, Any], Any], None]
-
-from typing import NamedTuple
 
 
 class TemporarySubscription(NamedTuple):
