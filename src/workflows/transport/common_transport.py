@@ -105,8 +105,10 @@ class CommonTransport:
         """
         self.__subscription_id += 1
 
-        def mangled_callback(header: Mapping[str, Any], message: Any, /) -> None:
+        def _(header: Mapping[str, Any], message: Any) -> None:
             callback(header, self._mangle_for_receiving(message))
+
+        mangled_callback: MessageCallback = _
 
         if "disable_mangling" in kwargs:
             if kwargs["disable_mangling"]:
