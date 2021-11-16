@@ -2,12 +2,17 @@ import configparser
 import json
 import threading
 import time
-from typing import Any, Dict
+import uuid
+from typing import Any, Dict, Optional
 
 import stomp
 
-import workflows
-from workflows.transport.common_transport import CommonTransport, json_serializer
+import workflows.util
+from workflows.transport.common_transport import (
+    CommonTransport,
+    MessageCallback,
+    json_serializer,
+)
 
 
 class StompTransport(CommonTransport):
@@ -333,6 +338,31 @@ class StompTransport(CommonTransport):
         if kwargs.get("retroactive"):
             headers["activemq.retroactive"] = "true"
         self._conn.subscribe(destination, sub_id, headers=headers)
+
+    def _subscribe_temporary(
+        self,
+        sub_id: int,
+        channel_hint: Optional[str],
+        callback: MessageCallback,
+        **kwargs,
+    ) -> str:
+        """Create and then listen to a temporary queue, notify via callback function.
+        :param sub_id: ID for this subscription in the transport layer
+        :param channel_hint: Name suggestion for the temporary queue
+        :param callback: Function to be called when messages are received
+        :param **kwargs: Further parameters for the transport layer.
+               See _subscribe() above.
+        :returns: The name of the temporary queue
+        """
+
+        channel = channel_hint or workflows.util.generate_unique_host_id()
+        channel = channel + "." + str(uuid.uuid4())
+        if not channel.startswith("transient."):
+            channel = "transient." + channel
+
+        self._subscribe(sub_id, channel, callback, **kwargs)
+
+        return channel
 
     def _unsubscribe(self, subscription, **kwargs):
         """Stop listening to a queue or a broadcast
