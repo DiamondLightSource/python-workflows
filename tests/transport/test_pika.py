@@ -47,7 +47,10 @@ def revert_classvariables():
 
 
 @pytest.fixture
-def pikatransport(revert_classvariables):
+def pikatransport(revert_classvariables, connection_params):
+    # connection_params is unused here, but implements the fixture skipping
+    # logic following a single test, instead of attempting a connection for
+    # every individual test.
     pt = PikaTransport()
     pt.connect()
     yield pt
