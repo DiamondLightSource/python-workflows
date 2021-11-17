@@ -14,6 +14,7 @@ import stomp as stomppy
 
 import workflows
 import workflows.transport
+from workflows.transport.common_transport import TemporarySubscription
 from workflows.transport.stomp_transport import StompTransport
 
 _frame = namedtuple("frame", "headers, body")
@@ -584,6 +585,45 @@ def test_subscribe_to_broadcast(mockstomp):
     mockconn.unsubscribe.assert_called_once_with(id=1)
     stomp._unsubscribe(2)
     mockconn.unsubscribe.assert_called_with(id=2)
+
+
+@mock.patch("workflows.transport.stomp_transport.stomp")
+def test_subscribe_to_temporary_queue(mockstomp):
+    """Test subscribing to a topic (publish-subscribe) and callback functions."""
+    mock_cb = mock.Mock()
+    stomp = StompTransport()
+    stomp.connect()
+    mockconn = mockstomp.Connection.return_value
+
+    known_subscriptions = set()
+    known_queues = set()
+
+    def assert_not_seen_before(ts: TemporarySubscription):
+        assert ts.subscription_id, "Temporary subscription is missing an ID"
+        assert (
+            ts.subscription_id not in known_subscriptions
+        ), "Duplicate subscription ID"
+        assert ts.queue_name, "Temporary queue does not have a name"
+        assert ts.queue_name not in known_queues, "Duplicate temporary queue name"
+        known_subscriptions.add(ts.subscription_id)
+        known_queues.add(ts.queue_name)
+        print(f"Temporary subscription: {ts}")
+
+    mockconn.set_listener.assert_called_once()
+    listener = mockconn.set_listener.call_args[0][1]
+    assert listener is not None
+
+    ts = {}
+    for n, queue_hint in enumerate(
+        ("", "", "hint", "hint", "transient.hint", "transient.hint")
+    ):
+        ts[n] = stomp.subscribe_temporary(
+            channel_hint=queue_hint,
+            callback=mock_cb,
+        )
+        assert_not_seen_before(ts[n])
+        assert ts[n].queue_name.startswith("transient.")
+    return
 
 
 @mock.patch("workflows.transport.stomp_transport.stomp")
