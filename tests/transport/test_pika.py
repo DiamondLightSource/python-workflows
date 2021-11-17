@@ -12,9 +12,8 @@ from unittest import mock
 import pika
 import pytest
 
-import workflows
-import workflows.transport
 import workflows.transport.pika_transport
+from workflows.transport.common_transport import TemporarySubscription
 from workflows.transport.pika_transport import PikaTransport, _PikaThread
 
 
@@ -45,6 +44,17 @@ def revert_classvariables():
 
     PikaTransport.config = config
     PikaTransport.defaults = defaults
+
+
+@pytest.fixture
+def pikatransport(revert_classvariables, connection_params):
+    # connection_params is unused here, but implements the fixture skipping
+    # logic following a single test, instead of attempting a connection for
+    # every individual test.
+    pt = PikaTransport()
+    pt.connect()
+    yield pt
+    pt.disconnect()
 
 
 def test_lookup_and_initialize_pika_transport_layer():
@@ -1096,3 +1106,57 @@ def test_pikathread_unsubscribe(test_channel, connection_params):
 
 def test_pikathread_ack():
     pytest.xfail("Not Implemented")
+
+
+def test_full_stack_temporary_queue_roundtrip(pikatransport):
+    known_subscriptions = set()
+    known_queues = set()
+
+    def assert_not_seen_before(ts: TemporarySubscription):
+        assert ts.subscription_id, "Temporary subscription is missing an ID"
+        assert (
+            ts.subscription_id not in known_subscriptions
+        ), "Duplicate subscription ID"
+        assert ts.queue_name, "Temporary queue does not have a name"
+        assert ts.queue_name not in known_queues, "Duplicate temporary queue name"
+        known_subscriptions.add(ts.subscription_id)
+        known_queues.add(ts.queue_name)
+        print(f"Temporary subscription: {ts}")
+
+    replies = Queue()
+
+    def callback(subscription):
+        def _callback(header, message):
+            print(f"Received message for {subscription}: {message}")
+            replies.put((subscription, header, message))
+
+        return _callback
+
+    ts = {}
+    for n, queue_hint in enumerate(
+        ("", "", "hint", "hint", "transient.hint", "transient.hint")
+    ):
+        ts[n] = pikatransport.subscribe_temporary(queue_hint, callback(n))
+        assert_not_seen_before(ts[n])
+        assert queue_hint in ts[n].queue_name
+        assert "transient.transient." not in ts[n].queue_name
+        if not queue_hint:
+            assert ts[n].queue_name.startswith("amq.gen-")
+
+    assert replies.empty()
+
+    outstanding_messages = set()
+    for n in range(6):
+        outstanding_messages.add((n, f"message {n}"))
+        pikatransport.send(ts[n].queue_name, f"message {n}")
+
+    try:
+        while outstanding_messages:
+            s, _, m = replies.get(timeout=1.5)
+            if (s, m) not in outstanding_messages:
+                raise RuntimeError(
+                    f"Received unexpected message {m} on subscription {s}"
+                )
+            outstanding_messages.remove((s, m))
+    except Empty:
+        raise RuntimeError(f"Missing replies for {len(outstanding_messages)} messages")

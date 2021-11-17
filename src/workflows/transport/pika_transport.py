@@ -9,6 +9,7 @@ import random
 import sys
 import threading
 import time
+import uuid
 from concurrent.futures import Future
 from enum import Enum, auto
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Union
@@ -17,7 +18,7 @@ import pika.exceptions
 from bidict import bidict
 from pika.adapters.blocking_connection import BlockingChannel
 
-import workflows
+import workflows.util
 from workflows.transport.common_transport import (
     CommonTransport,
     MessageCallback,
@@ -414,8 +415,7 @@ class PikaTransport(CommonTransport):
         Args:
             sub_id: Internal ID for this subscription
             channel: Name of the exchange to bind to
-            callback:
-                Function to be called when message are received
+            callback: Function to be called when messages are received
             reconnectable:
                 Can we reconnect to this exchange if the connection is
                 lost. Currently, this means that messages can be missed
@@ -428,6 +428,48 @@ class PikaTransport(CommonTransport):
             subscription_id=sub_id,
             reconnectable=reconnectable,
         ).result()
+
+    def _subscribe_temporary(
+        self,
+        sub_id: int,
+        channel_hint: Optional[str],
+        callback: MessageCallback,
+        *,
+        acknowledgement: bool = False,
+        **kwargs,
+    ) -> str:
+        """
+        Create and then listen to a temporary queue, notify via callback function.
+
+        Wait until subscription is complete.
+
+        Args:
+            sub_id: Internal ID for this subscription
+            channel_hint: Name suggestion for the temporary queue
+            callback: Function to be called when messages are received
+            acknowledgement:
+                Each message will need to be explicitly acknowledged.
+        Returns:
+            The name of the temporary queue
+        """
+        queue: str = channel_hint or ""
+        if queue:
+            if not queue.startswith("transient."):
+                queue = "transient." + queue
+            queue = queue + "." + str(uuid.uuid4())
+
+        try:
+            return self._pika_thread.subscribe_temporary(
+                queue=queue,
+                callback=functools.partial(self._call_message_callback, sub_id),
+                auto_ack=not acknowledgement,
+                subscription_id=sub_id,
+            ).result()
+        except (
+            pika.exceptions.AMQPChannelError,
+            pika.exceptions.AMQPConnectionError,
+        ) as e:
+            raise workflows.Disconnected(e)
 
     def _unsubscribe(self, sub_id: int, **kwargs):
         """Stop listening to a queue
@@ -905,6 +947,65 @@ class _PikaThread(threading.Thread):
                 self._add_subscription_in_thread, subscription_id, new_sub, result
             )
         )
+        return result
+
+    def subscribe_temporary(
+        self,
+        queue: str,
+        callback: PikaCallback,
+        subscription_id: int,
+        *,
+        auto_ack: bool = True,
+    ) -> Future[str]:
+        """
+        Create and then subscribe to a temporary queue. Thread-safe.
+
+        Args:
+            queue: The queue to listen for messages on, may be empty
+            callback: The function to call when receiving messages on this queue
+            subscription_id: Internal ID representing this subscription.
+            auto_ack: Should this subscription auto-acknowledge messages?
+
+        Returns:
+            A Future representing the resulting queue name.
+            It will be set upon subscription success.
+        """
+
+        if not self._connection:
+            raise RuntimeError("Cannot subscribe to unstarted connection")
+
+        result: Future[str] = Future()
+
+        def _declare_subscribe_queue_in_thread():
+            try:
+                if result.set_running_or_notify_cancel():
+                    assert (
+                        subscription_id not in self._subscriptions
+                    ), f"Subscription request {subscription_id} rejected due to existing subscription {self._subscriptions[subscription_id]}"
+                    temporary_queue_name = (
+                        self._get_shared_channel()
+                        .queue_declare(
+                            queue, auto_delete=True, exclusive=True, durable=False
+                        )
+                        .method.queue
+                    )
+                    temporary_subscription = _PikaSubscription(
+                        arguments={},
+                        auto_ack=auto_ack,
+                        destination=temporary_queue_name,
+                        kind=_PikaSubscriptionKind.DIRECT,
+                        on_message_callback=callback,
+                        prefetch_count=0,
+                        reconnectable=False,
+                    )
+                    self._add_subscription(subscription_id, temporary_subscription)
+                    result.set_result(temporary_queue_name)
+            except BaseException as e:
+                result.set_exception(e)
+                raise
+
+        self._connection.add_callback_threadsafe(_declare_subscribe_queue_in_thread)
+
         return result
 
     def unsubscribe(self, subscription_id: int) -> Future[None]:
