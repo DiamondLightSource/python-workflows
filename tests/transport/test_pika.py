@@ -1132,6 +1132,8 @@ def test_full_stack_temporary_queue_roundtrip(pikatransport):
         assert_not_seen_before(ts[n])
         assert queue_hint in ts[n].queue_name
         assert "transient.transient." not in ts[n].queue_name
+        if not queue_hint:
+            assert ts[n].queue_name.startswith("amq.gen-")
 
     assert replies.empty()
 

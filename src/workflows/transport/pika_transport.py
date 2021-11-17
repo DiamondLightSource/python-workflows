@@ -452,9 +452,10 @@ class PikaTransport(CommonTransport):
             The name of the temporary queue
         """
         queue: str = channel_hint or ""
-        if queue and not queue.startswith("transient."):
-            queue = "transient." + queue
-        queue = queue + "." + str(uuid.uuid4())
+        if queue:
+            if not queue.startswith("transient."):
+                queue = "transient." + queue
+            queue = queue + "." + str(uuid.uuid4())
 
         try:
             return self._pika_thread.subscribe_temporary(
