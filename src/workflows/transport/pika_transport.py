@@ -325,17 +325,20 @@ class PikaTransport(CommonTransport):
         body: bytes,
     ):
         """Rewrite and redirect a pika callback to the subscription function"""
-        self.subscription_callback(subscription_id)(
+        merged_headers = dict(properties.headers)
+        merged_headers.update(
             {
                 "consumer_tag": str(method.consumer_tag),
                 "delivery_mode": properties.delivery_mode,
                 "exchange": method.exchange,
-                "headers": properties.headers,
                 "message-id": method.delivery_tag,
                 "redelivered": method.redelivered,
                 "routing_key": method.routing_key,
                 "subscription": subscription_id,
-            },
+            }
+        )
+        self.subscription_callback(subscription_id)(
+            merged_headers,
             body,
         )
 
@@ -1186,6 +1189,7 @@ class _PikaThread(threading.Thread):
                         )
                     channel.tx_select()
                     self._transaction_on_channel[channel] = transaction_id
+                    self._channel_has_active_tx.setdefault(channel, False)
 
                     future.set_result(None)
                 except BaseException as e:

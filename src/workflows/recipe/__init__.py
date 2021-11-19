@@ -49,7 +49,7 @@ def _wrap_subscription(
                         RecipeWrapper object to the target function.
         :param message: Incoming deserialized message object.
         """
-        if header.get("workflows-recipe") in (True, "True", "true", 1):
+        if header.get("workflows-recipe") in {True, "True", "true", 1}:
             rw = RecipeWrapper(message=message, transport=transport_layer)
             if log_extender and rw.environment and rw.environment.get("ID"):
                 with log_extender("recipe_ID", rw.environment["ID"]):
