@@ -1103,7 +1103,9 @@ class _PikaThread(threading.Thread):
         transaction = self._transaction_on_channel.get(channel)
         if transaction == transaction_id:
             # Matching transaction IDs - perfect
-            self._channel_has_active_tx[channel] |= transaction is not None
+            if transaction is not None:
+                # If we are in a transaction then make a note that it is now being used
+                self._channel_has_active_tx[channel] = True
             self._connection.add_callback_threadsafe(
                 lambda: channel.basic_ack(delivery_tag, multiple=multiple)
             )
