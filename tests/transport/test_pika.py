@@ -553,13 +553,16 @@ def test_messages_are_deserialized_after_transport(mock_pikathread):
     callback = mock.Mock()
     transport.subscribe("queue", callback)
 
+    mock_properties = mock.Mock()
+    mock_properties.headers = {"mock_header": 1}
+
     # Extract the function passed to pikathread, and call it
     args, kwargs = mock_pikathread.subscribe_queue.call_args
     message_handler = kwargs["callback"]
     message_handler(
         mock.Mock(),
         mock.Mock(),
-        mock.Mock(),
+        mock_properties,
         banana_str,
     )
     callback.assert_called_once()
@@ -568,7 +571,7 @@ def test_messages_are_deserialized_after_transport(mock_pikathread):
     assert args[1] == banana
 
     message_handler(
-        mock.Mock(), mock.Mock(), mock.Mock(), mock.sentinel.undeserializable
+        mock.Mock(), mock.Mock(), mock_properties, mock.sentinel.undeserializable
     )
     args, kwargs = callback.call_args
     assert not kwargs
@@ -579,14 +582,14 @@ def test_messages_are_deserialized_after_transport(mock_pikathread):
     transport.subscribe_broadcast("queue", callback)
     message_handler = mock_pikathread.subscribe_broadcast.call_args[1]["callback"]
 
-    message_handler(mock.Mock(), mock.Mock(), mock.Mock(), banana_str)
+    message_handler(mock.Mock(), mock.Mock(), mock_properties, banana_str)
     callback.assert_called_once()
     args, kwargs = callback.call_args
     assert not kwargs
     assert args[1] == banana
 
     message_handler(
-        mock.Mock(), mock.Mock(), mock.Mock(), mock.sentinel.undeserializable
+        mock.Mock(), mock.Mock(), mock_properties, mock.sentinel.undeserializable
     )
     args, kwargs = callback.call_args
     assert not kwargs
@@ -596,7 +599,7 @@ def test_messages_are_deserialized_after_transport(mock_pikathread):
     callback = mock.Mock()
     transport.subscribe("queue", callback, disable_mangling=True)
     message_handler = mock_pikathread.subscribe_queue.call_args[1]["callback"]
-    message_handler(mock.Mock(), mock.Mock(), mock.Mock(), banana_str)
+    message_handler(mock.Mock(), mock.Mock(), mock_properties, banana_str)
     callback.assert_called_once()
     args, kwargs = callback.call_args
     assert not kwargs
@@ -606,7 +609,7 @@ def test_messages_are_deserialized_after_transport(mock_pikathread):
     callback = mock.Mock()
     transport.subscribe_broadcast("queue", callback, disable_mangling=True)
     message_handler = mock_pikathread.subscribe_broadcast.call_args[1]["callback"]
-    message_handler(mock.Mock(), mock.Mock(), mock.Mock(), banana_str)
+    message_handler(mock.Mock(), mock.Mock(), mock_properties, banana_str)
     callback.assert_called_once()
     args, kwargs = callback.call_args
     assert not kwargs
