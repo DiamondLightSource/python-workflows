@@ -1,4 +1,21 @@
 repos:
+# Syntax validation and some basic sanity checks
+- repo: https://github.com/pre-commit/pre-commit-hooks
+  rev: v4.0.1
+  hooks:
+  - id: check-merge-conflict
+  - id: check-ast
+  - id: check-json
+  - id: check-added-large-files
+    args: ['--maxkb=200']
+  - id: check-yaml
+
+# Upgrade type hints to Python 3.7+ standard
+- repo: https://github.com/snok/pep585-upgrade
+  rev: cc5678ebc6ddf2f1fa17c34d212627474c988e86  # v1.0.1
+  hooks:
+  - id: upgrade-type-hints
+    args: [ '--futures=true' ]
 
 # Automatically sort imports
 - repo: https://github.com/PyCQA/isort
@@ -20,23 +37,7 @@ repos:
   - id: flake8
     additional_dependencies: ['flake8-comprehensions==3.5.0']
 
-# Syntax validation and some basic sanity checks
-- repo: https://github.com/pre-commit/pre-commit-hooks
-  rev: v4.0.1
-  hooks:
-  - id: check-merge-conflict
-  - id: check-ast
-  - id: check-json
-  - id: check-added-large-files
-    args: ['--maxkb=200']
-  - id: check-yaml
-
 # Type checking
-- repo: https://github.com/snok/pep585-upgrade
-  rev: cc5678ebc6ddf2f1fa17c34d212627474c988e86  # v1.0.1
-  hooks:
-  - id: upgrade-type-hints
-    args: [ '--futures=true' ]
 - repo: https://github.com/pre-commit/mirrors-mypy
   rev: v0.910
   hooks:
