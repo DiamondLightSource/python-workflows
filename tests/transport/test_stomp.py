@@ -92,9 +92,7 @@ port = 1234
 username = someuser
 password = somesecret
 prefix = namespace
-""".encode(
-                "utf-8"
-            )
+""".encode()
         )
         cfgfile.close()
 
