@@ -2,8 +2,7 @@ from __future__ import annotations
 
 import decimal
 import logging
-from collections.abc import Mapping
-from typing import Any, Callable, NamedTuple, Optional
+from typing import Any, Callable, Dict, Mapping, NamedTuple, Optional, Set
 
 import workflows
 
@@ -20,9 +19,9 @@ class CommonTransport:
     subscriptions and transactions."""
 
     __callback_interceptor = None
-    __subscriptions: dict[int, dict[str, Any]] = {}
+    __subscriptions: Dict[int, Dict[str, Any]] = {}
     __subscription_id: int = 0
-    __transactions: set[int] = set()
+    __transactions: Set[int] = set()
     __transaction_id: int = 0
 
     log = logging.getLogger("workflows.transport")

@@ -10,10 +10,9 @@ import sys
 import threading
 import time
 import uuid
-from collections.abc import Iterable
 from concurrent.futures import Future
 from enum import Enum, auto
-from typing import Any, Callable, Optional, Union
+from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Union
 
 import pika.exceptions
 from bidict import bidict
@@ -59,7 +58,7 @@ class PikaTransport(CommonTransport):
     }
 
     # Effective configuration
-    config: dict[Any, Any] = {}
+    config: Dict[Any, Any] = {}
 
     def __init__(self):
         self._channel = None
@@ -237,7 +236,7 @@ class PikaTransport(CommonTransport):
             callback=set_parameter,
         )
 
-    def _generate_connection_parameters(self) -> list[pika.ConnectionParameters]:
+    def _generate_connection_parameters(self) -> List[pika.ConnectionParameters]:
         username = self.config.get("--rabbit-user", self.defaults.get("--rabbit-user"))
         password = self.config.get("--rabbit-pass", self.defaults.get("--rabbit-pass"))
         credentials = pika.PlainCredentials(username, password)
@@ -717,7 +716,7 @@ class _PikaSubscription:
         reconnectable: Are we allowed to reconnect to this subscription
     """
 
-    arguments: dict[str, Any]
+    arguments: Dict[str, Any]
     auto_ack: bool
     destination: str
     kind: _PikaSubscriptionKind
@@ -756,7 +755,7 @@ class _PikaThread(threading.Thread):
         # Internal store of subscriptions, to resubscribe if necessary. Keys are
         # unique and auto-generated, and known as subscription IDs or consumer tags
         # (strictly: pika/AMQP consumer tags are strings, not integers)
-        self._subscriptions: dict[int, _PikaSubscription] = {}
+        self._subscriptions: Dict[int, _PikaSubscription] = {}
         # The pika connection object
         self._connection: Optional[pika.BlockingConnection] = None
         # Index of per-subscription channels.
@@ -764,7 +763,7 @@ class _PikaThread(threading.Thread):
         # Bidirectional index of all ongoing transactions. May include the shared channel
         self._transaction_on_channel: bidict[BlockingChannel, int] = bidict()
         # Information on whether a channel has uncommitted messages
-        self._channel_has_active_tx: dict[BlockingChannel, bool] = {}
+        self._channel_has_active_tx: Dict[BlockingChannel, bool] = {}
         # A common, shared channel, used for sending messages outside of transactions.
         self._pika_shared_channel: Optional[BlockingChannel]
         # Are we allowed to reconnect. Can only be turned off, never on
@@ -772,7 +771,7 @@ class _PikaThread(threading.Thread):
         # Our list of connection parameters, so we know where to connect to
         self._connection_parameters = list(connection_parameters)
         # If we failed with an unexpected exception
-        self._exc_info: Optional[tuple[Any, Any, Any]] = None
+        self._exc_info: Optional[Tuple[Any, Any, Any]] = None
         self._reconnection_attempt_limit = reconnection_attempts
         # General bookkeeping events
 
