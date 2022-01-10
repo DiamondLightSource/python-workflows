@@ -82,7 +82,7 @@ def test_check_config_file_behaviour(mockstomp):
     cfgfile = tempfile.NamedTemporaryFile(delete=False)
     try:
         cfgfile.write(
-            """
+            b"""
 # An example stomp configuration file
 # Only lines in the [stomp] block will be interpreted
 
@@ -92,7 +92,7 @@ port = 1234
 username = someuser
 password = somesecret
 prefix = namespace
-""".encode()
+"""
         )
         cfgfile.close()
 

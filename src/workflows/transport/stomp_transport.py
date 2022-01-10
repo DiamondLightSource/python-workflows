@@ -508,6 +508,4 @@ class StompTransport(CommonTransport):
         if target_function:
             target_function(headers, body)
         else:
-            raise workflows.Error(
-                "Unhandled message {} {}".format(repr(headers), repr(body))
-            )
+            raise workflows.Error(f"Unhandled message {headers!r} {body!r}")

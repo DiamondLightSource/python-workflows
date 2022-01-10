@@ -23,7 +23,7 @@ def about(value, tolerance):
             return not self.__eq__(other)
 
         def __repr__(self):
-            return "<{} +- {}>".format(str(value), str(tolerance))
+            return f"<{value} +- {tolerance}>"
 
     return Comparator()
 

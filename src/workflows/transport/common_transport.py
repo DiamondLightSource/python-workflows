@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import decimal
 import logging
-from typing import Any, Callable, Dict, Mapping, NamedTuple, Optional, Set
+from typing import Any, Callable, Mapping, NamedTuple
 
 import workflows
 
@@ -19,9 +19,9 @@ class CommonTransport:
     subscriptions and transactions."""
 
     __callback_interceptor = None
-    __subscriptions: Dict[int, Dict[str, Any]] = {}
+    __subscriptions: dict[int, dict[str, Any]] = {}
     __subscription_id: int = 0
-    __transactions: Set[int] = set()
+    __transactions: set[int] = set()
     __transaction_id: int = 0
 
     log = logging.getLogger("workflows.transport")
@@ -84,7 +84,7 @@ class CommonTransport:
         return self.__subscription_id
 
     def subscribe_temporary(
-        self, channel_hint: Optional[str], callback: MessageCallback, **kwargs
+        self, channel_hint: str | None, callback: MessageCallback, **kwargs
     ) -> TemporarySubscription:
         """Listen to a new queue that is specifically created for this connection,
         and has a limited lifetime. Notify for messages via callback function.
@@ -287,7 +287,7 @@ class CommonTransport:
         """
         self._broadcast(destination, message, **kwargs)
 
-    def ack(self, message, subscription_id: Optional[int] = None, **kwargs):
+    def ack(self, message, subscription_id: int | None = None, **kwargs):
         """Acknowledge receipt of a message. This only makes sense when the
         'acknowledgement' flag was set for the relevant subscription.
         :param message: ID of the message to be acknowledged, OR a dictionary
@@ -314,7 +314,7 @@ class CommonTransport:
         )
         self._ack(message_id, subscription_id=subscription_id, **kwargs)
 
-    def nack(self, message, subscription_id: Optional[int] = None, **kwargs):
+    def nack(self, message, subscription_id: int | None = None, **kwargs):
         """Reject receipt of a message. This only makes sense when the
         'acknowledgement' flag was set for the relevant subscription.
         :param message: ID of the message to be rejected, OR a dictionary
@@ -341,7 +341,7 @@ class CommonTransport:
         )
         self._nack(message_id, subscription_id=subscription_id, **kwargs)
 
-    def transaction_begin(self, subscription_id: Optional[int] = None, **kwargs) -> int:
+    def transaction_begin(self, subscription_id: int | None = None, **kwargs) -> int:
         """Start a new transaction.
         :param **kwargs: Further parameters for the transport layer.
         :return: A transaction ID that can be passed to other functions.
@@ -418,7 +418,7 @@ class CommonTransport:
     def _subscribe_temporary(
         self,
         sub_id: int,
-        channel_hint: Optional[str],
+        channel_hint: str | None,
         callback: MessageCallback,
         **kwargs,
     ) -> str:
@@ -486,7 +486,7 @@ class CommonTransport:
         raise NotImplementedError("Transport interface not implemented")
 
     def _transaction_begin(
-        self, transaction_id: int, *, subscription_id: Optional[int] = None, **kwargs
+        self, transaction_id: int, *, subscription_id: int | None = None, **kwargs
     ) -> None:
         """Start a new transaction.
         :param transaction_id: ID for this transaction in the transport layer.
