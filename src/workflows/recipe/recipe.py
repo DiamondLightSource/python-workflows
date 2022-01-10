@@ -1,7 +1,9 @@
+from __future__ import annotations
+
 import copy
 import json
 import string
-from typing import Any, Dict
+from typing import Any
 
 import workflows
 
@@ -13,7 +15,7 @@ class Recipe:
     A recipe describes how all involved services are connected together, how
     data should be passed and how errors should be handled."""
 
-    recipe: Dict[Any, Any] = {}
+    recipe: dict[Any, Any] = {}
     """The processing recipe is encoded in this dictionary."""
     # TODO: Describe format
 

@@ -1,11 +1,14 @@
-# A workflows transport that doesn't actually transport anything
+from __future__ import annotations
 
 import json
 import logging
 import pprint
-from typing import Any, Dict
+from typing import Any
 
 from workflows.transport.common_transport import CommonTransport, json_serializer
+
+# A workflows transport that doesn't actually transport anything
+
 
 _offlog = logging.getLogger("workflows.transport.offline_transport")
 
@@ -14,9 +17,9 @@ class OfflineTransport(CommonTransport):
     """Abstraction layer for messaging infrastructure. Here we.. do nothing."""
 
     # Add for compatibility
-    defaults: Dict[Any, Any] = {}
+    defaults: dict[Any, Any] = {}
     # Effective configuration
-    config: Dict[Any, Any] = {}
+    config: dict[Any, Any] = {}
 
     def __init__(self):
         self._connected = False
