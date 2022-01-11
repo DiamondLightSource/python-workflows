@@ -11,14 +11,6 @@ repos:
     args: ['--maxkb=200']
   - id: check-yaml
 
-# Upgrade type hints to Python 3.7+ standard
-# Need to wait on https://github.com/snok/pep585-upgrade/issues/26
-#- repo: https://github.com/snok/pep585-upgrade
-#  rev: cc5678ebc6ddf2f1fa17c34d212627474c988e86  # v1.0.1
-#  hooks:
-#  - id: upgrade-type-hints
-#    args: [ '--futures=true' ]
-
 # Automatically sort imports
 - repo: https://github.com/PyCQA/isort
   rev: 5.9.3
