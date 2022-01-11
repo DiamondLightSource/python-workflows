@@ -1,5 +1,7 @@
 # A workflows transport that doesn't actually transport anything
 
+from __future__ import annotations
+
 import json
 import logging
 import pprint

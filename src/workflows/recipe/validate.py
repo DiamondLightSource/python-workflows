@@ -15,6 +15,8 @@ Example of how this could be used in a .pre-commit-config.yaml file:
 ```
 """
 
+from __future__ import annotations
+
 import argparse
 import json
 import logging

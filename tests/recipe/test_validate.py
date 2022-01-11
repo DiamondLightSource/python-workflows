@@ -2,6 +2,8 @@
 Tests the functionality of validate.py with several different recipes which should raise different errors
 """
 
+from __future__ import annotations
+
 import json
 import sys
 from unittest import mock

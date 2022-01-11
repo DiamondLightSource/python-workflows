@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from workflows.recipe.recipe import Recipe
 from workflows.recipe.validate import validate_recipe
 from workflows.recipe.wrapper import RecipeWrapper
