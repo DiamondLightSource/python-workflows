@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from optparse import SUPPRESS_HELP, OptionParser
 
 import workflows

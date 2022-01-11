@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import random
 import time
 
@@ -40,7 +42,7 @@ class SampleTxn(CommonService):
         assert header["message-id"]
 
         txn = self._transport.transaction_begin()
-        self.log.info(" 1. Txn: {}".format(str(txn)))
+        self.log.info(f" 1. Txn: {txn}")
         if self.crashpoint():
             self._transport.transaction_abort(txn)
             self.log.info("---  Abort  ---")

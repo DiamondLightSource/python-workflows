@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from unittest import mock
 
 import workflows.contrib.status_monitor as status_monitor

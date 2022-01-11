@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from marshmallow import fields
 from zocalo.configuration import PluginSchema
 

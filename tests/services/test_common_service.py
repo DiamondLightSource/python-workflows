@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import queue
 from multiprocessing import Pipe
 from unittest import mock
