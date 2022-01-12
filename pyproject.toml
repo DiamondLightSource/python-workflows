@@ -3,4 +3,8 @@ requires = ["setuptools >= 40.6.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.isort]
-profile="black"
+profile = "black"
+
+[tool.pytest.ini_options]
+addopts = "-ra"
+required_plugins = "pytest-timeout"
