@@ -1101,21 +1101,19 @@ class _PikaThread(threading.Thread):
 
         # Check if channel is in tx mode
         transaction = self._transaction_on_channel.get(channel)
-        if transaction == transaction_id:
-            # Matching transaction IDs - perfect
-            if transaction is not None:
-                # If we are in a transaction then make a note that it is now being used
-                self._channel_has_active_tx[channel] = True
-            self._connection.add_callback_threadsafe(
-                lambda: channel.basic_ack(delivery_tag, multiple=multiple)
-            )
-        elif transaction_id is None and not self._channel_has_active_tx[channel]:
+        if transaction_id is None and not self._channel_has_active_tx.get(channel):
 
             def _ack_callback():
                 channel.basic_ack(delivery_tag, multiple=multiple)
-                channel.tx_commit()
 
             self._connection.add_callback_threadsafe(_ack_callback)
+        elif transaction == transaction_id:
+            # Matching transaction IDs - perfect
+            # We are in a transaction so make a note that it is now being used
+            self._channel_has_active_tx[channel] = True
+            self._connection.add_callback_threadsafe(
+                lambda: channel.basic_ack(delivery_tag, multiple=multiple)
+            )
         else:
             raise workflows.Error(
                 "Transaction state mismatch. "
@@ -1140,21 +1138,22 @@ class _PikaThread(threading.Thread):
 
         # Check if channel is in tx mode
         transaction = self._transaction_on_channel.get(channel)
-        if transaction == transaction_id:
+        if transaction_id is None and not self._channel_has_active_tx.get(channel):
+
+            def _nack_callback():
+                channel.basic_nack(delivery_tag, multiple=multiple, requeue=requeue)
+
+            self._connection.add_callback_threadsafe(_nack_callback)
+
+        elif transaction == transaction_id:
             # Matching transaction IDs - perfect
-            self._channel_has_active_tx[channel] |= transaction is not None
+            # We are in a transaction so make a note that it is now being used
+            self._channel_has_active_tx[channel] = True
             self._connection.add_callback_threadsafe(
                 lambda: channel.basic_nack(
                     delivery_tag, multiple=multiple, requeue=requeue
                 )
             )
-        elif transaction_id is None and not self._channel_has_active_tx[channel]:
-
-            def _nack_callback():
-                channel.basic_nack(delivery_tag, multiple=multiple, requeue=requeue)
-                channel.tx_commit()
-
-            self._connection.add_callback_threadsafe(_nack_callback)
         else:
             raise workflows.Error(
                 "Transaction state mismatch. "
