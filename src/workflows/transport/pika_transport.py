@@ -1183,6 +1183,11 @@ class _PikaThread(threading.Thread):
                                 f"Could not find subscription {subscription_id} to begin transaction"
                             )
                         channel = self._pika_channels[subscription_id]
+                        if self._subscriptions[subscription_id].reconnectable:
+                            raise KeyError(
+                                f"Subscription {subscription_id} on channel {channel} is reconnectable; "
+                                "Transactions are unsupported on reconnectable channels"
+                            )
                     else:
                         channel = self._get_shared_channel()
                     if channel in self._transaction_on_channel:
