@@ -1109,11 +1109,10 @@ class _PikaThread(threading.Thread):
                 f"Call assumes transaction {transaction_id}, channel has transaction {transaction}"
             )
         if transaction_id is None and not self._channel_has_active_tx.get(channel):
-            channel_is_transactional = self._channel_is_transactional.get(channel)
 
             def _ack_callback():
                 channel.basic_ack(delivery_tag, multiple=multiple)
-                if channel_is_transactional:
+                if self._channel_is_transactional.get(channel):
                     channel.tx_commit()
 
             self._connection.add_callback_threadsafe(_ack_callback)
@@ -1149,11 +1148,10 @@ class _PikaThread(threading.Thread):
                 f"Call assumes transaction {transaction_id}, channel has transaction {transaction}"
             )
         if transaction_id is None and not self._channel_has_active_tx.get(channel):
-            channel_is_transactional = self._channel_is_transactional.get(channel)
 
             def _nack_callback():
                 channel.basic_nack(delivery_tag, multiple=multiple)
-                if channel_is_transactional:
+                if self._channel_is_transactional.get(channel):
                     channel.tx_commit()
 
             self._connection.add_callback_threadsafe(_nack_callback)
