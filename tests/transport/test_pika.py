@@ -1109,8 +1109,59 @@ def test_pikathread_unsubscribe(test_channel, connection_params):
         thread.join(stop=True)
 
 
-def test_pikathread_ack():
-    pytest.xfail("Not Implemented")
+def test_pikathread_ack_nack(test_channel, connection_params):
+    queue = test_channel.temporary_queue_declare()
+    thread = _PikaThread(connection_params)
+    try:
+        thread.start()
+        thread.wait_for_connection()
+
+        messages = Queue()
+
+        def _get_message(channel, method_frame, header_frame, body):
+            print(f"Received message {body}")
+            if body == b"ack":
+                thread.ack(
+                    delivery_tag=method_frame.delivery_tag,
+                    subscription_id=1,
+                    transaction_id=None,
+                )
+                messages.put(body)
+            elif body == b"nack":
+                thread.nack(
+                    delivery_tag=method_frame.delivery_tag,
+                    subscription_id=1,
+                    transaction_id=None,
+                    requeue=False,
+                )
+
+        thread.subscribe_queue(
+            queue,
+            _get_message,
+            reconnectable=False,
+            subscription_id=1,
+            auto_ack=False,
+        )
+
+        # Send two messages to be ack'd, and confirm they've both been received
+        test_channel.basic_publish("", queue, "ack")
+        test_channel.basic_publish("", queue, "ack")
+        assert messages.get(timeout=1) == b"ack"
+        assert messages.get(timeout=1) == b"ack"
+
+        # Send two messages to be nack'd
+        test_channel.basic_publish("", queue, "nack")
+        test_channel.basic_publish("", queue, "nack")
+        # Wait a short time to make sure it no messages have been delivered
+        with pytest.raises(Empty):
+            messages.get(timeout=1)
+
+        # Send another message to be ack'd, and confirm receipt
+        test_channel.basic_publish("", queue, "ack")
+        assert messages.get(timeout=2) == b"ack"
+
+    finally:
+        thread.join(stop=True)
 
 
 def test_full_stack_temporary_queue_roundtrip(pikatransport):
