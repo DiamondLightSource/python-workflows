@@ -1150,7 +1150,7 @@ class _PikaThread(threading.Thread):
         if transaction_id is None and not self._channel_has_active_tx.get(channel):
 
             def _nack_callback():
-                channel.basic_nack(delivery_tag, multiple=multiple)
+                channel.basic_nack(delivery_tag, multiple=multiple, requeue=requeue)
                 if self._channel_is_transactional.get(channel):
                     channel.tx_commit()
 
