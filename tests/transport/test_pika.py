@@ -1119,7 +1119,9 @@ def test_pikathread_ack_nack(test_channel, connection_params):
         messages = Queue()
 
         def _get_message(channel, method_frame, header_frame, body):
-            print(f"Received message delivery_tag={method_frame.delivery_tag} {body=}")
+            print(
+                f"Received message delivery_tag={method_frame.delivery_tag} body={body}"
+            )
             messages.put((method_frame.delivery_tag, body))
 
         thread.subscribe_queue(
