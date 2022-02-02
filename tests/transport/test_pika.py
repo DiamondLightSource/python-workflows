@@ -1119,21 +1119,8 @@ def test_pikathread_ack_nack(test_channel, connection_params):
         messages = Queue()
 
         def _get_message(channel, method_frame, header_frame, body):
-            print(f"Received message {body}")
-            if body == b"ack":
-                thread.ack(
-                    delivery_tag=method_frame.delivery_tag,
-                    subscription_id=1,
-                    transaction_id=None,
-                )
-                messages.put(body)
-            elif body == b"nack":
-                thread.nack(
-                    delivery_tag=method_frame.delivery_tag,
-                    subscription_id=1,
-                    transaction_id=None,
-                    requeue=False,
-                )
+            print(f"Received message delivery_tag={method_frame.delivery_tag} {body=}")
+            messages.put((method_frame.delivery_tag, body))
 
         thread.subscribe_queue(
             queue,
@@ -1141,24 +1128,99 @@ def test_pikathread_ack_nack(test_channel, connection_params):
             reconnectable=False,
             subscription_id=1,
             auto_ack=False,
-        )
+        ).result()
 
-        # Send two messages to be ack'd, and confirm they've both been received
-        test_channel.basic_publish("", queue, "ack")
-        test_channel.basic_publish("", queue, "ack")
-        assert messages.get(timeout=1) == b"ack"
-        assert messages.get(timeout=1) == b"ack"
+        # Send a message and then ack it
+        transaction_id = 0
+        for i in range(2):
+            transaction_id += 1
+            test_channel.basic_publish("", queue, "ack")
+            delivery_tag, body = messages.get(timeout=1)
+            assert body == b"ack"
+            thread.ack(
+                delivery_tag=delivery_tag, subscription_id=1, transaction_id=None
+            )
 
-        # Send two messages to be nack'd
-        test_channel.basic_publish("", queue, "nack")
-        test_channel.basic_publish("", queue, "nack")
+        # Send a message and then nack it
+        for i in range(2):
+            transaction_id += 1
+            test_channel.basic_publish("", queue, "nack")
+            delivery_tag, body = messages.get(timeout=1)
+            assert body == b"nack"
+            thread.nack(
+                delivery_tag=delivery_tag,
+                subscription_id=1,
+                transaction_id=None,
+                requeue=False,
+            )
+
         # Wait a short time to make sure it no messages have been delivered
         with pytest.raises(Empty):
             messages.get(timeout=1)
+    finally:
+        thread.join(stop=True)
 
-        # Send another message to be ack'd, and confirm receipt
-        test_channel.basic_publish("", queue, "ack")
-        assert messages.get(timeout=2) == b"ack"
+
+def test_pikathread_ack_nack_transaction(test_channel, connection_params):
+
+    queue = test_channel.temporary_queue_declare()
+    thread = _PikaThread(connection_params)
+    try:
+        thread.start()
+        thread.wait_for_connection()
+
+        messages = Queue()
+
+        def _get_message(channel, method_frame, header_frame, body):
+            print(f"Received message delivery_tag={method_frame.delivery_tag} {body=}")
+            messages.put((method_frame.delivery_tag, body))
+
+        thread.subscribe_queue(
+            queue,
+            _get_message,
+            reconnectable=False,
+            subscription_id=1,
+            auto_ack=False,
+        ).result()
+
+        # Send a message and then ack it within a transaction
+        transaction_id = 0
+        for i in range(2):
+            transaction_id += 1
+            test_channel.basic_publish("", queue, "ack")
+            delivery_tag, body = messages.get(timeout=1)
+            assert body == b"ack"
+            thread.tx_select(transaction_id=transaction_id, subscription_id=1).result()
+            thread.ack(
+                delivery_tag=delivery_tag,
+                subscription_id=1,
+                transaction_id=transaction_id,
+            )
+            thread.tx_commit(transaction_id=transaction_id)
+
+        # Send a message, start a transaction, ack it and then rollback, followed by a nack
+        for i in range(2):
+            transaction_id += 1
+            test_channel.basic_publish("", queue, "nack")
+            delivery_tag, body = messages.get(timeout=1)
+            assert body == b"nack"
+            thread.tx_select(transaction_id=transaction_id, subscription_id=1).result()
+            thread.ack(
+                delivery_tag=delivery_tag,
+                subscription_id=1,
+                transaction_id=transaction_id,
+            )
+            thread.tx_rollback(transaction_id=transaction_id).result()
+            thread.nack(
+                delivery_tag=delivery_tag,
+                subscription_id=1,
+                transaction_id=None,
+                requeue=False,
+            )
+
+        # Wait a short time to make sure it no messages have been delivered
+        with pytest.raises(Empty):
+            messages.get(timeout=1)
 
     finally:
         thread.join(stop=True)
