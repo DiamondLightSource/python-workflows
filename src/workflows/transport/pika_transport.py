@@ -1160,7 +1160,9 @@ class _PikaThread(threading.Thread):
             # We are in a transaction so make a note that it is now being used
             self._channel_has_active_tx[channel] = True
             self._connection.add_callback_threadsafe(
-                lambda: channel.basic_nack(delivery_tag, multiple=multiple)
+                lambda: channel.basic_nack(
+                    delivery_tag, multiple=multiple, requeue=requeue
+                )
             )
 
     def tx_select(
