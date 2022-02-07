@@ -764,6 +764,8 @@ class _PikaThread(threading.Thread):
         self._transaction_on_channel: bidict[BlockingChannel, int] = bidict()
         # Information on whether a channel has uncommitted messages
         self._channel_has_active_tx: Dict[BlockingChannel, bool] = {}
+        # Information on whether a channel is transactional
+        self._channel_is_transactional: Dict[BlockingChannel, bool] = {}
         # A common, shared channel, used for sending messages outside of transactions.
         self._pika_shared_channel: Optional[BlockingChannel]
         # Are we allowed to reconnect. Can only be turned off, never on
@@ -1101,25 +1103,25 @@ class _PikaThread(threading.Thread):
 
         # Check if channel is in tx mode
         transaction = self._transaction_on_channel.get(channel)
-        if transaction == transaction_id:
-            # Matching transaction IDs - perfect
-            if transaction is not None:
-                # If we are in a transaction then make a note that it is now being used
-                self._channel_has_active_tx[channel] = True
-            self._connection.add_callback_threadsafe(
-                lambda: channel.basic_ack(delivery_tag, multiple=multiple)
-            )
-        elif transaction_id is None and not self._channel_has_active_tx[channel]:
-
-            def _ack_callback():
-                channel.basic_ack(delivery_tag, multiple=multiple)
-                channel.tx_commit()
-
-            self._connection.add_callback_threadsafe(_ack_callback)
-        else:
+        if transaction_id != transaction:
             raise workflows.Error(
                 "Transaction state mismatch. "
                 f"Call assumes transaction {transaction_id}, channel has transaction {transaction}"
+            )
+        if transaction_id is None and not self._channel_has_active_tx.get(channel):
+
+            def _ack_callback():
+                channel.basic_ack(delivery_tag, multiple=multiple)
+                if self._channel_is_transactional.get(channel):
+                    channel.tx_commit()
+
+            self._connection.add_callback_threadsafe(_ack_callback)
+        else:
+            # Matching transaction IDs - perfect
+            # We are in a transaction so make a note that it is now being used
+            self._channel_has_active_tx[channel] = True
+            self._connection.add_callback_threadsafe(
+                lambda: channel.basic_ack(delivery_tag, multiple=multiple)
             )
 
     def nack(
@@ -1140,25 +1142,27 @@ class _PikaThread(threading.Thread):
 
         # Check if channel is in tx mode
         transaction = self._transaction_on_channel.get(channel)
-        if transaction == transaction_id:
+        if transaction_id != transaction:
+            raise workflows.Error(
+                "Transaction state mismatch. "
+                f"Call assumes transaction {transaction_id}, channel has transaction {transaction}"
+            )
+        if transaction_id is None and not self._channel_has_active_tx.get(channel):
+
+            def _nack_callback():
+                channel.basic_nack(delivery_tag, multiple=multiple, requeue=requeue)
+                if self._channel_is_transactional.get(channel):
+                    channel.tx_commit()
+
+            self._connection.add_callback_threadsafe(_nack_callback)
+        else:
             # Matching transaction IDs - perfect
-            self._channel_has_active_tx[channel] |= transaction is not None
+            # We are in a transaction so make a note that it is now being used
+            self._channel_has_active_tx[channel] = True
             self._connection.add_callback_threadsafe(
                 lambda: channel.basic_nack(
                     delivery_tag, multiple=multiple, requeue=requeue
                 )
-            )
-        elif transaction_id is None and not self._channel_has_active_tx[channel]:
-
-            def _nack_callback():
-                channel.basic_nack(delivery_tag, multiple=multiple, requeue=requeue)
-                channel.tx_commit()
-
-            self._connection.add_callback_threadsafe(_nack_callback)
-        else:
-            raise workflows.Error(
-                "Transaction state mismatch. "
-                f"Call assumes transaction {transaction_id}, channel has transaction {transaction}"
             )
 
     def tx_select(
@@ -1197,6 +1201,7 @@ class _PikaThread(threading.Thread):
                     channel.tx_select()
                     self._transaction_on_channel[channel] = transaction_id
                     self._channel_has_active_tx.setdefault(channel, False)
+                    self._channel_is_transactional[channel] = True
 
                     future.set_result(None)
                 except BaseException as e:
@@ -1419,6 +1424,9 @@ class _PikaThread(threading.Thread):
                 # Clear the channels because this might be a reconnect
                 self._pika_channels = {}
                 self._pika_shared_channel = None
+                self._transaction_on_channel = bidict()
+                self._channel_has_active_tx = {}
+                self._channel_is_transactional = {}
 
                 # [Re]create subscriptions
                 self._recreate_subscriptions()
