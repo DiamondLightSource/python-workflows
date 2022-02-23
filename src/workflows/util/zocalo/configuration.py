@@ -39,6 +39,7 @@ class Pika:
         username = fields.Str(required=True)
         password = fields.Str(required=True)
         vhost = fields.Str(required=True)
+        delayed_message_exchange = fields.Str(required=False)
 
     @staticmethod
     def activate(configuration):
@@ -48,7 +49,9 @@ class Pika:
             ("username", "--rabbit-user"),
             ("password", "--rabbit-pass"),
             ("vhost", "--rabbit-vhost"),
+            ("delayed_message_exchange", "--rabbit-delayed-message-exchange"),
         ]:
+            configuration.setdefault("delayed_message_exchange", None)
             PikaTransport.defaults[target] = configuration[cfgoption]
 
 
