@@ -271,9 +271,8 @@ def test_send_message(mockpika, mock_pikathread):
     assert mockproperties.call_args[1].get("headers") == {}
     assert int(mockproperties.call_args[1].get("delivery_mode")) == 2
 
-    # Was a test for delayed sending, this is advanced in rabbitMQ and
-    # to be implemented later
-    with pytest.raises(AssertionError):
+    # No delayed message exchange specified, so raise ValueError
+    with pytest.raises(ValueError):
         transport._send(
             str(mock.sentinel.queue),
             mock.sentinel.message,
