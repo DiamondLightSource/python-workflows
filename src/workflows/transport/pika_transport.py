@@ -526,7 +526,7 @@ class PikaTransport(CommonTransport):
                     "No delayed message exchange set, but transport delay requested"
                 )
             headers["x-delay"] = 1000 * delay
-            exchange = "zocalo"
+            exchange = self._delayed_message_exchange
         else:
             exchange = ""
 
