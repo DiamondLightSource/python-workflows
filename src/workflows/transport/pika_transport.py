@@ -55,7 +55,6 @@ class PikaTransport(CommonTransport):
         "--rabbit-user": "guest",
         "--rabbit-pass": "guest",
         "--rabbit-vhost": "/",
-        "--rabbit-delayed-message-exchange": None,
     }
 
     # Effective configuration
@@ -68,10 +67,6 @@ class PikaTransport(CommonTransport):
         self._lock = threading.RLock()
         self._pika_thread = None
         self._vhost = "/"
-        self._delayed_message_exchange = self.config.get(
-            "--rabbit-delayed-message-exchange",
-            self.defaults.get("--rabbit-delayed-message-exchange"),
-        )
 
     def get_namespace(self) -> str:
         """Return the RabbitMQ virtual host"""
@@ -92,7 +87,6 @@ class PikaTransport(CommonTransport):
             ("password", "--rabbit-pass"),
             ("username", "--rabbit-user"),
             ("vhost", "--rabbit-vhost"),
-            ("delayed_message_exchange", "--rabbit-delayed-message-exchange"),
         ]:
             try:
                 cls.defaults[target] = cfgparser.get("rabbit", cfgoption)
@@ -166,14 +160,6 @@ class PikaTransport(CommonTransport):
             metavar="CNF",
             default=cls.defaults.get("--rabbit-conf"),
             help="Rabbit configuration file containing connection information, disables default values",
-            type=str,
-            action=SetParameter,
-        )
-        argparser.add_argument(
-            "--rabbit-delayed-message-exchange",
-            metavar="CNF",
-            default=cls.defaults.get("--rabbit-delayed-message-exchange"),
-            help="Exchange to use for sending delayed messages",
             type=str,
             action=SetParameter,
         )
@@ -521,12 +507,8 @@ class PikaTransport(CommonTransport):
             headers = {}
 
         if delay:
-            if self._delayed_message_exchange is None:
-                raise ValueError(
-                    "No delayed message exchange set, but transport delay requested"
-                )
             headers["x-delay"] = 1000 * delay
-            exchange = self._delayed_message_exchange
+            exchange = "delayed"
         else:
             exchange = ""
 
