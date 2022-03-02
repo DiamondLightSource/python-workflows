@@ -5,10 +5,16 @@ from __future__ import annotations
 import json
 import logging
 import pprint
-from typing import Any, Dict, Type
+import uuid
+from typing import Any, Dict, Optional, Type
 
+import workflows.util
 from workflows.transport import middleware
-from workflows.transport.common_transport import CommonTransport, json_serializer
+from workflows.transport.common_transport import (
+    CommonTransport,
+    MessageCallback,
+    json_serializer,
+)
 
 _offlog = logging.getLogger("workflows.transport.offline_transport")
 
@@ -50,6 +56,21 @@ class OfflineTransport(CommonTransport):
             f"Subscribing to messages on {channel}",
             f"subscription ID {sub_id}, callback function {callback}, further keywords: {kwargs}",
         )
+
+    def _subscribe_temporary(
+        self,
+        sub_id: int,
+        channel_hint: Optional[str],
+        callback: MessageCallback,
+        **kwargs,
+    ) -> str:
+        channel = channel_hint or workflows.util.generate_unique_host_id()
+        channel = channel + "." + str(uuid.uuid4())
+        if not channel.startswith("transient."):
+            channel = "transient." + channel
+
+        self._subscribe(sub_id, channel, callback, **kwargs)
+        return channel
 
     def _subscribe_broadcast(self, sub_id, channel, callback, **kwargs):
         self._output(

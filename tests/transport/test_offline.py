@@ -345,6 +345,42 @@ def test_subscribe_to_broadcast(caplog):
         ]
 
 
+def test_subscribe_temporary(caplog):
+    """Test subscribing to a temporary queue and callback functions."""
+    mock_cb1 = mock.Mock()
+    channel_hint = "foo"
+    offline = OfflineTransport()
+    offline.connect()
+
+    with caplog.at_level(logging.INFO):
+        channel = offline._subscribe_temporary(
+            1,
+            channel_hint,
+            mock_cb1,
+            transformation=mock.sentinel.transformation,
+        )
+        message = f"Subscribing to messages on {channel}"
+        assert caplog.record_tuples == [
+            (
+                "workflows.transport.offline_transport",
+                logging.INFO,
+                f"Offline Transport: {message}",
+            )
+        ]
+
+    caplog.clear()
+    with caplog.at_level(logging.INFO):
+        offline._unsubscribe(1)
+        message = "Ending subscription #1"
+        assert caplog.record_tuples == [
+            (
+                "workflows.transport.offline_transport",
+                logging.INFO,
+                f"Offline Transport: {message}",
+            )
+        ]
+
+
 def test_transaction_calls(caplog):
     """Test that calls to create, commit, abort transactions are properly logged."""
     offline = OfflineTransport()
