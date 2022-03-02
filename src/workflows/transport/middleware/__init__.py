@@ -62,6 +62,7 @@ class CounterMiddleware(BaseTransportMiddleware):
     def __init__(self):
         self.subscribe_count = 0
         self.send_count = 0
+        self.broadcast_count = 0
         self.ack_count = 0
         self.nack_count = 0
         self.transaction_begin_count = 0
@@ -78,6 +79,11 @@ class CounterMiddleware(BaseTransportMiddleware):
         call_next(destination, message, **kwargs)
         self.send_count += 1
         logger.info(f"send() count: {self.send_count}")
+
+    def broadcast(self, call_next: Callable, destination, message, **kwargs):
+        call_next(destination, message, **kwargs)
+        self.broadcast_count += 1
+        logger.info(f"broadcast() count: {self.broadcast_count}")
 
     def ack(
         self,
