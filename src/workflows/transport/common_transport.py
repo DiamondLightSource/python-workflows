@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import decimal
 import logging
-from typing import Any, Callable, Dict, Mapping, NamedTuple, Optional, Set
+from typing import Any, Callable, Dict, Mapping, NamedTuple, Optional, Set, Type
 
 import workflows
+from workflows.transport import middleware
 
 MessageCallback = Callable[[Mapping[str, Any], Any], None]
 
@@ -29,6 +30,17 @@ class CommonTransport:
     #
     # -- High level communication calls ----------------------------------------
     #
+
+    def __init__(
+        self, middleware: list[Type[middleware.BaseTransportMiddleware]] = None
+    ):
+        if middleware is None:
+            self.middleware = []
+        else:
+            self.middleware = middleware
+
+    def add_middleware(self, middleware: Type[middleware.BaseTransportMiddleware]):
+        self.middleware.insert(0, middleware)
 
     @classmethod
     def add_command_line_options(cls, parser):
@@ -64,24 +76,33 @@ class CommonTransport:
                                 acknowledged.
         :return: A unique subscription ID
         """
-        self.__subscription_id += 1
 
-        def mangled_callback(header, message):
-            return callback(header, self._mangle_for_receiving(message))
+        def wrap_subscribe(channel, callback, **kwargs):
+            self.__subscription_id += 1
 
-        if "disable_mangling" in kwargs:
-            if kwargs["disable_mangling"]:
-                mangled_callback = callback  # noqa:F811
-            del kwargs["disable_mangling"]
-        self.__subscriptions[self.__subscription_id] = {
-            "channel": channel,
-            "callback": mangled_callback,
-            "ack": kwargs.get("acknowledgement"),
-            "unsubscribed": False,
-        }
-        self.log.debug("Subscribing to %s with ID %d", channel, self.__subscription_id)
-        self._subscribe(self.__subscription_id, channel, mangled_callback, **kwargs)
-        return self.__subscription_id
+            def mangled_callback(header, message):
+                return callback(header, self._mangle_for_receiving(message))
+
+            if "disable_mangling" in kwargs:
+                if kwargs["disable_mangling"]:
+                    mangled_callback = callback  # noqa:F811
+                del kwargs["disable_mangling"]
+            self.__subscriptions[self.__subscription_id] = {
+                "channel": channel,
+                "callback": mangled_callback,
+                "ack": kwargs.get("acknowledgement"),
+                "unsubscribed": False,
+            }
+            self.log.debug(
+                "Subscribing to %s with ID %d", channel, self.__subscription_id
+            )
+            self._subscribe(self.__subscription_id, channel, mangled_callback, **kwargs)
+            return self.__subscription_id
+
+        wrapped = middleware.wrap(
+            wrap_subscribe, "subscribe", middleware=self.middleware
+        )
+        return wrapped(channel, callback, **kwargs)
 
     def subscribe_temporary(
         self, channel_hint: Optional[str], callback: MessageCallback, **kwargs
@@ -242,8 +263,13 @@ class CommonTransport:
                transaction: Transaction ID if message should be part of a
                             transaction
         """
-        message = self._mangle_for_sending(message)
-        self._send(destination, message, **kwargs)
+
+        def wrap_send(destination, message, **kwargs):
+            message = self._mangle_for_sending(message)
+            self._send(destination, message, **kwargs)
+
+        wrapped = middleware.wrap(wrap_send, "send", middleware=self.middleware)
+        wrapped(destination, message, **kwargs)
 
     def raw_send(self, destination, message, **kwargs):
         """Send a raw (unmangled) message to a queue.
@@ -257,7 +283,12 @@ class CommonTransport:
                transaction: Transaction ID if message should be part of a
                             transaction
         """
-        self._send(destination, message, **kwargs)
+
+        def wrap_send(destination, message, **kwargs):
+            self._send(destination, message, **kwargs)
+
+        wrapped = middleware.wrap(wrap_send, "raw_send", middleware=self.middleware)
+        wrapped(destination, message, **kwargs)
 
     def broadcast(self, destination, message, **kwargs):
         """Broadcast a message.
@@ -270,8 +301,15 @@ class CommonTransport:
                transaction: Transaction ID if message should be part of a
                             transaction
         """
-        message = self._mangle_for_sending(message)
-        self._broadcast(destination, message, **kwargs)
+
+        def wrap_broadcast(destination, message, **kwargs):
+            message = self._mangle_for_sending(message)
+            self._broadcast(destination, message, **kwargs)
+
+        wrapped = middleware.wrap(
+            wrap_broadcast, "broadcast", middleware=self.middleware
+        )
+        wrapped(destination, message, **kwargs)
 
     def raw_broadcast(self, destination, message, **kwargs):
         """Broadcast a raw (unmangled) message.
@@ -285,7 +323,14 @@ class CommonTransport:
                transaction: Transaction ID if message should be part of a
                             transaction
         """
-        self._broadcast(destination, message, **kwargs)
+
+        def wrap_broadcast(destination, message, **kwargs):
+            self._broadcast(destination, message, **kwargs)
+
+        wrapped = middleware.wrap(
+            wrap_broadcast, "raw_broadcast", middleware=self.middleware
+        )
+        wrapped(destination, message, **kwargs)
 
     def ack(self, message, subscription_id: Optional[int] = None, **kwargs):
         """Acknowledge receipt of a message. This only makes sense when the
@@ -299,20 +344,29 @@ class CommonTransport:
                transaction: Transaction ID if acknowledgement should be part of
                             a transaction
         """
-        if isinstance(message, dict):
-            message_id = message.get("message-id")
+
+        def wrap_ack(message, subscription_id=None, **kwargs):
+            if isinstance(message, dict):
+                message_id = message.get("message-id")
+                if not subscription_id:
+                    subscription_id = message.get("subscription")
+            else:
+                message_id = message
+            if not message_id:
+                raise workflows.Error("Cannot acknowledge message without message ID")
             if not subscription_id:
-                subscription_id = message.get("subscription")
-        else:
-            message_id = message
-        if not message_id:
-            raise workflows.Error("Cannot acknowledge message without message ID")
-        if not subscription_id:
-            raise workflows.Error("Cannot acknowledge message without subscription ID")
-        self.log.debug(
-            "Acknowledging message %s on subscription %s", message_id, subscription_id
-        )
-        self._ack(message_id, subscription_id=subscription_id, **kwargs)
+                raise workflows.Error(
+                    "Cannot acknowledge message without subscription ID"
+                )
+            self.log.debug(
+                "Acknowledging message %s on subscription %s",
+                message_id,
+                subscription_id,
+            )
+            self._ack(message_id, subscription_id=subscription_id, **kwargs)
+
+        wrapped = middleware.wrap(wrap_ack, "ack", middleware=self.middleware)
+        wrapped(message, subscription_id, **kwargs)
 
     def nack(self, message, subscription_id: Optional[int] = None, **kwargs):
         """Reject receipt of a message. This only makes sense when the
@@ -326,62 +380,88 @@ class CommonTransport:
                transaction: Transaction ID if rejection should be part of a
                             transaction
         """
-        if isinstance(message, dict):
-            message_id = message.get("message-id")
+
+        def wrap_nack(message, subscription_id=None, **kwargs):
+            if isinstance(message, dict):
+                message_id = message.get("message-id")
+                if not subscription_id:
+                    subscription_id = message.get("subscription")
+            else:
+                message_id = message
+            if not message_id:
+                raise workflows.Error("Cannot reject message without message ID")
             if not subscription_id:
-                subscription_id = message.get("subscription")
-        else:
-            message_id = message
-        if not message_id:
-            raise workflows.Error("Cannot reject message without message ID")
-        if not subscription_id:
-            raise workflows.Error("Cannot reject message without subscription ID")
-        self.log.debug(
-            "Rejecting message %s on subscription %d", message_id, subscription_id
-        )
-        self._nack(message_id, subscription_id=subscription_id, **kwargs)
+                raise workflows.Error("Cannot reject message without subscription ID")
+            self.log.debug(
+                "Rejecting message %s on subscription %d", message_id, subscription_id
+            )
+            self._nack(message_id, subscription_id=subscription_id, **kwargs)
+
+        wrapped = middleware.wrap(wrap_nack, "nack", middleware=self.middleware)
+        wrapped(message, subscription_id, **kwargs)
 
     def transaction_begin(self, subscription_id: Optional[int] = None, **kwargs) -> int:
         """Start a new transaction.
         :param **kwargs: Further parameters for the transport layer.
         :return: A transaction ID that can be passed to other functions.
         """
-        self.__transaction_id += 1
-        self.__transactions.add(self.__transaction_id)
-        if subscription_id:
-            self.log.debug(
-                "Starting transaction with ID %d on subscription %d",
-                self.__transaction_id,
-                subscription_id,
+
+        def wrap_transaction_begin(subscription_id=None, **kwargs):
+            self.__transaction_id += 1
+            self.__transactions.add(self.__transaction_id)
+            if subscription_id:
+                self.log.debug(
+                    "Starting transaction with ID %d on subscription %d",
+                    self.__transaction_id,
+                    subscription_id,
+                )
+            else:
+                self.log.debug("Starting transaction with ID %d", self.__transaction_id)
+            self._transaction_begin(
+                self.__transaction_id, subscription_id=subscription_id, **kwargs
             )
-        else:
-            self.log.debug("Starting transaction with ID %d", self.__transaction_id)
-        self._transaction_begin(
-            self.__transaction_id, subscription_id=subscription_id, **kwargs
+            return self.__transaction_id
+
+        wrapped = middleware.wrap(
+            wrap_transaction_begin, "transaction_begin", middleware=self.middleware
         )
-        return self.__transaction_id
+        return wrapped(subscription_id, **kwargs)
 
     def transaction_abort(self, transaction_id: int, **kwargs):
         """Abort a transaction and roll back all operations.
         :param transaction_id: ID of transaction to be aborted.
         :param **kwargs: Further parameters for the transport layer.
         """
-        if transaction_id not in self.__transactions:
-            raise workflows.Error("Attempting to abort unknown transaction")
-        self.log.debug("Aborting transaction %s", transaction_id)
-        self.__transactions.remove(transaction_id)
-        self._transaction_abort(transaction_id, **kwargs)
+
+        def wrap_transaction_abort(transaction_id, **kwargs):
+            if transaction_id not in self.__transactions:
+                raise workflows.Error("Attempting to abort unknown transaction")
+            self.log.debug("Aborting transaction %s", transaction_id)
+            self.__transactions.remove(transaction_id)
+            self._transaction_abort(transaction_id, **kwargs)
+
+        wrapped = middleware.wrap(
+            wrap_transaction_abort, "transaction_abort", middleware=self.middleware
+        )
+        wrapped(transaction_id, **kwargs)
 
     def transaction_commit(self, transaction_id: int, **kwargs):
         """Commit a transaction.
         :param transaction_id: ID of transaction to be committed.
         :param **kwargs: Further parameters for the transport layer.
         """
-        if transaction_id not in self.__transactions:
-            raise workflows.Error("Attempting to commit unknown transaction")
-        self.log.debug("Committing transaction %s", transaction_id)
-        self.__transactions.remove(transaction_id)
-        self._transaction_commit(transaction_id, **kwargs)
+
+        def wrap_transaction_commit(transaction_id, **kwargs):
+            if transaction_id not in self.__transactions:
+                raise workflows.Error("Attempting to commit unknown transaction")
+            self.log.debug("Committing transaction %s", transaction_id)
+            self.__transactions.remove(transaction_id)
+            self._transaction_commit(transaction_id, **kwargs)
+
+        wrapped = middleware.wrap(
+            wrap_transaction_commit, "transaction_commit", middleware=self.middleware
+        )
+        wrapped(transaction_id, **kwargs)
 
     @property
     def is_reconnectable(self):

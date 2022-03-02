@@ -5,8 +5,9 @@ from __future__ import annotations
 import json
 import logging
 import pprint
-from typing import Any, Dict
+from typing import Any, Dict, Type
 
+from workflows.transport import middleware
 from workflows.transport.common_transport import CommonTransport, json_serializer
 
 _offlog = logging.getLogger("workflows.transport.offline_transport")
@@ -20,8 +21,11 @@ class OfflineTransport(CommonTransport):
     # Effective configuration
     config: Dict[Any, Any] = {}
 
-    def __init__(self):
+    def __init__(
+        self, middleware: list[Type[middleware.BaseTransportMiddleware]] = None
+    ):
         self._connected = False
+        super().__init__(middleware=middleware)
 
     def connect(self):
         self._connected = True

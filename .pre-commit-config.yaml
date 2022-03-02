@@ -49,3 +49,4 @@ repos:
   - id: mypy
     files: 'src/.*\.py$'
     additional_dependencies: ['types-setuptools==57.0.2']
+    args: [--no-strict-optional, --ignore-missing-imports]

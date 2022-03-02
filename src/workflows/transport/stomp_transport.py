@@ -5,11 +5,12 @@ import json
 import threading
 import time
 import uuid
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Type
 
 import stomp
 
 import workflows.util
+from workflows.transport import middleware
 from workflows.transport.common_transport import (
     CommonTransport,
     MessageCallback,
@@ -32,7 +33,9 @@ class StompTransport(CommonTransport):
     # Effective configuration
     config: Dict[Any, Any] = {}
 
-    def __init__(self):
+    def __init__(
+        self, middleware: list[Type[middleware.BaseTransportMiddleware]] = None
+    ):
         self._connected = False
         self._namespace = ""
         self._idcounter = 0
@@ -41,6 +44,7 @@ class StompTransport(CommonTransport):
         #   self._stomp_listener = stomp.PrintingListener()
         self._stomp_listener.on_message = self._on_message
         self._stomp_listener.on_before_message = lambda frame: frame
+        super().__init__()
 
     def get_namespace(self):
         """Return the stomp namespace. This is a prefix used for all topic and

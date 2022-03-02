@@ -1,0 +1,149 @@
+from __future__ import annotations
+
+import logging
+import time
+from functools import reduce
+from typing import Callable, Optional, Type
+
+logger = logging.getLogger(__name__)
+
+
+class BaseTransportMiddleware:
+    def subscribe(self, call_next: Callable, channel, callback, **kwargs) -> int:
+        return call_next(channel, callback, **kwargs)
+
+    def send(self, call_next: Callable, destination, message, **kwargs):
+        call_next(destination, message, **kwargs)
+
+    def raw_send(self, call_next: Callable, destination, message, **kwargs):
+        call_next(destination, message, **kwargs)
+
+    def broadcast(self, call_next: Callable, destination, message, **kwargs):
+        call_next(destination, message, **kwargs)
+
+    def raw_broadcast(self, call_next: Callable, destination, message, **kwargs):
+        call_next(destination, message, **kwargs)
+
+    def ack(
+        self,
+        call_next: Callable,
+        message,
+        subscription_id: Optional[int] = None,
+        **kwargs,
+    ):
+        call_next(message, subscription_id=subscription_id, **kwargs)
+
+    def nack(
+        self,
+        call_next: Callable,
+        message,
+        subscription_id: Optional[int] = None,
+        **kwargs,
+    ):
+        call_next(message, subscription_id=subscription_id, **kwargs)
+
+    def transaction_begin(
+        self, call_next: Callable, subscription_id: Optional[int] = None, **kwargs
+    ) -> int:
+        return call_next(subscription_id=subscription_id, **kwargs)
+
+    def transaction_abort(
+        self, call_next: Callable, transaction_id: int = None, **kwargs
+    ):
+        call_next(transaction_id, **kwargs)
+
+    def transaction_commit(
+        self, call_next: Callable, transaction_id: int = None, **kwargs
+    ):
+        call_next(transaction_id, **kwargs)
+
+
+class CounterMiddleware(BaseTransportMiddleware):
+    def __init__(self):
+        self.subscribe_count = 0
+        self.send_count = 0
+        self.ack_count = 0
+        self.nack_count = 0
+        self.transaction_begin_count = 0
+        self.transaction_abort_count = 0
+        self.transaction_commit_count = 0
+        super().__init__()
+
+    def subscribe(self, call_next: Callable, channel, callback, **kwargs) -> int:
+        self.subscribe_count += 1
+        logger.info(f"subscribe() count: {self.subscribe_count}")
+        return call_next(channel, callback, **kwargs)
+
+    def send(self, call_next: Callable, destination, message, **kwargs):
+        call_next(destination, message, **kwargs)
+        self.send_count += 1
+        logger.info(f"send() count: {self.send_count}")
+
+    def ack(
+        self,
+        call_next: Callable,
+        message,
+        subscription_id: Optional[int] = None,
+        **kwargs,
+    ):
+        call_next(message, subscription_id=subscription_id, **kwargs)
+        self.ack_count += 1
+        logger.info(f"ack() count: {self.ack_count}")
+
+    def nack(
+        self,
+        call_next: Callable,
+        message,
+        subscription_id: Optional[int] = None,
+        **kwargs,
+    ):
+        call_next(message, subscription_id=subscription_id, **kwargs)
+        self.nack_count += 1
+        logger.info(f"nack() count: {self.nack_count}")
+
+    def transaction_begin(self, call_next: Callable, *args, **kwargs) -> int:
+        self.transaction_begin_count += 1
+        logger.info(f"transaction_begin() count: {self.transaction_begin_count}")
+        return call_next(*args, **kwargs)
+
+    def transaction_abort(self, call_next: Callable, *args, **kwargs):
+        call_next(*args, **kwargs)
+        self.transaction_abort_count += 1
+        logger.info(f"transaction_abort() count: {self.transaction_abort_count}")
+
+    def transaction_commit(self, call_next: Callable, *args, **kwargs):
+        call_next(*args, **kwargs)
+        self.transaction_commit_count += 1
+        logger.info(f"transaction_commit() count: {self.transaction_commit_count}")
+
+
+class TimerMiddleware(BaseTransportMiddleware):
+    def subscribe(self, call_next: Callable, channel, callback, **kwargs) -> int:
+        def wrapped_callback(header, message):
+            start_time = time.perf_counter()
+            result = callback(header, message)
+            end_time = time.perf_counter()
+            logger.info(
+                f"Callback for {header['destination']} took: {end_time - start_time:.3f}"
+            )
+            return result
+
+        return call_next(channel, wrapped_callback, **kwargs)
+
+    def send(self, call_next: Callable, destination, message, **kwargs):
+        start_time = time.perf_counter()
+        call_next(destination, message, **kwargs)
+        end_time = time.perf_counter()
+        logger.info(f"send() took: {end_time - start_time:.3f}")
+
+
+def wrap(
+    call: Callable, name: str, middleware: list[Type[BaseTransportMiddleware]]
+) -> Callable:
+    return reduce(
+        lambda call_next, m: lambda *args, **kwargs: getattr(m, name)(
+            call_next, *args, **kwargs
+        ),
+        reversed(middleware),
+        lambda *args, **kwargs: call(*args, **kwargs),
+    )
