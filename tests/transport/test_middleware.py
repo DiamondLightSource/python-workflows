@@ -79,12 +79,25 @@ def test_prometheus_middleware():
     offline.broadcast(str(mock.sentinel.channel), str(mock.sentinel.message))
 
     def callback(header, message):
+        print(header)
         time.sleep(1)
 
-    subscription_id = offline.subscribe(str(mock.sentinel.channel), callback)
-    offline.subscription_callback(subscription_id)(
+    sid_1 = offline.subscribe(str(mock.sentinel.channel), callback)
+    offline.subscription_callback(sid_1)(
         {"destination": "foo"}, str(mock.sentinel.message)
     )
+
+    sid_2 = offline.subscribe_broadcast(str(mock.sentinel.channel), callback)
+    offline.subscription_callback(sid_2)(
+        {"destination": "bar"}, str(mock.sentinel.message)
+    )
+
+    ts = offline.subscribe_temporary(str(mock.sentinel.channel), callback)
+    offline.subscription_callback(ts.subscription_id)(
+        {"destination": "foobar"}, str(mock.sentinel.message)
+    )
+
+    offline.unsubscribe(sid_2)
 
     txid = offline.transaction_begin()
     offline.transaction_abort(txid)
@@ -95,10 +108,15 @@ def test_prometheus_middleware():
     txid = offline.transaction_begin()
 
     data = prometheus_client.generate_latest().decode("ascii")
+    print(data)
     expected_output = """
-workflows_callback_processing_time_seconds_bucket{le="+Inf",source="foo"} 1.0
-workflows_callback_processing_time_seconds_count{source="foo"} 1.0
+workflows_callback_processing_time_seconds_bucket{le="+Inf",source="foo"} 3.0
+workflows_callback_processing_time_seconds_count{source="foo"} 3.0
+workflows_callback_processing_time_seconds_sum{source="foo"}
+workflows_transport_active_subscriptions{source="foo"} 2.0
 workflows_transport_subscriptions_total{source="foo"} 1.0
+workflows_transport_temporary_subscriptions_total{source="foo"} 1.0
+workflows_transport_broadcast_subscriptions_total{source="foo"} 1.0
 workflows_transport_ack_total{source="foo"} 1.0
 workflows_transport_nack_total{source="foo"} 1.0
 workflows_transport_send_total{source="foo"} 10.0
@@ -107,5 +125,5 @@ workflows_transport_transaction_abort_total{source="foo"} 1.0
 workflows_transport_transaction_commit_total{source="foo"} 1.0
 workflows_transport_transactions_in_progress{source="foo"} 1.0
 """
-    for line in expected_output:
+    for line in expected_output.splitlines():
         assert line in data

@@ -3,7 +3,13 @@ from __future__ import annotations
 import logging
 import time
 from functools import reduce
-from typing import Callable, Optional, Type
+from typing import TYPE_CHECKING, Callable, Optional, Type
+
+if TYPE_CHECKING:
+    from workflows.transport.common_transport import (
+        MessageCallback,
+        TemporarySubscription,
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -11,6 +17,31 @@ logger = logging.getLogger(__name__)
 class BaseTransportMiddleware:
     def subscribe(self, call_next: Callable, channel, callback, **kwargs) -> int:
         return call_next(channel, callback, **kwargs)
+
+    def subscribe_temporary(
+        self,
+        call_next: Callable,
+        channel_hint: Optional[str],
+        callback: MessageCallback,
+        **kwargs,
+    ) -> TemporarySubscription:
+        return call_next(channel_hint, callback, **kwargs)
+
+    def subscribe_broadcast(
+        self, call_next: Callable, channel, callback, **kwargs
+    ) -> int:
+        return call_next(channel, callback, **kwargs)
+
+    def unsubscribe(
+        self,
+        call_next: Callable,
+        subscription: int,
+        drop_callback_reference=False,
+        **kwargs,
+    ):
+        call_next(
+            subscription, drop_callback_reference=drop_callback_reference, **kwargs
+        )
 
     def send(self, call_next: Callable, destination, message, **kwargs):
         call_next(destination, message, **kwargs)
@@ -61,6 +92,7 @@ class BaseTransportMiddleware:
 class CounterMiddleware(BaseTransportMiddleware):
     def __init__(self):
         self.subscribe_count = 0
+        self.subscribe_broadcast_count = 0
         self.send_count = 0
         self.broadcast_count = 0
         self.ack_count = 0

@@ -122,35 +122,44 @@ class CommonTransport:
         :return: A named tuple containing a unique subscription ID and the actual
                  queue name which can then be referenced by other senders.
         """
-        self.__subscription_id += 1
 
-        def _(header: Mapping[str, Any], message: Any) -> None:
-            callback(header, self._mangle_for_receiving(message))
+        def wrap_subscribe_temporary(
+            channel_hint, callback, **kwargs
+        ) -> TemporarySubscription:
+            self.__subscription_id += 1
 
-        mangled_callback: MessageCallback = _
+            def _(header: Mapping[str, Any], message: Any) -> None:
+                callback(header, self._mangle_for_receiving(message))
 
-        if "disable_mangling" in kwargs:
-            if kwargs["disable_mangling"]:
-                mangled_callback = callback  # noqa:F811
-            del kwargs["disable_mangling"]
-        self.__subscriptions[self.__subscription_id] = {
-            # "channel": channel,
-            "callback": mangled_callback,
-            "ack": kwargs.get("acknowledgement"),
-            "unsubscribed": False,
-        }
-        self.log.debug(
-            "Subscribing to temporary queue (name hint: %r) with ID %d",
-            channel_hint,
-            self.__subscription_id,
+            mangled_callback: MessageCallback = _
+
+            if "disable_mangling" in kwargs:
+                if kwargs["disable_mangling"]:
+                    mangled_callback = callback  # noqa:F811
+                del kwargs["disable_mangling"]
+            self.__subscriptions[self.__subscription_id] = {
+                # "channel": channel,
+                "callback": mangled_callback,
+                "ack": kwargs.get("acknowledgement"),
+                "unsubscribed": False,
+            }
+            self.log.debug(
+                "Subscribing to temporary queue (name hint: %r) with ID %d",
+                channel_hint,
+                self.__subscription_id,
+            )
+            queue_name = self._subscribe_temporary(
+                self.__subscription_id, channel_hint, mangled_callback, **kwargs
+            )
+
+            return TemporarySubscription(
+                subscription_id=self.__subscription_id, queue_name=queue_name
+            )
+
+        wrapped = middleware.wrap(
+            wrap_subscribe_temporary, "subscribe_temporary", middleware=self.middleware
         )
-        queue_name = self._subscribe_temporary(
-            self.__subscription_id, channel_hint, mangled_callback, **kwargs
-        )
-
-        return TemporarySubscription(
-            subscription_id=self.__subscription_id, queue_name=queue_name
-        )
+        return wrapped(channel_hint, callback, **kwargs)
 
     def unsubscribe(self, subscription: int, drop_callback_reference=False, **kwargs):
         """Stop listening to a queue or a broadcast
@@ -163,16 +172,23 @@ class CommonTransport:
                                         raised instead.
         :param **kwargs: Further parameters for the transport layer.
         """
-        if subscription not in self.__subscriptions:
-            raise workflows.Error("Attempting to unsubscribe unknown subscription")
-        if self.__subscriptions[subscription]["unsubscribed"]:
-            raise workflows.Error(
-                "Attempting to unsubscribe already unsubscribed subscription"
-            )
-        self._unsubscribe(subscription, **kwargs)
-        self.__subscriptions[subscription]["unsubscribed"] = True
-        if drop_callback_reference:
-            self.drop_callback_reference(subscription)
+
+        def wrap_unsubscribe(subscription, drop_callback_reference, **kwargs):
+            if subscription not in self.__subscriptions:
+                raise workflows.Error("Attempting to unsubscribe unknown subscription")
+            if self.__subscriptions[subscription]["unsubscribed"]:
+                raise workflows.Error(
+                    "Attempting to unsubscribe already unsubscribed subscription"
+                )
+            self._unsubscribe(subscription, **kwargs)
+            self.__subscriptions[subscription]["unsubscribed"] = True
+            if drop_callback_reference:
+                self.drop_callback_reference(subscription)
+
+        wrapped = middleware.wrap(
+            wrap_unsubscribe, "unsubscribe", middleware=self.middleware
+        )
+        wrapped(subscription, drop_callback_reference=drop_callback_reference, **kwargs)
 
     def drop_callback_reference(self, subscription: int):
         """Drop reference to the callback function after unsubscribing.
@@ -201,30 +217,37 @@ class CommonTransport:
                retroactive: Ask broker to send old messages if possible
         :return: A unique subscription ID
         """
-        self.__subscription_id += 1
 
-        def mangled_callback(header, message):
-            return callback(header, self._mangle_for_receiving(message))
+        def wrap_subscribe_broadcast(channel, callback, **kwargs) -> int:
+            self.__subscription_id += 1
 
-        if "disable_mangling" in kwargs:
-            if kwargs["disable_mangling"]:
-                mangled_callback = callback  # noqa:F811
-            del kwargs["disable_mangling"]
-        self.__subscriptions[self.__subscription_id] = {
-            "channel": channel,
-            "callback": mangled_callback,
-            "ack": False,
-            "unsubscribed": False,
-        }
-        self.log.debug(
-            "Subscribing to broadcasts on %s with ID %d",
-            channel,
-            self.__subscription_id,
+            def mangled_callback(header, message):
+                return callback(header, self._mangle_for_receiving(message))
+
+            if "disable_mangling" in kwargs:
+                if kwargs["disable_mangling"]:
+                    mangled_callback = callback  # noqa:F811
+                del kwargs["disable_mangling"]
+            self.__subscriptions[self.__subscription_id] = {
+                "channel": channel,
+                "callback": mangled_callback,
+                "ack": False,
+                "unsubscribed": False,
+            }
+            self.log.debug(
+                "Subscribing to broadcasts on %s with ID %d",
+                channel,
+                self.__subscription_id,
+            )
+            self._subscribe_broadcast(
+                self.__subscription_id, channel, mangled_callback, **kwargs
+            )
+            return self.__subscription_id
+
+        wrapped = middleware.wrap(
+            wrap_subscribe_broadcast, "subscribe_broadcast", middleware=self.middleware
         )
-        self._subscribe_broadcast(
-            self.__subscription_id, channel, mangled_callback, **kwargs
-        )
-        return self.__subscription_id
+        return wrapped(channel, callback, **kwargs)
 
     def subscription_callback(self, subscription: int) -> MessageCallback:
         """Retrieve the callback function for a subscription. Raise a

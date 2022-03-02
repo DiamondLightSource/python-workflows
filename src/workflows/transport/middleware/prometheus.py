@@ -5,10 +5,27 @@ from typing import Callable, Optional
 
 from prometheus_client import Counter, Gauge, Histogram
 
+from workflows.transport.common_transport import MessageCallback, TemporarySubscription
+
 from . import BaseTransportMiddleware
 
 SUBSCRIPTIONS = Counter(
     "workflows_transport_subscriptions_total",
+    "The total number of transport subscriptions",
+    ["source"],
+)
+BROADCAST_SUBSCRIPTIONS = Counter(
+    "workflows_transport_broadcast_subscriptions_total",
+    "The total number of transport broadcast subscriptions",
+    ["source"],
+)
+TEMPORARY_SUBSCRIPTIONS = Counter(
+    "workflows_transport_temporary_subscriptions_total",
+    "The total number of transport temporary subscriptions",
+    ["source"],
+)
+ACTIVE_SUBSCRIPTIONS = Gauge(
+    "workflows_transport_active_subscriptions",
     "The total number of transport subscriptions",
     ["source"],
 )
@@ -74,7 +91,57 @@ class PrometheusMiddleware(BaseTransportMiddleware):
             return result
 
         SUBSCRIPTIONS.labels(source=self.source).inc()
+        ACTIVE_SUBSCRIPTIONS.labels(source=self.source).inc()
         return call_next(channel, wrapped_callback, **kwargs)
+
+    def subscribe_temporary(
+        self,
+        call_next: Callable,
+        channel_hint: Optional[str],
+        callback: MessageCallback,
+        **kwargs,
+    ) -> TemporarySubscription:
+        def wrapped_callback(header, message):
+            start_time = time.perf_counter()
+            result = callback(header, message)
+            end_time = time.perf_counter()
+            CALLBACK_PROCESSING_TIME.labels(source=self.source).observe(
+                end_time - start_time
+            )
+            return result
+
+        TEMPORARY_SUBSCRIPTIONS.labels(source=self.source).inc()
+        ACTIVE_SUBSCRIPTIONS.labels(source=self.source).inc()
+        return call_next(channel_hint, wrapped_callback, **kwargs)
+
+    def subscribe_broadcast(
+        self, call_next: Callable, channel, callback, **kwargs
+    ) -> int:
+        def wrapped_callback(header, message):
+            start_time = time.perf_counter()
+            result = callback(header, message)
+            end_time = time.perf_counter()
+            CALLBACK_PROCESSING_TIME.labels(source=self.source).observe(
+                end_time - start_time
+            )
+            print(f"{end_time - start_time: .3f}")
+            return result
+
+        BROADCAST_SUBSCRIPTIONS.labels(source=self.source).inc()
+        ACTIVE_SUBSCRIPTIONS.labels(source=self.source).inc()
+        return call_next(channel, wrapped_callback, **kwargs)
+
+    def unsubscribe(
+        self,
+        call_next: Callable,
+        subscription: int,
+        drop_callback_reference=False,
+        **kwargs,
+    ):
+        ACTIVE_SUBSCRIPTIONS.labels(source=self.source).dec()
+        call_next(
+            subscription, drop_callback_reference=drop_callback_reference, **kwargs
+        )
 
     def send(self, call_next: Callable, destination, message, **kwargs):
         SENDS.labels(source=self.source).inc()
@@ -85,7 +152,7 @@ class PrometheusMiddleware(BaseTransportMiddleware):
         call_next: Callable,
         message,
         subscription_id: Optional[int] = None,
-        **kwargs
+        **kwargs,
     ):
         ACKS.labels(source=self.source).inc()
         call_next(message, subscription_id=subscription_id, **kwargs)
@@ -95,7 +162,7 @@ class PrometheusMiddleware(BaseTransportMiddleware):
         call_next: Callable,
         message,
         subscription_id: Optional[int] = None,
-        **kwargs
+        **kwargs,
     ):
         NACKS.labels(source=self.source).inc()
         call_next(message, subscription_id=subscription_id, **kwargs)
