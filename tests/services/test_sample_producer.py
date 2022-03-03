@@ -2,8 +2,11 @@ from __future__ import annotations
 
 from unittest import mock
 
+import pytest
+
 import workflows.services
 import workflows.services.sample_producer
+from workflows.transport.offline_transport import OfflineTransport
 
 
 def test_service_can_be_looked_up():
@@ -41,3 +44,23 @@ def test_service_produces_messages():
     calls = mock_transport.send.call_args_list
     assert calls[0][0][0] == calls[1][0][0]  # same destination
     assert calls[0][0][1] != calls[1][0][1]  # different message
+
+
+def test_service_with_metrics(mocker):
+    prometheus_client = pytest.importorskip("prometheus_client")
+    t = OfflineTransport()
+    mock_start_http_server = mocker.patch("prometheus_client.start_http_server")
+
+    p = workflows.services.sample_producer.SampleProducer(
+        environment={"metrics": {"port": 4242}}
+    )
+    p.transport = t
+    p.start()
+
+    mock_start_http_server.assert_called_with(port=4242)
+
+    p.create_message()
+    p.create_message()
+
+    data = prometheus_client.generate_latest().decode("ascii")
+    assert 'workflows_transport_send_total{source="SampleProducer"} 2.0' in data

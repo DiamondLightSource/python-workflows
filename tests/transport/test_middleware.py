@@ -108,7 +108,6 @@ def test_prometheus_middleware():
     txid = offline.transaction_begin()
 
     data = prometheus_client.generate_latest().decode("ascii")
-    print(data)
     expected_output = """
 workflows_callback_processing_time_seconds_bucket{le="+Inf",source="foo"} 3.0
 workflows_callback_processing_time_seconds_count{source="foo"} 3.0
