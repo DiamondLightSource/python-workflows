@@ -505,10 +505,12 @@ class PikaTransport(CommonTransport):
         """
         if not headers:
             headers = {}
-        assert delay is None, "Not implemented"
 
-        # if delay:
-        #     headers["x-delay"] = 1000 * delay
+        if delay:
+            headers["x-delay"] = 1000 * delay
+            exchange = "delayed"
+        else:
+            exchange = ""
 
         properties = pika.BasicProperties(
             headers=headers,
@@ -518,7 +520,7 @@ class PikaTransport(CommonTransport):
             properties.expiration = str(expiration * 1000)
 
         self._pika_thread.send(
-            exchange="",
+            exchange=exchange,
             routing_key=str(destination),
             body=message,
             properties=properties,
