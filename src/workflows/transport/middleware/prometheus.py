@@ -33,6 +33,7 @@ CALLBACK_PROCESSING_TIME = Histogram(
     "workflows_callback_processing_time_seconds",
     "Histogram of callback processing time (in seconds)",
     ["source"],
+    unit="seconds",
 )
 ACKS = Counter(
     "workflows_transport_ack_total",
