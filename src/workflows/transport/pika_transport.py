@@ -68,7 +68,7 @@ class PikaTransport(CommonTransport):
         self._conn = None
         self._connected = False
         self._lock = threading.RLock()
-        self._pika_thread: _PikaThread | None = None
+        self._pika_thread: _PikaThread
         self._vhost = "/"
         super().__init__(middleware=middleware)
 
@@ -287,7 +287,7 @@ class PikaTransport(CommonTransport):
     def connect(self) -> bool:
         """Ensure both connection and channel to the RabbitMQ server are open."""
         with self._lock:
-            if self._pika_thread is None:
+            if not hasattr(self, "_pika_thread"):
                 self._pika_thread = _PikaThread(self._generate_connection_parameters())
         try:
             self._pika_thread.start()
@@ -302,7 +302,7 @@ class PikaTransport(CommonTransport):
         """Return connection status."""
         # TODO: Does this question even make sense with reconnection?
         #       Surely .connection_alive is (slightly) better?
-        return self._pika_thread is not None and self._pika_thread.connection_alive
+        return hasattr(self, "_pika_thread") and self._pika_thread.connection_alive
 
     def disconnect(self):
         """Gracefully close connection to pika server"""
