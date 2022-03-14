@@ -275,12 +275,14 @@ def test_send_message(mockpika, mock_pikathread):
         str(mock.sentinel.queue),
         mock.sentinel.message,
         headers={"hdr": mock.sentinel.header},
-        delay=123,
+        delay=123.456,
     )
-    assert mockproperties.call_args[1].get("headers") == {
+    headers = mockproperties.call_args[1].get("headers")
+    assert headers == {
         "hdr": mock.sentinel.header,
-        "x-delay": 123000,
+        "x-delay": 123456,
     }
+    assert isinstance(headers["x-delay"], int)
     assert int(mockproperties.call_args[1].get("delivery_mode")) == 2
 
     # assert mockchannel.basic_publish.call_count == 2
