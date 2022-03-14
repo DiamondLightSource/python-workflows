@@ -185,7 +185,8 @@ class CommonService:
             self.transport.subscription_callback_set_intercept(
                 self._transport_interceptor
             )
-            if metrics := self._environment.get("metrics"):
+            metrics = self._environment.get("metrics")
+            if metrics:
                 import prometheus_client
 
                 from workflows.transport.middleware.prometheus import (
