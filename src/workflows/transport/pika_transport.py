@@ -507,7 +507,7 @@ class PikaTransport(CommonTransport):
             headers = {}
 
         if delay:
-            headers["x-delay"] = 1000 * delay
+            headers["x-delay"] = int(1000 * delay)
             exchange = "delayed"
         else:
             exchange = ""
