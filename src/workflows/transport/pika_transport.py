@@ -993,7 +993,7 @@ class _PikaThread(threading.Thread):
                     temporary_queue_name = channel.queue_declare(
                         queue, auto_delete=True, exclusive=True, durable=False
                     ).method.queue
-                    channel.queue_bind(exchange="delayed", queue=temporary_queue_name)
+                    channel.queue_bind(queue=temporary_queue_name, exchange="delayed")
                     temporary_subscription = _PikaSubscription(
                         arguments={},
                         auto_ack=auto_ack,
