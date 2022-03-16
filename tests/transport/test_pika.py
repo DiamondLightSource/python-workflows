@@ -1306,9 +1306,9 @@ def test_full_stack_temporary_queue_roundtrip(pikatransport):
 
     outstanding_messages = set()
     for n in range(6):
+        delay = 1 if n == 1 else None
         outstanding_messages.add((n, f"message {n}"))
-        pikatransport.send(ts[n].queue_name, f"message {n}")
-
+        pikatransport.send(ts[n].queue_name, f"message {n}", delay=delay)
     try:
         while outstanding_messages:
             s, _, m = replies.get(timeout=1.5)
