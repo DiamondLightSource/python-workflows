@@ -55,6 +55,11 @@ def pikatransport(revert_classvariables, connection_params):
     # every individual test.
     pt = PikaTransport()
     pt.connect()
+    pt._pika_thread._get_shared_channel().exchange_declare(
+        "delayed",
+        exchange_type="x-delayed-message",
+        arguments={"x-delayed-type": "direct"},
+    )
     yield pt
     pt.disconnect()
 
