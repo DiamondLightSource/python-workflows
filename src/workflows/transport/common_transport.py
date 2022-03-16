@@ -63,6 +63,7 @@ class CommonTransport:
         """Gracefully disconnect the transport class. This function should be
         overridden."""
 
+    @middleware.wrap
     def subscribe(self, channel, callback, **kwargs) -> int:
         """Listen to a queue, notify via callback function.
         :param channel: Queue name to subscribe to
@@ -77,33 +78,26 @@ class CommonTransport:
         :return: A unique subscription ID
         """
 
-        def wrap_subscribe(channel, callback, **kwargs):
-            self.__subscription_id += 1
+        self.__subscription_id += 1
 
-            def mangled_callback(header, message):
-                return callback(header, self._mangle_for_receiving(message))
+        def mangled_callback(header, message):
+            return callback(header, self._mangle_for_receiving(message))
 
-            if "disable_mangling" in kwargs:
-                if kwargs["disable_mangling"]:
-                    mangled_callback = callback  # noqa:F811
-                del kwargs["disable_mangling"]
-            self.__subscriptions[self.__subscription_id] = {
-                "channel": channel,
-                "callback": mangled_callback,
-                "ack": kwargs.get("acknowledgement"),
-                "unsubscribed": False,
-            }
-            self.log.debug(
-                "Subscribing to %s with ID %d", channel, self.__subscription_id
-            )
-            self._subscribe(self.__subscription_id, channel, mangled_callback, **kwargs)
-            return self.__subscription_id
+        if "disable_mangling" in kwargs:
+            if kwargs["disable_mangling"]:
+                mangled_callback = callback  # noqa:F811
+            del kwargs["disable_mangling"]
+        self.__subscriptions[self.__subscription_id] = {
+            "channel": channel,
+            "callback": mangled_callback,
+            "ack": kwargs.get("acknowledgement"),
+            "unsubscribed": False,
+        }
+        self.log.debug("Subscribing to %s with ID %d", channel, self.__subscription_id)
+        self._subscribe(self.__subscription_id, channel, mangled_callback, **kwargs)
+        return self.__subscription_id
 
-        wrapped = middleware.wrap(
-            wrap_subscribe, "subscribe", middleware=self.middleware
-        )
-        return wrapped(channel, callback, **kwargs)
-
+    @middleware.wrap
     def subscribe_temporary(
         self, channel_hint: Optional[str], callback: MessageCallback, **kwargs
     ) -> TemporarySubscription:
@@ -123,44 +117,37 @@ class CommonTransport:
                  queue name which can then be referenced by other senders.
         """
 
-        def wrap_subscribe_temporary(
-            channel_hint, callback, **kwargs
-        ) -> TemporarySubscription:
-            self.__subscription_id += 1
+        self.__subscription_id += 1
 
-            def _(header: Mapping[str, Any], message: Any) -> None:
-                callback(header, self._mangle_for_receiving(message))
+        def _(header: Mapping[str, Any], message: Any) -> None:
+            callback(header, self._mangle_for_receiving(message))
 
-            mangled_callback: MessageCallback = _
+        mangled_callback: MessageCallback = _
 
-            if "disable_mangling" in kwargs:
-                if kwargs["disable_mangling"]:
-                    mangled_callback = callback  # noqa:F811
-                del kwargs["disable_mangling"]
-            self.__subscriptions[self.__subscription_id] = {
-                # "channel": channel,
-                "callback": mangled_callback,
-                "ack": kwargs.get("acknowledgement"),
-                "unsubscribed": False,
-            }
-            self.log.debug(
-                "Subscribing to temporary queue (name hint: %r) with ID %d",
-                channel_hint,
-                self.__subscription_id,
-            )
-            queue_name = self._subscribe_temporary(
-                self.__subscription_id, channel_hint, mangled_callback, **kwargs
-            )
-
-            return TemporarySubscription(
-                subscription_id=self.__subscription_id, queue_name=queue_name
-            )
-
-        wrapped = middleware.wrap(
-            wrap_subscribe_temporary, "subscribe_temporary", middleware=self.middleware
+        if "disable_mangling" in kwargs:
+            if kwargs["disable_mangling"]:
+                mangled_callback = callback  # noqa:F811
+            del kwargs["disable_mangling"]
+        self.__subscriptions[self.__subscription_id] = {
+            # "channel": channel,
+            "callback": mangled_callback,
+            "ack": kwargs.get("acknowledgement"),
+            "unsubscribed": False,
+        }
+        self.log.debug(
+            "Subscribing to temporary queue (name hint: %r) with ID %d",
+            channel_hint,
+            self.__subscription_id,
         )
-        return wrapped(channel_hint, callback, **kwargs)
+        queue_name = self._subscribe_temporary(
+            self.__subscription_id, channel_hint, mangled_callback, **kwargs
+        )
 
+        return TemporarySubscription(
+            subscription_id=self.__subscription_id, queue_name=queue_name
+        )
+
+    @middleware.wrap
     def unsubscribe(self, subscription: int, drop_callback_reference=False, **kwargs):
         """Stop listening to a queue or a broadcast
         :param subscription: Subscription ID to cancel
@@ -173,22 +160,16 @@ class CommonTransport:
         :param **kwargs: Further parameters for the transport layer.
         """
 
-        def wrap_unsubscribe(subscription, drop_callback_reference, **kwargs):
-            if subscription not in self.__subscriptions:
-                raise workflows.Error("Attempting to unsubscribe unknown subscription")
-            if self.__subscriptions[subscription]["unsubscribed"]:
-                raise workflows.Error(
-                    "Attempting to unsubscribe already unsubscribed subscription"
-                )
-            self._unsubscribe(subscription, **kwargs)
-            self.__subscriptions[subscription]["unsubscribed"] = True
-            if drop_callback_reference:
-                self.drop_callback_reference(subscription)
-
-        wrapped = middleware.wrap(
-            wrap_unsubscribe, "unsubscribe", middleware=self.middleware
-        )
-        wrapped(subscription, drop_callback_reference=drop_callback_reference, **kwargs)
+        if subscription not in self.__subscriptions:
+            raise workflows.Error("Attempting to unsubscribe unknown subscription")
+        if self.__subscriptions[subscription]["unsubscribed"]:
+            raise workflows.Error(
+                "Attempting to unsubscribe already unsubscribed subscription"
+            )
+        self._unsubscribe(subscription, **kwargs)
+        self.__subscriptions[subscription]["unsubscribed"] = True
+        if drop_callback_reference:
+            self.drop_callback_reference(subscription)
 
     def drop_callback_reference(self, subscription: int):
         """Drop reference to the callback function after unsubscribing.
@@ -206,6 +187,7 @@ class CommonTransport:
             )
         del self.__subscriptions[subscription]
 
+    @middleware.wrap
     def subscribe_broadcast(self, channel, callback, **kwargs) -> int:
         """Listen to a broadcast topic, notify via callback function.
         :param channel: Topic name to subscribe to
@@ -218,36 +200,30 @@ class CommonTransport:
         :return: A unique subscription ID
         """
 
-        def wrap_subscribe_broadcast(channel, callback, **kwargs) -> int:
-            self.__subscription_id += 1
+        self.__subscription_id += 1
 
-            def mangled_callback(header, message):
-                return callback(header, self._mangle_for_receiving(message))
+        def mangled_callback(header, message):
+            return callback(header, self._mangle_for_receiving(message))
 
-            if "disable_mangling" in kwargs:
-                if kwargs["disable_mangling"]:
-                    mangled_callback = callback  # noqa:F811
-                del kwargs["disable_mangling"]
-            self.__subscriptions[self.__subscription_id] = {
-                "channel": channel,
-                "callback": mangled_callback,
-                "ack": False,
-                "unsubscribed": False,
-            }
-            self.log.debug(
-                "Subscribing to broadcasts on %s with ID %d",
-                channel,
-                self.__subscription_id,
-            )
-            self._subscribe_broadcast(
-                self.__subscription_id, channel, mangled_callback, **kwargs
-            )
-            return self.__subscription_id
-
-        wrapped = middleware.wrap(
-            wrap_subscribe_broadcast, "subscribe_broadcast", middleware=self.middleware
+        if "disable_mangling" in kwargs:
+            if kwargs["disable_mangling"]:
+                mangled_callback = callback  # noqa:F811
+            del kwargs["disable_mangling"]
+        self.__subscriptions[self.__subscription_id] = {
+            "channel": channel,
+            "callback": mangled_callback,
+            "ack": False,
+            "unsubscribed": False,
+        }
+        self.log.debug(
+            "Subscribing to broadcasts on %s with ID %d",
+            channel,
+            self.__subscription_id,
         )
-        return wrapped(channel, callback, **kwargs)
+        self._subscribe_broadcast(
+            self.__subscription_id, channel, mangled_callback, **kwargs
+        )
+        return self.__subscription_id
 
     def subscription_callback(self, subscription: int) -> MessageCallback:
         """Retrieve the callback function for a subscription. Raise a
@@ -275,6 +251,7 @@ class CommonTransport:
         """
         self.__callback_interceptor = interceptor
 
+    @middleware.wrap
     def send(self, destination, message, **kwargs):
         """Send a message to a queue.
         :param destination: Queue name to send to
@@ -287,13 +264,10 @@ class CommonTransport:
                             transaction
         """
 
-        def wrap_send(destination, message, **kwargs):
-            message = self._mangle_for_sending(message)
-            self._send(destination, message, **kwargs)
+        message = self._mangle_for_sending(message)
+        self._send(destination, message, **kwargs)
 
-        wrapped = middleware.wrap(wrap_send, "send", middleware=self.middleware)
-        wrapped(destination, message, **kwargs)
-
+    @middleware.wrap
     def raw_send(self, destination, message, **kwargs):
         """Send a raw (unmangled) message to a queue.
         This may cause errors if the receiver expects a mangled message.
@@ -307,12 +281,9 @@ class CommonTransport:
                             transaction
         """
 
-        def wrap_send(destination, message, **kwargs):
-            self._send(destination, message, **kwargs)
+        self._send(destination, message, **kwargs)
 
-        wrapped = middleware.wrap(wrap_send, "raw_send", middleware=self.middleware)
-        wrapped(destination, message, **kwargs)
-
+    @middleware.wrap
     def broadcast(self, destination, message, **kwargs):
         """Broadcast a message.
         :param destination: Topic name to send to
@@ -325,15 +296,10 @@ class CommonTransport:
                             transaction
         """
 
-        def wrap_broadcast(destination, message, **kwargs):
-            message = self._mangle_for_sending(message)
-            self._broadcast(destination, message, **kwargs)
+        message = self._mangle_for_sending(message)
+        self._broadcast(destination, message, **kwargs)
 
-        wrapped = middleware.wrap(
-            wrap_broadcast, "broadcast", middleware=self.middleware
-        )
-        wrapped(destination, message, **kwargs)
-
+    @middleware.wrap
     def raw_broadcast(self, destination, message, **kwargs):
         """Broadcast a raw (unmangled) message.
         This may cause errors if the receiver expects a mangled message.
@@ -347,14 +313,9 @@ class CommonTransport:
                             transaction
         """
 
-        def wrap_broadcast(destination, message, **kwargs):
-            self._broadcast(destination, message, **kwargs)
+        self._broadcast(destination, message, **kwargs)
 
-        wrapped = middleware.wrap(
-            wrap_broadcast, "raw_broadcast", middleware=self.middleware
-        )
-        wrapped(destination, message, **kwargs)
-
+    @middleware.wrap
     def ack(self, message, subscription_id: Optional[int] = None, **kwargs):
         """Acknowledge receipt of a message. This only makes sense when the
         'acknowledgement' flag was set for the relevant subscription.
@@ -368,29 +329,24 @@ class CommonTransport:
                             a transaction
         """
 
-        def wrap_ack(message, subscription_id=None, **kwargs):
-            if isinstance(message, dict):
-                message_id = message.get("message-id")
-                if not subscription_id:
-                    subscription_id = message.get("subscription")
-            else:
-                message_id = message
-            if not message_id:
-                raise workflows.Error("Cannot acknowledge message without message ID")
+        if isinstance(message, dict):
+            message_id = message.get("message-id")
             if not subscription_id:
-                raise workflows.Error(
-                    "Cannot acknowledge message without subscription ID"
-                )
-            self.log.debug(
-                "Acknowledging message %s on subscription %s",
-                message_id,
-                subscription_id,
-            )
-            self._ack(message_id, subscription_id=subscription_id, **kwargs)
+                subscription_id = message.get("subscription")
+        else:
+            message_id = message
+        if not message_id:
+            raise workflows.Error("Cannot acknowledge message without message ID")
+        if not subscription_id:
+            raise workflows.Error("Cannot acknowledge message without subscription ID")
+        self.log.debug(
+            "Acknowledging message %s on subscription %s",
+            message_id,
+            subscription_id,
+        )
+        self._ack(message_id, subscription_id=subscription_id, **kwargs)
 
-        wrapped = middleware.wrap(wrap_ack, "ack", middleware=self.middleware)
-        wrapped(message, subscription_id, **kwargs)
-
+    @middleware.wrap
     def nack(self, message, subscription_id: Optional[int] = None, **kwargs):
         """Reject receipt of a message. This only makes sense when the
         'acknowledgement' flag was set for the relevant subscription.
@@ -404,87 +360,68 @@ class CommonTransport:
                             transaction
         """
 
-        def wrap_nack(message, subscription_id=None, **kwargs):
-            if isinstance(message, dict):
-                message_id = message.get("message-id")
-                if not subscription_id:
-                    subscription_id = message.get("subscription")
-            else:
-                message_id = message
-            if not message_id:
-                raise workflows.Error("Cannot reject message without message ID")
+        if isinstance(message, dict):
+            message_id = message.get("message-id")
             if not subscription_id:
-                raise workflows.Error("Cannot reject message without subscription ID")
-            self.log.debug(
-                "Rejecting message %s on subscription %d", message_id, subscription_id
-            )
-            self._nack(message_id, subscription_id=subscription_id, **kwargs)
+                subscription_id = message.get("subscription")
+        else:
+            message_id = message
+        if not message_id:
+            raise workflows.Error("Cannot reject message without message ID")
+        if not subscription_id:
+            raise workflows.Error("Cannot reject message without subscription ID")
+        self.log.debug(
+            "Rejecting message %s on subscription %d", message_id, subscription_id
+        )
+        self._nack(message_id, subscription_id=subscription_id, **kwargs)
 
-        wrapped = middleware.wrap(wrap_nack, "nack", middleware=self.middleware)
-        wrapped(message, subscription_id, **kwargs)
-
+    @middleware.wrap
     def transaction_begin(self, subscription_id: Optional[int] = None, **kwargs) -> int:
         """Start a new transaction.
         :param **kwargs: Further parameters for the transport layer.
         :return: A transaction ID that can be passed to other functions.
         """
 
-        def wrap_transaction_begin(subscription_id=None, **kwargs):
-            self.__transaction_id += 1
-            self.__transactions.add(self.__transaction_id)
-            if subscription_id:
-                self.log.debug(
-                    "Starting transaction with ID %d on subscription %d",
-                    self.__transaction_id,
-                    subscription_id,
-                )
-            else:
-                self.log.debug("Starting transaction with ID %d", self.__transaction_id)
-            self._transaction_begin(
-                self.__transaction_id, subscription_id=subscription_id, **kwargs
+        self.__transaction_id += 1
+        self.__transactions.add(self.__transaction_id)
+        if subscription_id:
+            self.log.debug(
+                "Starting transaction with ID %d on subscription %d",
+                self.__transaction_id,
+                subscription_id,
             )
-            return self.__transaction_id
-
-        wrapped = middleware.wrap(
-            wrap_transaction_begin, "transaction_begin", middleware=self.middleware
+        else:
+            self.log.debug("Starting transaction with ID %d", self.__transaction_id)
+        self._transaction_begin(
+            self.__transaction_id, subscription_id=subscription_id, **kwargs
         )
-        return wrapped(subscription_id, **kwargs)
+        return self.__transaction_id
 
+    @middleware.wrap
     def transaction_abort(self, transaction_id: int, **kwargs):
         """Abort a transaction and roll back all operations.
         :param transaction_id: ID of transaction to be aborted.
         :param **kwargs: Further parameters for the transport layer.
         """
 
-        def wrap_transaction_abort(transaction_id, **kwargs):
-            if transaction_id not in self.__transactions:
-                raise workflows.Error("Attempting to abort unknown transaction")
-            self.log.debug("Aborting transaction %s", transaction_id)
-            self.__transactions.remove(transaction_id)
-            self._transaction_abort(transaction_id, **kwargs)
+        if transaction_id not in self.__transactions:
+            raise workflows.Error("Attempting to abort unknown transaction")
+        self.log.debug("Aborting transaction %s", transaction_id)
+        self.__transactions.remove(transaction_id)
+        self._transaction_abort(transaction_id, **kwargs)
 
-        wrapped = middleware.wrap(
-            wrap_transaction_abort, "transaction_abort", middleware=self.middleware
-        )
-        wrapped(transaction_id, **kwargs)
-
+    @middleware.wrap
     def transaction_commit(self, transaction_id: int, **kwargs):
         """Commit a transaction.
         :param transaction_id: ID of transaction to be committed.
         :param **kwargs: Further parameters for the transport layer.
         """
 
-        def wrap_transaction_commit(transaction_id, **kwargs):
-            if transaction_id not in self.__transactions:
-                raise workflows.Error("Attempting to commit unknown transaction")
-            self.log.debug("Committing transaction %s", transaction_id)
-            self.__transactions.remove(transaction_id)
-            self._transaction_commit(transaction_id, **kwargs)
-
-        wrapped = middleware.wrap(
-            wrap_transaction_commit, "transaction_commit", middleware=self.middleware
-        )
-        wrapped(transaction_id, **kwargs)
+        if transaction_id not in self.__transactions:
+            raise workflows.Error("Attempting to commit unknown transaction")
+        self.log.debug("Committing transaction %s", transaction_id)
+        self.__transactions.remove(transaction_id)
+        self._transaction_commit(transaction_id, **kwargs)
 
     @property
     def is_reconnectable(self):

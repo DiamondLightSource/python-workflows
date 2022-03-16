@@ -1,9 +1,9 @@
 from __future__ import annotations
 
+import functools
 import logging
 import time
-from functools import reduce
-from typing import TYPE_CHECKING, Callable, Optional, Type
+from typing import TYPE_CHECKING, Callable, Optional
 
 if TYPE_CHECKING:
     from workflows.transport.common_transport import (
@@ -175,13 +175,16 @@ class TimerMiddleware(BaseTransportMiddleware):
         logger.info(f"send() took: {end_time - start_time:.3f}")
 
 
-def wrap(
-    call: Callable, name: str, middleware: list[Type[BaseTransportMiddleware]]
-) -> Callable:
-    return reduce(
-        lambda call_next, m: lambda *args, **kwargs: getattr(m, name)(
-            call_next, *args, **kwargs
-        ),
-        reversed(middleware),
-        lambda *args, **kwargs: call(*args, **kwargs),
-    )
+def wrap(f: Callable):
+    @functools.wraps(f)
+    def wrapper(self, *args, **kwargs):
+
+        return functools.reduce(
+            lambda call_next, m: lambda *args, **kwargs: getattr(m, f.__name__)(
+                call_next, *args, **kwargs
+            ),
+            reversed(self.middleware),
+            lambda *args, **kwargs: f(self, *args, **kwargs),
+        )(*args, **kwargs)
+
+    return wrapper
