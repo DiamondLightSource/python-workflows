@@ -15,6 +15,15 @@ steps:
     cat <<EOF >Dockerfile
     FROM rabbitmq:3.9-management
     COPY rabbitmq.conf /etc/rabbitmq/rabbitmq.conf
+
+    RUN apt-get update && \
+      apt-get install -y curl unzip
+    RUN mkdir -p /plugins && \
+      curl -fsSL \
+      -o "/plugins/rabbitmq_delayed_message_exchange-3.9.0.ez" \
+      https://github.com/rabbitmq/rabbitmq-delayed-message-exchange/releases/download/3.9.0/rabbitmq_delayed_message_exchange-3.9.0.ez
+
+    RUN rabbitmq-plugins enable --offline rabbitmq_delayed_message_exchange
     EOF
 
     docker build -t azure-rabbitmq .
