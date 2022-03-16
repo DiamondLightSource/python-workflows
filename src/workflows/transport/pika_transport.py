@@ -989,13 +989,11 @@ class _PikaThread(threading.Thread):
                     assert (
                         subscription_id not in self._subscriptions
                     ), f"Subscription request {subscription_id} rejected due to existing subscription {self._subscriptions[subscription_id]}"
-                    temporary_queue_name = (
-                        self._get_shared_channel()
-                        .queue_declare(
-                            queue, auto_delete=True, exclusive=True, durable=False
-                        )
-                        .method.queue
-                    )
+                    channel = self._get_shared_channel()
+                    temporary_queue_name = channel.queue_declare(
+                        queue, auto_delete=True, exclusive=True, durable=False
+                    ).method.queue
+                    channel.queue_bind(exchange="delayed", queue=temporary_queue_name)
                     temporary_subscription = _PikaSubscription(
                         arguments={},
                         auto_ack=auto_ack,
