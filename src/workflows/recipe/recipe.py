@@ -7,10 +7,25 @@ import string
 from typing import Any, Dict
 
 from ruamel.yaml import YAML
+from ruamel.yaml.constructor import SafeConstructor
 
 import workflows
 
 basestring = (str, bytes)
+
+
+def construct_yaml_map(self, node):
+    # Test if there are duplicate node keys
+    # In the case of duplicate keys, last wins
+    data = {}
+    yield data
+    for key_node, value_node in node.value:
+        key = self.construct_object(key_node, deep=True)
+        val = self.construct_object(value_node, deep=True)
+        data[key] = val
+
+
+SafeConstructor.add_constructor("tag:yaml.org,2002:map", construct_yaml_map)
 
 
 class Recipe:
