@@ -4,11 +4,11 @@ Tests the functionality of validate.py with several different recipes which shou
 
 from __future__ import annotations
 
-import json
 import sys
 from unittest import mock
 
 import pytest
+import ruamel.yaml
 
 import workflows
 from workflows.recipe.validate import main, validate_recipe
@@ -64,8 +64,8 @@ def test_value_error_when_validating_bad_json(tmpdir):
     recipe_file = tmpdir.join("recipe.json")
     recipe_file.write(bad_json)
 
-    # Run validate with mock open, expect JSON error
-    with pytest.raises(json.JSONDecodeError):
+    # Run validate with mock open, expect parsing error
+    with pytest.raises(ruamel.yaml.parser.ParserError):
         validate_recipe(recipe_file.strpath)
 
 
