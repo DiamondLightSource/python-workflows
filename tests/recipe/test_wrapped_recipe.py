@@ -4,7 +4,7 @@ from unittest import mock
 
 import pytest
 
-import workflows
+import workflows.transport.common_transport
 from workflows.recipe import Recipe
 from workflows.recipe.wrapper import RecipeWrapper
 
