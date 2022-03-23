@@ -5,6 +5,8 @@ import json
 import string
 from typing import Any, Dict
 
+import yaml
+
 import workflows
 
 basestring = (str, bytes)
@@ -29,7 +31,7 @@ class Recipe:
     def deserialize(self, string):
         """Convert a recipe that has been stored as serialized json string to a
         data structure."""
-        return self._sanitize(json.loads(string))
+        return self._sanitize(yaml.safe_load(string))
 
     @staticmethod
     def _sanitize(recipe):

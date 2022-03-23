@@ -368,3 +368,64 @@ def test_merging_recipes():
             C.recipe.values(),
         )
     )
+
+
+def test_deserialize_json():
+    healthy_recipe = """
+        {
+          "1": {
+            "queue": "my.queue",
+            "parameters": {
+              "foo": "bar",
+              "ingredients": ["ham", "spam"],
+              "workingdir": "/path/to/workingdir",
+              "output_file": "out.txt"
+            }
+          },
+          "start": [
+            [1, []]
+          ]
+        }
+    """
+    A = workflows.recipe.Recipe(healthy_recipe)
+    assert A.recipe == {
+        "start": [(1, [])],
+        1: {
+            "queue": "my.queue",
+            "parameters": {
+                "foo": "bar",
+                "ingredients": ["ham", "spam"],
+                "workingdir": "/path/to/workingdir",
+                "output_file": "out.txt",
+            },
+        },
+    }
+
+
+def test_deserialize_yaml():
+    healthy_recipe = """
+1:
+  queue: my.queue
+  parameters:
+    foo: bar
+    ingredients:
+    - ham
+    - spam
+    workingdir: /path/to/workingdir
+    output_file: out.txt
+start:
+- [1, []]
+"""
+    A = workflows.recipe.Recipe(healthy_recipe)
+    assert A.recipe == {
+        "start": [(1, [])],
+        1: {
+            "queue": "my.queue",
+            "parameters": {
+                "foo": "bar",
+                "ingredients": ["ham", "spam"],
+                "workingdir": "/path/to/workingdir",
+                "output_file": "out.txt",
+            },
+        },
+    }

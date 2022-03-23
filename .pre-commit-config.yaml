@@ -48,4 +48,4 @@ repos:
   hooks:
   - id: mypy
     files: 'src/.*\.py$'
-    additional_dependencies: ['types-setuptools==57.0.2']
+    additional_dependencies: ['types-setuptools==57.0.2', 'types-PyYAML']

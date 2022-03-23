@@ -2,6 +2,7 @@ bidict==0.21.4
 pytest==7.1.1
 pytest-cov==3.0.0
 pytest-timeout==2.1.0
+pyyamml
 setuptools==60.10.0
 stomp.py==8.0.0
 pika==1.2.0
