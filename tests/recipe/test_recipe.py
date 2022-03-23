@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import json
 from unittest import mock
 
 import pytest
+import yaml
 
 import workflows
 import workflows.recipe
@@ -99,6 +101,9 @@ def test_serializing_and_deserializing_recipes():
     # Check that both recipies are valid
     assert A.deserialize(A.serialize()) == A.recipe
     assert B.deserialize(B.serialize()) == B.recipe
+
+    assert A.deserialize(A.serialize(format="yaml")) == A.recipe
+    assert B.deserialize(B.serialize(format="yaml")) == B.recipe
 
 
 def test_validate_tests_for_empty_recipe():
@@ -429,3 +434,40 @@ start:
             },
         },
     }
+
+
+def test_serialize_json():
+    A, B = generate_recipes()
+
+    assert (
+        A.recipe
+        == workflows.recipe.Recipe(json.loads(A.serialize(format="json"))).recipe
+    )
+    assert (
+        B.recipe
+        == workflows.recipe.Recipe(json.loads(B.serialize(format="json"))).recipe
+    )
+
+
+def test_serialize_yaml():
+    A, B = generate_recipes()
+
+    # Verify that this definitely isn't json
+    with pytest.raises(json.JSONDecodeError):
+        json.loads(A.serialize(format="yaml"))
+
+    assert (
+        A.recipe
+        == workflows.recipe.Recipe(yaml.safe_load(A.serialize(format="yaml"))).recipe
+    )
+    assert (
+        B.recipe
+        == workflows.recipe.Recipe(yaml.safe_load(B.serialize(format="yaml"))).recipe
+    )
+
+
+def test_unsupported_serialization_format_raises_error():
+    A, _ = generate_recipes()
+
+    with pytest.raises(ValueError):
+        A.serialize(format="xml")

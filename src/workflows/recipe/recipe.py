@@ -52,9 +52,17 @@ class Recipe:
             recipe["start"] = [tuple(x) for x in recipe["start"]]
         return recipe
 
-    def serialize(self):
-        """Write out the current recipe as serialized json string."""
-        return json.dumps(self.recipe)
+    def serialize(self, format: str = "json"):
+        """Write out the current recipe as serialized string.
+
+        Supported serialization formats are "json" and "yaml".
+        """
+        if format == "json":
+            return json.dumps(self.recipe)
+        elif format == "yaml":
+            return yaml.safe_dump(self.recipe)
+        else:
+            raise ValueError(f"Unsupported serialization format {format}")
 
     def pretty(self):
         """Write out the current recipe as serialized json string with pretty formatting."""
