@@ -471,3 +471,21 @@ def test_unsupported_serialization_format_raises_error():
 
     with pytest.raises(ValueError):
         A.serialize(format="xml")
+
+
+def test_json_recipe_with_pseudo_comment():
+    recipe = """
+        {
+          "1": ["This is a comment"],
+          "1": {
+            "parameters": {
+              "foo": "bar"
+            }
+          },
+          "start": [
+            [1, []]
+          ]
+        }
+    """
+    A = workflows.recipe.Recipe(recipe)
+    assert A.recipe == {"start": [(1, [])], 1: {"parameters": {"foo": "bar"}}}
