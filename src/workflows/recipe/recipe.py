@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import copy
+import io
 import json
 import string
 from typing import Any, Dict
 
-import yaml
+from ruamel.yaml import YAML
 
 import workflows
 
@@ -31,7 +32,9 @@ class Recipe:
     def deserialize(self, string):
         """Convert a recipe that has been stored as serialized json string to a
         data structure."""
-        return self._sanitize(yaml.safe_load(string))
+        with YAML(typ="safe") as yaml:
+            yaml.allow_duplicate_keys = True
+            return self._sanitize(yaml.load(string))
 
     @staticmethod
     def _sanitize(recipe):
@@ -60,7 +63,10 @@ class Recipe:
         if format == "json":
             return json.dumps(self.recipe)
         elif format == "yaml":
-            return yaml.safe_dump(self.recipe)
+            buf = io.StringIO()
+            with YAML(output=buf, typ="safe") as yaml:
+                yaml.dump(self.recipe)
+            return buf.getvalue()
         else:
             raise ValueError(f"Unsupported serialization format {format}")
 
