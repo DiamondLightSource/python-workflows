@@ -4,7 +4,7 @@ import json
 from unittest import mock
 
 import pytest
-import yaml
+from ruamel.yaml import YAML
 
 import workflows
 import workflows.recipe
@@ -456,14 +456,15 @@ def test_serialize_yaml():
     with pytest.raises(json.JSONDecodeError):
         json.loads(A.serialize(format="yaml"))
 
-    assert (
-        A.recipe
-        == workflows.recipe.Recipe(yaml.safe_load(A.serialize(format="yaml"))).recipe
-    )
-    assert (
-        B.recipe
-        == workflows.recipe.Recipe(yaml.safe_load(B.serialize(format="yaml"))).recipe
-    )
+    with YAML(typ="safe") as yaml:
+        assert (
+            A.recipe
+            == workflows.recipe.Recipe(yaml.load(A.serialize(format="yaml"))).recipe
+        )
+        assert (
+            B.recipe
+            == workflows.recipe.Recipe(yaml.load(B.serialize(format="yaml"))).recipe
+        )
 
 
 def test_unsupported_serialization_format_raises_error():
