@@ -1462,9 +1462,9 @@ class _PikaThread(threading.Thread):
                 self._exc_info = sys.exc_info()
                 # Connection failed. Are we the first?
                 if connection_counter == 0:
-                    logger.error("Initial connection failed: %r", e)
+                    logger.error(f"Initial connection failed: {e!r}")
                     break
-                logger.error("Connection %d failed: %s", connection_counter, repr(e))
+                logger.error(f"Connection {connection_counter} failed: {e!r}")
             except BaseException as e:
                 logger.error(f"Connection failed for unknown reason: {e!r}")
                 self._exc_info = sys.exc_info()
