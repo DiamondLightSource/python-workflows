@@ -1,13 +1,31 @@
 from __future__ import annotations
 
 import copy
+import io
 import json
 import string
 from typing import Any, Dict
 
+from ruamel.yaml import YAML
+from ruamel.yaml.constructor import SafeConstructor
+
 import workflows
 
 basestring = (str, bytes)
+
+
+def construct_yaml_map(self, node):
+    # Test if there are duplicate node keys
+    # In the case of duplicate keys, last wins
+    data = {}
+    yield data
+    for key_node, value_node in node.value:
+        key = self.construct_object(key_node, deep=True)
+        val = self.construct_object(value_node, deep=True)
+        data[key] = val
+
+
+SafeConstructor.add_constructor("tag:yaml.org,2002:map", construct_yaml_map)
 
 
 class Recipe:
@@ -29,7 +47,9 @@ class Recipe:
     def deserialize(self, string):
         """Convert a recipe that has been stored as serialized json string to a
         data structure."""
-        return self._sanitize(json.loads(string))
+        with YAML(typ="safe") as yaml:
+            yaml.allow_duplicate_keys = True
+            return self._sanitize(yaml.load(string))
 
     @staticmethod
     def _sanitize(recipe):
@@ -50,9 +70,20 @@ class Recipe:
             recipe["start"] = [tuple(x) for x in recipe["start"]]
         return recipe
 
-    def serialize(self):
-        """Write out the current recipe as serialized json string."""
-        return json.dumps(self.recipe)
+    def serialize(self, format: str = "json"):
+        """Write out the current recipe as serialized string.
+
+        Supported serialization formats are "json" and "yaml".
+        """
+        if format == "json":
+            return json.dumps(self.recipe)
+        elif format == "yaml":
+            buf = io.StringIO()
+            with YAML(output=buf, typ="safe") as yaml:
+                yaml.dump(self.recipe)
+            return buf.getvalue()
+        else:
+            raise ValueError(f"Unsupported serialization format {format}")
 
     def pretty(self):
         """Write out the current recipe as serialized json string with pretty formatting."""

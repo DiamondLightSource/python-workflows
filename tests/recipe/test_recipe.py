@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import json
 from unittest import mock
 
 import pytest
+from ruamel.yaml import YAML
 
 import workflows
 import workflows.recipe
@@ -99,6 +101,9 @@ def test_serializing_and_deserializing_recipes():
     # Check that both recipies are valid
     assert A.deserialize(A.serialize()) == A.recipe
     assert B.deserialize(B.serialize()) == B.recipe
+
+    assert A.deserialize(A.serialize(format="yaml")) == A.recipe
+    assert B.deserialize(B.serialize(format="yaml")) == B.recipe
 
 
 def test_validate_tests_for_empty_recipe():
@@ -368,3 +373,120 @@ def test_merging_recipes():
             C.recipe.values(),
         )
     )
+
+
+def test_deserialize_json():
+    healthy_recipe = """
+        {
+          "1": {
+            "queue": "my.queue",
+            "parameters": {
+              "foo": "bar",
+              "ingredients": ["ham", "spam"],
+              "workingdir": "/path/to/workingdir",
+              "output_file": "out.txt"
+            }
+          },
+          "start": [
+            [1, []]
+          ]
+        }
+    """
+    A = workflows.recipe.Recipe(healthy_recipe)
+    assert A.recipe == {
+        "start": [(1, [])],
+        1: {
+            "queue": "my.queue",
+            "parameters": {
+                "foo": "bar",
+                "ingredients": ["ham", "spam"],
+                "workingdir": "/path/to/workingdir",
+                "output_file": "out.txt",
+            },
+        },
+    }
+
+
+def test_deserialize_yaml():
+    healthy_recipe = """
+1:
+  queue: my.queue
+  parameters:
+    foo: bar
+    ingredients:
+    - ham
+    - spam
+    workingdir: /path/to/workingdir
+    output_file: out.txt
+start:
+- [1, []]
+"""
+    A = workflows.recipe.Recipe(healthy_recipe)
+    assert A.recipe == {
+        "start": [(1, [])],
+        1: {
+            "queue": "my.queue",
+            "parameters": {
+                "foo": "bar",
+                "ingredients": ["ham", "spam"],
+                "workingdir": "/path/to/workingdir",
+                "output_file": "out.txt",
+            },
+        },
+    }
+
+
+def test_serialize_json():
+    A, B = generate_recipes()
+
+    assert (
+        A.recipe
+        == workflows.recipe.Recipe(json.loads(A.serialize(format="json"))).recipe
+    )
+    assert (
+        B.recipe
+        == workflows.recipe.Recipe(json.loads(B.serialize(format="json"))).recipe
+    )
+
+
+def test_serialize_yaml():
+    A, B = generate_recipes()
+
+    # Verify that this definitely isn't json
+    with pytest.raises(json.JSONDecodeError):
+        json.loads(A.serialize(format="yaml"))
+
+    with YAML(typ="safe") as yaml:
+        assert (
+            A.recipe
+            == workflows.recipe.Recipe(yaml.load(A.serialize(format="yaml"))).recipe
+        )
+        assert (
+            B.recipe
+            == workflows.recipe.Recipe(yaml.load(B.serialize(format="yaml"))).recipe
+        )
+
+
+def test_unsupported_serialization_format_raises_error():
+    A, _ = generate_recipes()
+
+    with pytest.raises(ValueError):
+        A.serialize(format="xml")
+
+
+def test_json_recipe_with_pseudo_comment():
+    recipe = """
+        {
+          "1": ["This is a comment"],
+          "1": {
+            "parameters": {
+              "foo": "bar"
+            }
+          },
+          "start": [
+            [1, []]
+          ]
+        }
+    """
+    A = workflows.recipe.Recipe(recipe)
+    assert A.recipe == {"start": [(1, [])], 1: {"parameters": {"foo": "bar"}}}
