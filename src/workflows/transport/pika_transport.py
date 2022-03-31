@@ -1512,9 +1512,13 @@ class _PikaThread(threading.Thread):
     def _register_future_and_callback(
         self, future: Future[Any], callback: Callable[[], None]
     ) -> None:
-        """Make note of a future and associated callback function for
-        encapsulated send() calls so that we can keep track of them even
-        following an unexpected connection loss."""
+        """
+        Queue a callback with the connection, and record its future.
+
+        Recording the future allows us to keep track of them even
+        following an unexpected connection loss, and either send them
+        upon reconnection or mark them as failed.
+        """
         assert self._connection is not None
         assert future not in self._future_tracker, "Futures must be unique"
         self._future_tracker[future] = callback
