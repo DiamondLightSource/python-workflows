@@ -787,6 +787,10 @@ class _PikaThread(threading.Thread):
         # This is also set on complete failure, to prevent clients blocking forever
         self._connected = threading.Event()
 
+        # Internal list of all live future objects that have been returned to
+        # external callers, and that have not been resolved yet.
+        self._future_tracker: dict[Future[None], Callable[[], None]] = {}
+
     @property
     def state(self) -> _PikaThreadStatus:
         """Read the current connection state"""
@@ -838,6 +842,8 @@ class _PikaThread(threading.Thread):
         if stop:
             self.stop()
         super().join(timeout)
+        for f in list(self._future_tracker):
+            f.set_exception(workflows.Disconnected())
         if re_raise:
             self.raise_if_exception()
 
@@ -901,10 +907,11 @@ class _PikaThread(threading.Thread):
             reconnectable=reconnectable,
         )
         result: Future[None] = Future()
-        self._connection.add_callback_threadsafe(
+        self._register_future_and_callback(
+            result,
             functools.partial(
                 self._add_subscription_in_thread, subscription_id, new_sub, result
-            )
+            ),
         )
         return result
 
@@ -949,10 +956,11 @@ class _PikaThread(threading.Thread):
             reconnectable=reconnectable,
         )
         result: Future[None] = Future()
-        self._connection.add_callback_threadsafe(
+        self._register_future_and_callback(
+            result,
             functools.partial(
                 self._add_subscription_in_thread, subscription_id, new_sub, result
-            )
+            ),
         )
         return result
 
@@ -1011,7 +1019,7 @@ class _PikaThread(threading.Thread):
                 result.set_exception(e)
                 raise
 
-        self._connection.add_callback_threadsafe(_declare_subscribe_queue_in_thread)
+        self._register_future_and_callback(result, _declare_subscribe_queue_in_thread)
 
         return result
 
@@ -1045,7 +1053,7 @@ class _PikaThread(threading.Thread):
             except BaseException as e:
                 result.set_exception(e)
 
-        self._connection.add_callback_threadsafe(_unsubscribe)
+        self._register_future_and_callback(result, _unsubscribe)
 
         return result
 
@@ -1085,7 +1093,7 @@ class _PikaThread(threading.Thread):
                     future.set_exception(e)
                     raise
 
-        self._connection.add_callback_threadsafe(_send)
+        self._register_future_and_callback(future, _send)
         return future
 
     def ack(
@@ -1210,7 +1218,7 @@ class _PikaThread(threading.Thread):
                     future.set_exception(e)
                     raise
 
-        self._connection.add_callback_threadsafe(_tx_select)
+        self._register_future_and_callback(future, _tx_select)
         return future
 
     def tx_rollback(self, transaction_id: int) -> Future[None]:
@@ -1239,7 +1247,7 @@ class _PikaThread(threading.Thread):
                     future.set_exception(e)
                     raise
 
-        self._connection.add_callback_threadsafe(_tx_rollback)
+        self._register_future_and_callback(future, _tx_rollback)
         return future
 
     def tx_commit(self, transaction_id: int) -> Future[None]:
@@ -1268,7 +1276,7 @@ class _PikaThread(threading.Thread):
                     future.set_exception(e)
                     raise
 
-        self._connection.add_callback_threadsafe(_tx_commit)
+        self._register_future_and_callback(future, _tx_commit)
         return future
 
     @property
@@ -1433,6 +1441,11 @@ class _PikaThread(threading.Thread):
                 # [Re]create subscriptions
                 self._recreate_subscriptions()
 
+                # Resubmit any outstanding future-connected callbacks
+                for f, callback in self._future_tracker.items():
+                    assert not f.done(), f"Future {f} is already completed"
+                    self._connection.add_callback_threadsafe(callback)
+
                 # We set up here because we don't want to class as CONNECTED
                 # until all requested subscriptions have been actioned.
                 self._state = _PikaThreadStatus.CONNECTED
@@ -1482,6 +1495,9 @@ class _PikaThread(threading.Thread):
         if self._connection and not self._connection.is_closed:
             self._connection.close()
 
+        for f in list(self._future_tracker):
+            f.set_exception(workflows.Disconnected())
+
         self._state = _PikaThreadStatus.STOPPED
         self._please_stop.set()
 
@@ -1492,6 +1508,18 @@ class _PikaThread(threading.Thread):
         self._connected.set()
 
         logger.debug("Leaving PikaThread runloop")
+
+    def _register_future_and_callback(
+        self, future: Future[Any], callback: Callable[[], None]
+    ) -> None:
+        """Make note of a future and associated callback function for
+        encapsulated send() calls so that we can keep track of them even
+        following an unexpected connection loss."""
+        assert self._connection is not None
+        assert future not in self._future_tracker, "Futures must be unique"
+        self._future_tracker[future] = callback
+        future.add_done_callback(self._future_tracker.pop)
+        self._connection.add_callback_threadsafe(callback)
 
     def _add_subscription_in_thread(
         self,
