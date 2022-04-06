@@ -217,7 +217,7 @@ class RecipeWrapper:
                 self.recipe[destination]["queue"],
                 self._generate_full_recipe_message(destination, payload, add_path_step),
                 headers=header,
-                **dest_kwargs
+                **dest_kwargs,
             )
         if self.recipe[destination].get("topic"):
             self._retry_transport(
@@ -225,7 +225,7 @@ class RecipeWrapper:
                 self.recipe[destination]["topic"],
                 self._generate_full_recipe_message(destination, payload, add_path_step),
                 headers=header,
-                **dest_kwargs
+                **dest_kwargs,
             )
 
     def _retry_transport(self, function, *args, **kwargs):

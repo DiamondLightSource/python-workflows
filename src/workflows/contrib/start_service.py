@@ -51,7 +51,7 @@ class ServiceStarter:
         cmdline_args=None,
         program_name="start_service",
         version=workflows.version(),
-        **kwargs
+        **kwargs,
     ):
         """Example command line interface to start services.
         :param cmdline_args: List of command line arguments to pass to parser
