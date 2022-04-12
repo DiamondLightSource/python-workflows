@@ -50,7 +50,7 @@ class ServiceStarter:
         self,
         cmdline_args=None,
         program_name="start_service",
-        version=workflows.version(),
+        version=None,
         **kwargs,
     ):
         """Example command line interface to start services.
@@ -61,6 +61,11 @@ class ServiceStarter:
 
         # Enumerate all known services
         known_services = workflows.services.get_known_services()
+
+        if version:
+            version = f"{version} (workflows {workflows.version()})"
+        else:
+            version = workflows.version()
 
         # Set up parser
         parser = OptionParser(
