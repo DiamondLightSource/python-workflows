@@ -37,7 +37,10 @@ def test_script_initialises_transport_and_starts_frontend(
     )
 
     mock_tlookup.assert_called_once_with(mock.sentinel.transport)
-    mock_parser.assert_called_once_with(usage=mock.ANY, version=mock.sentinel.version)
+    mock_parser.assert_called_once_with(
+        usage=mock.ANY,
+        version=f"{mock.sentinel.version} (workflows {workflows.version()})",
+    )
     mock_frontend.Frontend.assert_called_once_with(
         service="SomeService", transport=mock_tlookup.return_value
     )
