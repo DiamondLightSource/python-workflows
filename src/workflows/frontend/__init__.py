@@ -368,7 +368,7 @@ class Frontend:
 
         if not self._service_rapidstarts:
             self._service_rapidstarts = 0
-        minimum_wait = 0.1 * (2 ** self._service_rapidstarts)
+        minimum_wait = 0.1 * (2**self._service_rapidstarts)
         minimum_wait = min(5, minimum_wait)
 
         if time_since_last_switch > 10:

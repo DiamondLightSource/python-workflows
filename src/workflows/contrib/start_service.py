@@ -50,9 +50,9 @@ class ServiceStarter:
         self,
         cmdline_args=None,
         program_name="start_service",
-        version=workflows.version(),
+        version=None,
         add_metrics_option: bool = False,
-        **kwargs
+        **kwargs,
     ):
         """Example command line interface to start services.
         :param cmdline_args: List of command line arguments to pass to parser
@@ -62,6 +62,11 @@ class ServiceStarter:
 
         # Enumerate all known services
         known_services = workflows.services.get_known_services()
+
+        if version:
+            version = f"{version} (workflows {workflows.version()})"
+        else:
+            version = workflows.version()
 
         # Set up parser
         parser = OptionParser(

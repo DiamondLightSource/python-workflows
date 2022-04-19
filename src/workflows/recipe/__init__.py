@@ -107,5 +107,5 @@ def wrap_subscribe_broadcast(transport_layer, channel, callback, *args, **kwargs
         channel,
         callback,
         *args,
-        **kwargs
+        **kwargs,
     )
