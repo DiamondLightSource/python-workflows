@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 import time
 from typing import Callable, Optional
 
@@ -81,18 +82,27 @@ class PrometheusMiddleware(BaseTransportMiddleware):
     def __init__(self, source: str):
         self.source = source
 
+    @staticmethod
+    def get_callback_source(callable: Callable):
+        module = inspect.getmodule(callable)
+        if module:
+            return f"{module.__name__}:{callable.__qualname__}"
+        return callable.__qualname__
+
     def subscribe(self, call_next: Callable, channel, callback, **kwargs) -> int:
+        source = self.get_callback_source(callback)
+
         def wrapped_callback(header, message):
             start_time = time.perf_counter()
             result = callback(header, message)
             end_time = time.perf_counter()
-            CALLBACK_PROCESSING_TIME.labels(source=self.source).observe(
+            CALLBACK_PROCESSING_TIME.labels(source=source).observe(
                 end_time - start_time
             )
             return result
 
-        SUBSCRIPTIONS.labels(source=self.source).inc()
-        ACTIVE_SUBSCRIPTIONS.labels(source=self.source).inc()
+        SUBSCRIPTIONS.labels(source=source).inc()
+        ACTIVE_SUBSCRIPTIONS.labels(source=source).inc()
         return call_next(channel, wrapped_callback, **kwargs)
 
     def subscribe_temporary(
@@ -102,34 +112,37 @@ class PrometheusMiddleware(BaseTransportMiddleware):
         callback: MessageCallback,
         **kwargs,
     ) -> TemporarySubscription:
+        source = self.get_callback_source(callback)
+
         def wrapped_callback(header, message):
             start_time = time.perf_counter()
             result = callback(header, message)
             end_time = time.perf_counter()
-            CALLBACK_PROCESSING_TIME.labels(source=self.source).observe(
+            CALLBACK_PROCESSING_TIME.labels(source=source).observe(
                 end_time - start_time
             )
             return result
 
-        TEMPORARY_SUBSCRIPTIONS.labels(source=self.source).inc()
-        ACTIVE_SUBSCRIPTIONS.labels(source=self.source).inc()
+        TEMPORARY_SUBSCRIPTIONS.labels(source=source).inc()
+        ACTIVE_SUBSCRIPTIONS.labels(source=source).inc()
         return call_next(channel_hint, wrapped_callback, **kwargs)
 
     def subscribe_broadcast(
         self, call_next: Callable, channel, callback, **kwargs
     ) -> int:
+        source = self.get_callback_source(callback)
+
         def wrapped_callback(header, message):
             start_time = time.perf_counter()
             result = callback(header, message)
             end_time = time.perf_counter()
-            CALLBACK_PROCESSING_TIME.labels(source=self.source).observe(
+            CALLBACK_PROCESSING_TIME.labels(source=source).observe(
                 end_time - start_time
             )
-            print(f"{end_time - start_time: .3f}")
             return result
 
-        BROADCAST_SUBSCRIPTIONS.labels(source=self.source).inc()
-        ACTIVE_SUBSCRIPTIONS.labels(source=self.source).inc()
+        BROADCAST_SUBSCRIPTIONS.labels(source=source).inc()
+        ACTIVE_SUBSCRIPTIONS.labels(source=source).inc()
         return call_next(channel, wrapped_callback, **kwargs)
 
     def unsubscribe(

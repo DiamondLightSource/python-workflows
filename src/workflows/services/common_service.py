@@ -194,7 +194,8 @@ class CommonService:
                 )
 
                 self.log.debug("Instrumenting transport")
-                instrument = PrometheusMiddleware(source=self.__class__.__name__)
+                source = f"{self.__module__}:{self.__class__.__name__}"
+                instrument = PrometheusMiddleware(source=source)
                 self._transport.add_middleware(instrument)
                 port = metrics["port"]
                 self.log.debug(f"Starting metrics endpoint on port {port}")
