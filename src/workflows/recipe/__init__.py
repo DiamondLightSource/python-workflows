@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import functools
+
 from workflows.recipe.recipe import Recipe
 from workflows.recipe.validate import validate_recipe
 from workflows.recipe.wrapper import RecipeWrapper
@@ -42,6 +44,7 @@ def _wrap_subscription(
     allow_non_recipe_messages = kwargs.pop("allow_non_recipe_messages", False)
     log_extender = kwargs.pop("log_extender", None)
 
+    @functools.wraps(callback)
     def unwrap_recipe(header, message):
         """This is a helper function unpacking incoming messages when they are
         in a recipe format. Other messages are passed through unmodified.
