@@ -109,9 +109,9 @@ def test_prometheus_middleware():
 
     data = prometheus_client.generate_latest().decode("ascii")
     expected_output = """
-workflows_callback_processing_time_seconds_bucket{le="+Inf",source="foo"} 3.0
-workflows_callback_processing_time_seconds_count{source="foo"} 3.0
-workflows_callback_processing_time_seconds_sum{source="foo"}
+workflows_callback_processing_time_seconds_bucket{le="+Inf",source="test_middleware:test_prometheus_middleware.<locals>.callback"} 3.0
+workflows_callback_processing_time_seconds_count{source="test_middleware:test_prometheus_middleware.<locals>.callback"} 3.0
+workflows_callback_processing_time_seconds_sum{source="test_middleware:test_prometheus_middleware.<locals>.callback"}
 workflows_transport_active_subscriptions{source="foo"} 2.0
 workflows_transport_subscriptions_total{source="foo"} 1.0
 workflows_transport_temporary_subscriptions_total{source="foo"} 1.0

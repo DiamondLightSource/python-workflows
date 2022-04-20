@@ -63,4 +63,7 @@ def test_service_with_metrics(mocker):
     p.create_message()
 
     data = prometheus_client.generate_latest().decode("ascii")
-    assert 'workflows_transport_send_total{source="SampleProducer"} 2.0' in data
+    assert (
+        'workflows_transport_send_total{source="workflows.services.sample_producer:SampleProducer"} 2.0'
+        in data
+    )
