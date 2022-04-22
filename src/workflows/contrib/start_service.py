@@ -60,7 +60,7 @@ class ServiceStarter:
         """
 
         # Enumerate all known services
-        known_services = workflows.services.get_known_services()
+        known_services = sorted(workflows.services.get_known_services())
 
         if version:
             version = f"{version} (workflows {workflows.version()})"
