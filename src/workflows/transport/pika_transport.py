@@ -12,13 +12,14 @@ import time
 import uuid
 from concurrent.futures import Future
 from enum import Enum, auto
-from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Type, Union
 
 import pika.exceptions
 from bidict import bidict
 from pika.adapters.blocking_connection import BlockingChannel
 
 import workflows.util
+from workflows.transport import middleware
 from workflows.transport.common_transport import (
     CommonTransport,
     MessageCallback,
@@ -60,13 +61,16 @@ class PikaTransport(CommonTransport):
     # Effective configuration
     config: Dict[Any, Any] = {}
 
-    def __init__(self):
+    def __init__(
+        self, middleware: list[Type[middleware.BaseTransportMiddleware]] = None
+    ):
         self._channel = None
         self._conn = None
         self._connected = False
         self._lock = threading.RLock()
-        self._pika_thread = None
+        self._pika_thread: _PikaThread
         self._vhost = "/"
+        super().__init__(middleware=middleware)
 
     def get_namespace(self) -> str:
         """Return the RabbitMQ virtual host"""
@@ -283,7 +287,7 @@ class PikaTransport(CommonTransport):
     def connect(self) -> bool:
         """Ensure both connection and channel to the RabbitMQ server are open."""
         with self._lock:
-            if not self._pika_thread:
+            if not hasattr(self, "_pika_thread"):
                 self._pika_thread = _PikaThread(self._generate_connection_parameters())
         try:
             self._pika_thread.start()
@@ -298,7 +302,7 @@ class PikaTransport(CommonTransport):
         """Return connection status."""
         # TODO: Does this question even make sense with reconnection?
         #       Surely .connection_alive is (slightly) better?
-        return self._pika_thread and self._pika_thread.connection_alive
+        return hasattr(self, "_pika_thread") and self._pika_thread.connection_alive
 
     def disconnect(self):
         """Gracefully close connection to pika server"""

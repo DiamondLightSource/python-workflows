@@ -51,6 +51,7 @@ class ServiceStarter:
         cmdline_args=None,
         program_name="start_service",
         version=None,
+        add_metrics_option: bool = False,
         **kwargs,
     ):
         """Example command line interface to start services.
@@ -81,6 +82,25 @@ class ServiceStarter:
             help="Name of the service to start. Known services: "
             + ", ".join(known_services),
         )
+        if add_metrics_option:
+            parser.add_option(
+                "-m",
+                "--metrics",
+                dest="metrics",
+                action="store_true",
+                default=False,
+                help=(
+                    "Record metrics for this service and expose them on the port defined by"
+                    "the --metrics-port option."
+                ),
+            )
+            parser.add_option(
+                "--metrics-port",
+                dest="metrics_port",
+                default=8080,
+                type="int",
+                help="Expose metrics via a prometheus endpoint on this port.",
+            )
         workflows.transport.add_command_line_options(parser, transport_argument=True)
 
         # Call on_parser_preparation hook
@@ -122,7 +142,15 @@ class ServiceStarter:
             if matching and len(matching) == 1:
                 options.service = matching[0]
 
-        kwargs.update({"service": options.service, "transport": transport_factory})
+        kwargs.update(
+            {
+                "service": options.service,
+                "transport": transport_factory,
+            },
+        )
+        kwargs.setdefault("environment", {})
+        if add_metrics_option:
+            kwargs["environment"]["metrics"] = {"port": options.metrics_port}
 
         # Call before_frontend_construction hook
         kwargs = self.before_frontend_construction(kwargs) or kwargs

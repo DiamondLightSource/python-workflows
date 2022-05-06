@@ -185,6 +185,22 @@ class CommonService:
             self.transport.subscription_callback_set_intercept(
                 self._transport_interceptor
             )
+            metrics = self._environment.get("metrics")
+            if metrics:
+                import prometheus_client
+
+                from workflows.transport.middleware.prometheus import (
+                    PrometheusMiddleware,
+                )
+
+                self.log.debug("Instrumenting transport")
+                source = f"{self.__module__}:{self.__class__.__name__}"
+                instrument = PrometheusMiddleware(source=source)
+                self._transport.add_middleware(instrument)
+                port = metrics["port"]
+                self.log.debug(f"Starting metrics endpoint on port {port}")
+                prometheus_client.start_http_server(port=port)
+
         else:
             self.log.debug("No transport layer defined for service. Skipping.")
 
