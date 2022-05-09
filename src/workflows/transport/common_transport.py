@@ -64,7 +64,9 @@ class CommonTransport:
         overridden."""
 
     @middleware.wrap
-    def subscribe(self, channel, callback, **kwargs) -> int:
+    def subscribe(
+        self, channel, callback, mangle_for_receiving: Callable | None = None, **kwargs
+    ) -> int:
         """Listen to a queue, notify via callback function.
         :param channel: Queue name to subscribe to
         :param callback: Function to be called when messages are received.
@@ -80,10 +82,13 @@ class CommonTransport:
 
         self.__subscription_id += 1
 
-        def mangled_callback(header, message):
-            return callback(header, self._mangle_for_receiving(message))
+        if mangle_for_receiving is None:
+            mangle_for_receiving = self._mangle_for_receiving
 
-        if "disable_mangling" in kwargs:
+        def mangled_callback(header, message):
+            return callback(header, mangle_for_receiving(message))
+
+        if "disable_mangling" in kwargs or mangle_for_receiving is False:
             if kwargs["disable_mangling"]:
                 mangled_callback = callback  # noqa:F811
             del kwargs["disable_mangling"]
@@ -252,7 +257,9 @@ class CommonTransport:
         self.__callback_interceptor = interceptor
 
     @middleware.wrap
-    def send(self, destination, message, **kwargs):
+    def send(
+        self, destination, message, mangle_for_sending: Callable | None = None, **kwargs
+    ):
         """Send a message to a queue.
         :param destination: Queue name to send to
         :param message: Either a string or a serializable object to be sent
@@ -264,7 +271,13 @@ class CommonTransport:
                             transaction
         """
 
-        message = self._mangle_for_sending(message)
+        if mangle_for_sending is None:
+            mangle_for_sending = self._mangle_for_sending
+
+        if kwargs.get("disable_mangling"):
+            del kwargs["disable_mangling"]
+        else:
+            message = mangle_for_sending(message)
         self._send(destination, message, **kwargs)
 
     @middleware.wrap
