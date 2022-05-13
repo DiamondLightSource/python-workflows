@@ -74,6 +74,44 @@ def test_subscription_messages_pass_mangling_function():
     mock_callback.assert_called_once_with(mock.sentinel.header, mock.sentinel.message)
 
 
+def test_subscription_messages_custom_mangling_function():
+    """A message received via a subscription passes through a custom mangle function."""
+    ct = CommonTransport()
+    ct._subscribe = mock.Mock()
+    mock_callback = mock.Mock()
+
+    subid = ct.subscribe(
+        mock.sentinel.channel,
+        mock_callback,
+        mangle_for_receiving=lambda message: {**message, "ham": "spam"},
+    )
+    assert subid
+    assert ct.subscription_callback(subid) != mock_callback
+    ct.subscription_callback(subid)(mock.sentinel.header, {"foo": "bar"})
+    mock_callback.assert_called_once_with(
+        mock.sentinel.header, {"foo": "bar", "ham": "spam"}
+    )
+
+
+def test_temporary_subscription_messages_custom_mangling_function():
+    """A message received via a temporary subscription passes through a custom mangle function."""
+    ct = CommonTransport()
+    ct._subscribe_temporary = mock.Mock()
+    mock_callback = mock.Mock()
+
+    subid, _ = ct.subscribe_temporary(
+        mock.sentinel.channel,
+        mock_callback,
+        mangle_for_receiving=lambda message: {**message, "ham": "spam"},
+    )
+    assert subid
+    assert ct.subscription_callback(subid) != mock_callback
+    ct.subscription_callback(subid)(mock.sentinel.header, {"foo": "bar"})
+    mock_callback.assert_called_once_with(
+        mock.sentinel.header, {"foo": "bar", "ham": "spam"}
+    )
+
+
 def test_simple_subscribe_unsubscribe_a_broadcast():
     """Public subscribe_bc()-call should be routed to specific _subscribe_bc().
     Unsubscribes should be routed to _unsubscribe() and handled properly."""
@@ -132,6 +170,25 @@ def test_broadcast_subscription_messages_pass_mangling_function():
     assert ct.subscription_callback(subid) != mock_callback
     ct.subscription_callback(subid)(mock.sentinel.header, mock.sentinel.message)
     mock_callback.assert_called_once_with(mock.sentinel.header, mock.sentinel.message)
+
+
+def test_broadcast_subscription_messages_custom_mangling_function():
+    """A message received via a broadcast subscription passes through a custom mangle function."""
+    ct = CommonTransport()
+    ct._subscribe_broadcast = mock.Mock()
+    mock_callback = mock.Mock()
+
+    subid = ct.subscribe_broadcast(
+        mock.sentinel.channel,
+        mock_callback,
+        mangle_for_receiving=lambda message: {**message, "ham": "spam"},
+    )
+    assert subid
+    assert ct.subscription_callback(subid) != mock_callback
+    ct.subscription_callback(subid)(mock.sentinel.header, {"foo": "bar"})
+    mock_callback.assert_called_once_with(
+        mock.sentinel.header, {"foo": "bar", "ham": "spam"}
+    )
 
 
 @pytest.mark.parametrize("mangling", [None, True, False])
