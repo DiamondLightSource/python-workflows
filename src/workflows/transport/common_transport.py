@@ -68,7 +68,7 @@ class CommonTransport:
         self,
         channel,
         callback,
-        mangle_for_receiving: Callable | None = None,
+        mangle_for_receiving: Callable[[Any], Any] | None = None,
         disable_mangling: bool = False,
         **kwargs,
     ) -> int:
