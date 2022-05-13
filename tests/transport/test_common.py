@@ -213,9 +213,27 @@ def test_simple_send_message():
     ct._send.assert_called_with(mock.sentinel.destination, mock.sentinel.message)
 
 
+def test_send_message_custom_mangling():
+    """Pass messages to send(), modified message should be routed to specific _send()"""
+    ct = CommonTransport()
+    ct._send = mock.Mock()
+
+    message = {"foo": "bar"}
+
+    ct.send(
+        mock.sentinel.destination,
+        message,
+        mangle_for_sending=lambda message: message | {"ham": "spam"},
+    )
+
+    ct._send.assert_called_once_with(
+        mock.sentinel.destination,
+        {"foo": "bar", "ham": "spam"},
+    )
+
+
 def test_simple_broadcast_message():
     """Pass messages to broadcast(), should be routed to specific _broadcast()"""
-
     ct = CommonTransport()
     ct._broadcast = mock.Mock()
 
@@ -238,6 +256,25 @@ def test_simple_broadcast_message():
     ct.broadcast(mock.sentinel.destination, mock.sentinel.message)
 
     ct._broadcast.assert_called_with(mock.sentinel.destination, mock.sentinel.message)
+
+
+def test_broadcast_message_custom_mangling():
+    """Pass messages to broadcast(), modified message should be routed to specific _send()"""
+    ct = CommonTransport()
+    ct._broadcast = mock.Mock()
+
+    message = {"foo": "bar"}
+
+    ct.broadcast(
+        mock.sentinel.destination,
+        message,
+        mangle_for_sending=lambda message: message | {"ham": "spam"},
+    )
+
+    ct._broadcast.assert_called_once_with(
+        mock.sentinel.destination,
+        {"foo": "bar", "ham": "spam"},
+    )
 
 
 def test_create_and_destroy_transactions():
