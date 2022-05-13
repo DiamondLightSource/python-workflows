@@ -280,7 +280,7 @@ def test_send_message_custom_mangling():
     ct.send(
         mock.sentinel.destination,
         message,
-        mangle_for_sending=lambda message: message | {"ham": "spam"},
+        mangle_for_sending=lambda message: {**message, "ham": "spam"},
     )
 
     ct._send.assert_called_once_with(
@@ -325,7 +325,7 @@ def test_broadcast_message_custom_mangling():
     ct.broadcast(
         mock.sentinel.destination,
         message,
-        mangle_for_sending=lambda message: message | {"ham": "spam"},
+        mangle_for_sending=lambda message: {**message, "ham": "spam"},
     )
 
     ct._broadcast.assert_called_once_with(
