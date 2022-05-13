@@ -65,15 +65,22 @@ class CommonTransport:
 
     @middleware.wrap
     def subscribe(
-        self, channel, callback, mangle_for_receiving: Callable | None = None, **kwargs
+        self,
+        channel,
+        callback,
+        mangle_for_receiving: Callable | None = None,
+        disable_mangling: bool = False,
+        **kwargs,
     ) -> int:
         """Listen to a queue, notify via callback function.
         :param channel: Queue name to subscribe to
         :param callback: Function to be called when messages are received.
                          The callback will pass two arguments, the header as a
                          dictionary structure, and the message.
+        :param mangle_for_receiving: Optionally override the default mangle_for_receiving
+               function. Defaults to self._mangle_for_receiving() if not set.
+        :param disable_mangling: Receive messages as unprocessed strings
         :param **kwargs: Further parameters for the transport layer. For example
-               disable_mangling: Receive messages as unprocessed strings.
                exclusive: Attempt to become exclusive subscriber to the queue.
                acknowledgement: If true receipt of each message needs to be
                                 acknowledged.
@@ -88,10 +95,8 @@ class CommonTransport:
         def mangled_callback(header, message):
             return callback(header, mangle_for_receiving(message))
 
-        if "disable_mangling" in kwargs or mangle_for_receiving is False:
-            if kwargs["disable_mangling"]:
-                mangled_callback = callback  # noqa:F811
-            del kwargs["disable_mangling"]
+        if disable_mangling:
+            mangled_callback = callback  # noqa:F811
         self.__subscriptions[self.__subscription_id] = {
             "channel": channel,
             "callback": mangled_callback,
@@ -104,7 +109,12 @@ class CommonTransport:
 
     @middleware.wrap
     def subscribe_temporary(
-        self, channel_hint: Optional[str], callback: MessageCallback, **kwargs
+        self,
+        channel_hint: Optional[str],
+        callback: MessageCallback,
+        mangle_for_receiving: Callable[[Any], Any] | None = None,
+        disable_mangling: bool = False,
+        **kwargs,
     ) -> TemporarySubscription:
         """Listen to a new queue that is specifically created for this connection,
         and has a limited lifetime. Notify for messages via callback function.
@@ -114,8 +124,10 @@ class CommonTransport:
         :param callback: Function to be called when messages are received.
                          The callback will pass two arguments, the header as a
                          dictionary structure, and the message.
+        :param mangle_for_receiving: Optionally override the default mangle_for_receiving
+               function. Defaults to self._mangle_for_receiving() if not set.
+        :param disable_mangling: Receive messages as unprocessed strings.
         :param **kwargs: Further parameters for the transport layer. For example
-               disable_mangling: Receive messages as unprocessed strings.
                acknowledgement: If true receipt of each message needs to be
                                 acknowledged.
         :return: A named tuple containing a unique subscription ID and the actual
@@ -124,15 +136,18 @@ class CommonTransport:
 
         self.__subscription_id += 1
 
+        if mangle_for_receiving is None:
+            mangle_for_receiving = self._mangle_for_receiving
+
         def _(header: Mapping[str, Any], message: Any) -> None:
-            callback(header, self._mangle_for_receiving(message))
+            assert mangle_for_receiving is not None
+            mangled_message = mangle_for_receiving(message)
+            callback(header, mangled_message)
 
         mangled_callback: MessageCallback = _
 
-        if "disable_mangling" in kwargs:
-            if kwargs["disable_mangling"]:
-                mangled_callback = callback  # noqa:F811
-            del kwargs["disable_mangling"]
+        if disable_mangling:
+            mangled_callback = callback  # noqa:F811
         self.__subscriptions[self.__subscription_id] = {
             # "channel": channel,
             "callback": mangled_callback,
@@ -193,27 +208,37 @@ class CommonTransport:
         del self.__subscriptions[subscription]
 
     @middleware.wrap
-    def subscribe_broadcast(self, channel, callback, **kwargs) -> int:
+    def subscribe_broadcast(
+        self,
+        channel,
+        callback,
+        mangle_for_receiving: Callable[[Any], Any] | None = None,
+        disable_mangling: bool = False,
+        **kwargs,
+    ) -> int:
         """Listen to a broadcast topic, notify via callback function.
         :param channel: Topic name to subscribe to
         :param callback: Function to be called when messages are received.
                          The callback will pass two arguments, the header as a
                          dictionary structure, and the message.
+        :param mangle_for_receiving: Optionally override the default mangle_for_receiving
+               function. Defaults to self._mangle_for_receiving() if not set.
+        :param disable_mangling: Receive messages as unprocessed strings.
         :param **kwargs: Further parameters for the transport layer. For example
-               disable_mangling: Receive messages as unprocessed strings.
                retroactive: Ask broker to send old messages if possible
         :return: A unique subscription ID
         """
 
         self.__subscription_id += 1
 
-        def mangled_callback(header, message):
-            return callback(header, self._mangle_for_receiving(message))
+        if mangle_for_receiving is None:
+            mangle_for_receiving = self._mangle_for_receiving
 
-        if "disable_mangling" in kwargs:
-            if kwargs["disable_mangling"]:
-                mangled_callback = callback  # noqa:F811
-            del kwargs["disable_mangling"]
+        def mangled_callback(header, message):
+            return callback(header, mangle_for_receiving(message))
+
+        if disable_mangling:
+            mangled_callback = callback  # noqa:F811
         self.__subscriptions[self.__subscription_id] = {
             "channel": channel,
             "callback": mangled_callback,
@@ -258,11 +283,19 @@ class CommonTransport:
 
     @middleware.wrap
     def send(
-        self, destination, message, mangle_for_sending: Callable | None = None, **kwargs
+        self,
+        destination,
+        message,
+        mangle_for_sending: Callable[[Any], Any] | None = None,
+        disable_mangling: bool = False,
+        **kwargs,
     ):
         """Send a message to a queue.
         :param destination: Queue name to send to
         :param message: Either a string or a serializable object to be sent
+        :param mangle_for_sending: Optionally override the default mangle_for_sending
+               function. Defaults to self._mangle_for_sending() if not set.
+        :param disable_mangling: Receive messages as unprocessed strings
         :param **kwargs: Further parameters for the transport layer. For example
                delay: Delay transport of message by this many seconds
                headers: Optional dictionary of header entries
@@ -274,9 +307,7 @@ class CommonTransport:
         if mangle_for_sending is None:
             mangle_for_sending = self._mangle_for_sending
 
-        if kwargs.get("disable_mangling"):
-            del kwargs["disable_mangling"]
-        else:
+        if not disable_mangling:
             message = mangle_for_sending(message)
         self._send(destination, message, **kwargs)
 
@@ -297,10 +328,20 @@ class CommonTransport:
         self._send(destination, message, **kwargs)
 
     @middleware.wrap
-    def broadcast(self, destination, message, **kwargs):
+    def broadcast(
+        self,
+        destination,
+        message,
+        mangle_for_sending: Callable[[Any], Any] | None = None,
+        disable_mangling: bool = False,
+        **kwargs,
+    ):
         """Broadcast a message.
         :param destination: Topic name to send to
         :param message: Either a string or a serializable object to be sent
+        :param mangle_for_sending: Optionally override the default mangle_for_sending
+               function. Defaults to self._mangle_for_sending() if not set.
+        :param disable_mangling: Receive messages as unprocessed strings
         :param **kwargs: Further parameters for the transport layer. For example
                delay: Delay transport of message by this many seconds
                headers: Optional dictionary of header entries
@@ -309,7 +350,11 @@ class CommonTransport:
                             transaction
         """
 
-        message = self._mangle_for_sending(message)
+        if mangle_for_sending is None:
+            mangle_for_sending = self._mangle_for_sending
+
+        if not disable_mangling:
+            message = mangle_for_sending(message)
         self._broadcast(destination, message, **kwargs)
 
     @middleware.wrap
