@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import functools
 import logging
 import time
 from unittest import mock
@@ -126,3 +127,36 @@ workflows_transport_transactions_in_progress{source="foo"} 1.0
 """
     for line in expected_output.splitlines():
         assert line in data
+
+
+def example_callback(header, message):
+    pass
+
+
+example_functools_partial_callback = functools.partial(
+    example_callback, message={"foo": "bar"}
+)
+example_nested_functools_partial_callback = functools.partial(
+    example_functools_partial_callback, header={"ham": "spam"}
+)
+
+
+def test_get_callback_source():
+    from workflows.transport.middleware import prometheus
+
+    assert (
+        prometheus.PrometheusMiddleware.get_callback_source(example_callback)
+        == "test_middleware:example_callback"
+    )
+    assert (
+        prometheus.PrometheusMiddleware.get_callback_source(
+            example_functools_partial_callback
+        )
+        == "test_middleware:example_callback"
+    )
+    assert (
+        prometheus.PrometheusMiddleware.get_callback_source(
+            example_nested_functools_partial_callback
+        )
+        == "test_middleware:example_callback"
+    )
