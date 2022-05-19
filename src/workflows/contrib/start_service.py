@@ -149,7 +149,7 @@ class ServiceStarter:
             },
         )
         kwargs.setdefault("environment", {})
-        if add_metrics_option:
+        if add_metrics_option and options.metrics:
             kwargs["environment"]["metrics"] = {"port": options.metrics_port}
 
         # Call before_frontend_construction hook
