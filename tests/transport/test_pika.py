@@ -603,7 +603,7 @@ def test_messages_are_deserialized_after_transport(mock_pikathread):
 
     # Test subscriptions with mangling disabled
     callback = mock.Mock()
-    transport.subscribe("queue", callback, disable_mangling=True)
+    transport.subscribe("queue", callback, mangle_for_receiving=False)
     message_handler = mock_pikathread.subscribe_queue.call_args[1]["callback"]
     message_handler(mock.Mock(), mock.Mock(), mock_properties, banana_str)
     callback.assert_called_once()
@@ -613,7 +613,7 @@ def test_messages_are_deserialized_after_transport(mock_pikathread):
 
     # Test broadcast subscriptions with mangling disabled
     callback = mock.Mock()
-    transport.subscribe_broadcast("queue", callback, disable_mangling=True)
+    transport.subscribe_broadcast("queue", callback, mangle_for_receiving=False)
     message_handler = mock_pikathread.subscribe_broadcast.call_args[1]["callback"]
     message_handler(mock.Mock(), mock.Mock(), mock_properties, banana_str)
     callback.assert_called_once()

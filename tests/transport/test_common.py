@@ -21,7 +21,7 @@ def test_subscribe_unsubscribe_a_channel():
         mock_callback,
         exclusive=mock.sentinel.exclusive,
         acknowledgement=mock.sentinel.ack,
-        disable_mangling=True,
+        mangle_for_receiving=False,
     )
 
     assert subid
@@ -124,7 +124,7 @@ def test_simple_subscribe_unsubscribe_a_broadcast():
         mock.sentinel.channel,
         mock_callback,
         retroactive=mock.sentinel.retro,
-        disable_mangling=True,
+        mangle_for_receiving=False,
     )
 
     assert subid
@@ -191,19 +191,21 @@ def test_broadcast_subscription_messages_custom_mangling_function():
     )
 
 
-@pytest.mark.parametrize("mangling", [None, True, False])
-def test_callbacks_can_be_intercepted(mangling):
+@pytest.mark.parametrize("mangle_for_receiving", [None, True, False])
+def test_callbacks_can_be_intercepted(mangle_for_receiving):
     """The function called on message receipt must be interceptable."""
     ct = CommonTransport()
     ct._subscribe = mock.Mock()
     mock_true_callback = mock.Mock()
     intercept = mock.Mock()
 
-    if mangling is None:
+    if mangle_for_receiving is None:
         subid = ct.subscribe(mock.sentinel.channel, mock_true_callback)
     else:
         subid = ct.subscribe(
-            mock.sentinel.channel, mock_true_callback, disable_mangling=mangling
+            mock.sentinel.channel,
+            mock_true_callback,
+            mangle_for_receiving=mangle_for_receiving,
         )
 
     # Original code path

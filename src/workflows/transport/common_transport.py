@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import decimal
 import logging
+import warnings
 from typing import Any, Callable, Dict, Mapping, NamedTuple, Optional, Set, Type
 
 import workflows
@@ -68,8 +69,7 @@ class CommonTransport:
         self,
         channel,
         callback,
-        mangle_for_receiving: Callable[[Any], Any] | None = None,
-        disable_mangling: bool = False,
+        mangle_for_receiving: Callable[[Any], Any] | bool = True,
         **kwargs,
     ) -> int:
         """Listen to a queue, notify via callback function.
@@ -79,7 +79,6 @@ class CommonTransport:
                          dictionary structure, and the message.
         :param mangle_for_receiving: Optionally override the default mangle_for_receiving
                function. Defaults to self._mangle_for_receiving() if not set.
-        :param disable_mangling: Receive messages as unprocessed strings
         :param **kwargs: Further parameters for the transport layer. For example
                exclusive: Attempt to become exclusive subscriber to the queue.
                acknowledgement: If true receipt of each message needs to be
@@ -89,13 +88,23 @@ class CommonTransport:
 
         self.__subscription_id += 1
 
-        if mangle_for_receiving is None:
+        if "disable_mangling" in kwargs:
+            warnings.warn(
+                "disable_mangling is deprecated - use mangle_for_receiving=False instead",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            if kwargs["disable_mangling"]:
+                mangle_for_receiving = False
+            del kwargs["disable_mangling"]
+
+        if mangle_for_receiving is True:
             mangle_for_receiving = self._mangle_for_receiving
 
         def mangled_callback(header, message):
             return callback(header, mangle_for_receiving(message))
 
-        if disable_mangling:
+        if not mangle_for_receiving:
             mangled_callback = callback  # noqa:F811
         self.__subscriptions[self.__subscription_id] = {
             "channel": channel,
@@ -112,8 +121,7 @@ class CommonTransport:
         self,
         channel_hint: Optional[str],
         callback: MessageCallback,
-        mangle_for_receiving: Callable[[Any], Any] | None = None,
-        disable_mangling: bool = False,
+        mangle_for_receiving: Callable[[Any], Any] | bool = True,
         **kwargs,
     ) -> TemporarySubscription:
         """Listen to a new queue that is specifically created for this connection,
@@ -126,7 +134,6 @@ class CommonTransport:
                          dictionary structure, and the message.
         :param mangle_for_receiving: Optionally override the default mangle_for_receiving
                function. Defaults to self._mangle_for_receiving() if not set.
-        :param disable_mangling: Receive messages as unprocessed strings.
         :param **kwargs: Further parameters for the transport layer. For example
                acknowledgement: If true receipt of each message needs to be
                                 acknowledged.
@@ -136,17 +143,27 @@ class CommonTransport:
 
         self.__subscription_id += 1
 
-        if mangle_for_receiving is None:
+        if "disable_mangling" in kwargs:
+            warnings.warn(
+                "disable_mangling is deprecated - use mangle_for_receiving=False instead",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            if kwargs["disable_mangling"]:
+                mangle_for_receiving = False
+            del kwargs["disable_mangling"]
+
+        if mangle_for_receiving is True:
             mangle_for_receiving = self._mangle_for_receiving
 
         def _(header: Mapping[str, Any], message: Any) -> None:
-            assert mangle_for_receiving is not None
+            assert callable(mangle_for_receiving)
             mangled_message = mangle_for_receiving(message)
             callback(header, mangled_message)
 
         mangled_callback: MessageCallback = _
 
-        if disable_mangling:
+        if not mangle_for_receiving:
             mangled_callback = callback  # noqa:F811
         self.__subscriptions[self.__subscription_id] = {
             # "channel": channel,
@@ -212,8 +229,7 @@ class CommonTransport:
         self,
         channel,
         callback,
-        mangle_for_receiving: Callable[[Any], Any] | None = None,
-        disable_mangling: bool = False,
+        mangle_for_receiving: Callable[[Any], Any] | bool = True,
         **kwargs,
     ) -> int:
         """Listen to a broadcast topic, notify via callback function.
@@ -223,7 +239,6 @@ class CommonTransport:
                          dictionary structure, and the message.
         :param mangle_for_receiving: Optionally override the default mangle_for_receiving
                function. Defaults to self._mangle_for_receiving() if not set.
-        :param disable_mangling: Receive messages as unprocessed strings.
         :param **kwargs: Further parameters for the transport layer. For example
                retroactive: Ask broker to send old messages if possible
         :return: A unique subscription ID
@@ -231,14 +246,26 @@ class CommonTransport:
 
         self.__subscription_id += 1
 
-        if mangle_for_receiving is None:
+        if "disable_mangling" in kwargs:
+            warnings.warn(
+                "disable_mangling is deprecated - use mangle_for_receiving=False instead",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            if kwargs["disable_mangling"]:
+                mangle_for_receiving = False
+            del kwargs["disable_mangling"]
+
+        if mangle_for_receiving is True:
             mangle_for_receiving = self._mangle_for_receiving
 
-        def mangled_callback(header, message):
-            return callback(header, mangle_for_receiving(message))
-
-        if disable_mangling:
+        if not mangle_for_receiving:
             mangled_callback = callback  # noqa:F811
+        else:
+
+            def mangled_callback(header, message):
+                return callback(header, mangle_for_receiving(message))
+
         self.__subscriptions[self.__subscription_id] = {
             "channel": channel,
             "callback": mangled_callback,
@@ -286,8 +313,7 @@ class CommonTransport:
         self,
         destination,
         message,
-        mangle_for_sending: Callable[[Any], Any] | None = None,
-        disable_mangling: bool = False,
+        mangle_for_sending: Callable[[Any], Any] | bool = True,
         **kwargs,
     ):
         """Send a message to a queue.
@@ -295,7 +321,6 @@ class CommonTransport:
         :param message: Either a string or a serializable object to be sent
         :param mangle_for_sending: Optionally override the default mangle_for_sending
                function. Defaults to self._mangle_for_sending() if not set.
-        :param disable_mangling: Receive messages as unprocessed strings
         :param **kwargs: Further parameters for the transport layer. For example
                delay: Delay transport of message by this many seconds
                headers: Optional dictionary of header entries
@@ -304,10 +329,10 @@ class CommonTransport:
                             transaction
         """
 
-        if mangle_for_sending is None:
+        if mangle_for_sending is True:
             mangle_for_sending = self._mangle_for_sending
 
-        if not disable_mangling:
+        if callable(mangle_for_sending):
             message = mangle_for_sending(message)
         self._send(destination, message, **kwargs)
 
@@ -332,8 +357,7 @@ class CommonTransport:
         self,
         destination,
         message,
-        mangle_for_sending: Callable[[Any], Any] | None = None,
-        disable_mangling: bool = False,
+        mangle_for_sending: Callable[[Any], Any] | bool = True,
         **kwargs,
     ):
         """Broadcast a message.
@@ -341,7 +365,6 @@ class CommonTransport:
         :param message: Either a string or a serializable object to be sent
         :param mangle_for_sending: Optionally override the default mangle_for_sending
                function. Defaults to self._mangle_for_sending() if not set.
-        :param disable_mangling: Receive messages as unprocessed strings
         :param **kwargs: Further parameters for the transport layer. For example
                delay: Delay transport of message by this many seconds
                headers: Optional dictionary of header entries
@@ -350,10 +373,10 @@ class CommonTransport:
                             transaction
         """
 
-        if mangle_for_sending is None:
+        if mangle_for_sending is True:
             mangle_for_sending = self._mangle_for_sending
 
-        if not disable_mangling:
+        if callable(mangle_for_sending):
             message = mangle_for_sending(message)
         self._broadcast(destination, message, **kwargs)
 

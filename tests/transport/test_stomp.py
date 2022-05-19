@@ -441,14 +441,14 @@ def test_messages_are_deserialized_after_transport(mockstomp):
 
     # Test subscriptions with mangling disabled
     callback = mock.Mock()
-    stomp.subscribe("channel", callback, disable_mangling=True)
+    stomp.subscribe("channel", callback, mangle_for_receiving=False)
     subscription_id = mockconn.subscribe.call_args[0][1]
     message_handler(_frame({"subscription": subscription_id}, banana_str))
     callback.assert_called_once_with({"subscription": subscription_id}, banana_str)
 
     # Test broadcast subscriptions with mangling disabled
     callback = mock.Mock()
-    stomp.subscribe_broadcast("channel", callback, disable_mangling=True)
+    stomp.subscribe_broadcast("channel", callback, mangle_for_receiving=False)
     subscription_id = mockconn.subscribe.call_args[0][1]
     message_handler(_frame({"subscription": subscription_id}, banana_str))
     callback.assert_called_once_with({"subscription": subscription_id}, banana_str)
