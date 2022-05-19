@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import functools
 import inspect
 import time
 from typing import Callable, Optional
@@ -84,10 +85,17 @@ class PrometheusMiddleware(BaseTransportMiddleware):
 
     @staticmethod
     def get_callback_source(callable: Callable):
+        if isinstance(callable, functools.partial):
+            # functools.partial objects don't have a __qualname__ attribute
+            # account for possibility of nested stack of functools.partials
+            return PrometheusMiddleware.get_callback_source(callable.func)
+        else:
+            # if defined, used the __qualname__ attribute, else fallback on the repr
+            qualname = getattr(callable, "__qualname__", repr(callable).split("(")[0])
         module = inspect.getmodule(callable)
         if module:
-            return f"{module.__name__}:{callable.__qualname__}"
-        return callable.__qualname__
+            return f"{module.__name__}:{qualname}"
+        return qualname
 
     def subscribe(self, call_next: Callable, channel, callback, **kwargs) -> int:
         def wrapped_callback(header, message):
