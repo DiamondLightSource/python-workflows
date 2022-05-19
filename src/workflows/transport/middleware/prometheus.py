@@ -85,14 +85,14 @@ class PrometheusMiddleware(BaseTransportMiddleware):
 
     @staticmethod
     def get_callback_source(callable: Callable):
-        module = inspect.getmodule(callable)
         if isinstance(callable, functools.partial):
             # functools.partial objects don't have a __qualname__ attribute
             # account for possibility of nested stack of functools.partials
-            qualname = PrometheusMiddleware.get_callback_source(callable.func)
+            return PrometheusMiddleware.get_callback_source(callable.func)
         else:
             # if defined, used the __qualname__ attribute, else fallback on the repr
             qualname = getattr(callable, "__qualname__", repr(callable).split("(")[0])
+        module = inspect.getmodule(callable)
         if module:
             return f"{module.__name__}:{qualname}"
         return qualname
