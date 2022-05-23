@@ -302,6 +302,31 @@ def test_send_message(mockpika, mock_pikathread):
 
 
 @mock.patch("workflows.transport.pika_transport.pika")
+def test_send_message_to_named_exchange(mockpika, mock_pikathread):
+    """Test sending a message to an explicitly named exchange"""
+    transport = PikaTransport()
+    transport.connect()
+
+    mockproperties = mockpika.BasicProperties
+
+    transport._send(mock.sentinel.queue, mock.sentinel.message, exchange="foo")
+    mock_pikathread.send.assert_called_once()
+    args, kwargs = mock_pikathread.send.call_args
+
+    assert not args
+    assert kwargs == {
+        "exchange": "foo",
+        "routing_key": str(mock.sentinel.queue),
+        "body": mock.sentinel.message,
+        "mandatory": True,
+        "properties": mock.ANY,
+        "transaction_id": None,
+    }
+    assert mockproperties.call_args[1].get("headers") == {}
+    assert int(mockproperties.call_args[1].get("delivery_mode")) == 2
+
+
+@mock.patch("workflows.transport.pika_transport.pika")
 def test_sending_message_with_expiration(mockpika, mock_pikathread):
     """Test sending a message that expires some time in the future."""
     transport = PikaTransport()
