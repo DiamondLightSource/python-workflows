@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import functools
+from typing import Any, Callable
 
 from workflows.recipe.recipe import Recipe
 from workflows.recipe.validate import validate_recipe
@@ -16,7 +17,13 @@ __all__ = [
 
 
 def _wrap_subscription(
-    transport_layer, subscription_call, channel, callback, *args, **kwargs
+    transport_layer,
+    subscription_call,
+    channel,
+    callback,
+    *args,
+    mangle_for_receiving: Callable[[Any], Any] | None = None,
+    **kwargs,
 ):
     """Internal method to create an intercepting function for incoming messages
     to interpret recipes. This function is then used to subscribe to a channel
@@ -54,6 +61,8 @@ def _wrap_subscription(
                         RecipeWrapper object to the target function.
         :param message: Incoming deserialized message object.
         """
+        if mangle_for_receiving:
+            message = mangle_for_receiving(message)
         if header.get("workflows-recipe") in {True, "True", "true", 1}:
             rw = RecipeWrapper(message=message, transport=transport_layer)
             if log_extender and rw.environment and rw.environment.get("ID"):
@@ -68,10 +77,19 @@ def _wrap_subscription(
         #                    str(header)[:1000], str(message)[:1000])
         transport_layer.nack(header)
 
+    if mangle_for_receiving:
+        kwargs = kwargs | {"disable_mangling": True}
     return subscription_call(channel, unwrap_recipe, *args, **kwargs)
 
 
-def wrap_subscribe(transport_layer, channel, callback, *args, **kwargs):
+def wrap_subscribe(
+    transport_layer,
+    channel,
+    callback,
+    *args,
+    mangle_for_receiving: Callable[[Any], Any] | None = None,
+    **kwargs,
+):
     """Listen to a queue on the transport layer, similar to the subscribe call in
     transport/common_transport.py. Intercept all incoming messages and parse
     for recipe information.
@@ -86,11 +104,24 @@ def wrap_subscribe(transport_layer, channel, callback, *args, **kwargs):
     """
 
     return _wrap_subscription(
-        transport_layer, transport_layer.subscribe, channel, callback, *args, **kwargs
+        transport_layer,
+        transport_layer.subscribe,
+        channel,
+        callback,
+        *args,
+        mangle_for_receiving=mangle_for_receiving,
+        **kwargs,
     )
 
 
-def wrap_subscribe_broadcast(transport_layer, channel, callback, *args, **kwargs):
+def wrap_subscribe_broadcast(
+    transport_layer,
+    channel,
+    callback,
+    *args,
+    mangle_for_receiving: Callable[[Any], Any] | None = None,
+    **kwargs,
+):
     """Listen to a topic on the transport layer, similar to the
     subscribe_broadcast call in transport/common_transport.py. Intercept all
     incoming messages and parse for recipe information.
@@ -110,5 +141,6 @@ def wrap_subscribe_broadcast(transport_layer, channel, callback, *args, **kwargs
         channel,
         callback,
         *args,
+        mangle_for_receiving=mangle_for_receiving,
         **kwargs,
     )
