@@ -494,6 +494,7 @@ class PikaTransport(CommonTransport):
         delay=None,
         expiration=None,
         transaction: Optional[int] = None,
+        exchange: Optional[str] = None,
         **kwargs,
     ):
         """
@@ -514,7 +515,7 @@ class PikaTransport(CommonTransport):
             headers["x-delay"] = int(1000 * delay)
             exchange = "delayed"
         else:
-            exchange = ""
+            exchange = exchange or ""
 
         properties = pika.BasicProperties(
             headers=headers,
