@@ -4,7 +4,6 @@ from unittest import mock
 
 import pytest
 
-import workflows
 import workflows.transport.common_transport
 from workflows.recipe import Recipe
 from workflows.recipe.wrapper import RecipeWrapper
@@ -21,6 +20,7 @@ def generate_recipe_message():
                     "somewhere": [2],
                     "multi-output": [2, 3, 4],
                     "exchange": [5],
+                    "a-topic": 3,
                 },
                 "parameter": "some {placeholder} to test replacement",
                 "error": 2,
@@ -273,6 +273,71 @@ def test_downstream_message_sending_via_recipewrapper_to_exchange():
             exchange="foo",
         )
     ]
+    assert t.mock_calls == expected
+    t.reset_mock()
+
+
+def test_downstream_message_sending_via_recipewrapper_with_custom_mangling():
+    """Test that when a custom mangling function is provided that the mangling is
+    done internally to the recipe wrapper and transport.raw_send is called.
+    """
+    m = generate_recipe_message()
+    t = mock.create_autospec(workflows.transport.common_transport.CommonTransport)
+
+    def downstream_message(dest, payload):
+        """Helper function to generate expected message contents for downstream
+        recipients."""
+        ds_message = generate_recipe_message()
+        ds_message["recipe-pointer"] = dest
+        ds_message["recipe-path"] = [1]
+        ds_message["payload"] = payload
+        return ds_message
+
+    rw = RecipeWrapper(message=m, transport=t)
+
+    def custom_mangle(message):
+        return {**message, "foo": "bar"}
+
+    # Messages sent to defined outputs are sent
+    rw.send_to(
+        "somewhere",
+        mock.sentinel.message_text,
+        mangle_for_sending=custom_mangle,
+    )
+    expected = [
+        mock.call.raw_send(
+            m["recipe"][2]["queue"],
+            {**downstream_message(2, mock.sentinel.message_text), "foo": "bar"},
+            headers={"workflows-recipe": True},
+        )
+    ]
+
+    t.reset_mock()
+    rw.send_to("a-topic", mock.sentinel.message_text, mangle_for_sending=custom_mangle)
+    expected = [
+        mock.call.raw_broadcast(
+            m["recipe"][3]["topic"],
+            {**downstream_message(3, mock.sentinel.message_text), "foo": "bar"},
+            headers={"workflows-recipe": True},
+        )
+    ]
+
+    t.reset_mock()
+    rw.set_default_channel("somewhere")
+    rw.send(
+        mock.sentinel.unnamed_output_with_default_name, mangle_for_sending=custom_mangle
+    )
+    expected = [
+        mock.call.raw_send(
+            m["recipe"][2]["queue"],
+            {
+                **downstream_message(2, mock.sentinel.unnamed_output_with_default_name),
+                "foo": "bar",
+            },
+            headers={"workflows-recipe": True},
+        )
+    ]
+
     assert t.mock_calls == expected
     t.reset_mock()
 
