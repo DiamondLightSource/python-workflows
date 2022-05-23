@@ -888,7 +888,7 @@ def test_channel(connection_params) -> pika.channel.Channel:
                 return exchange_name
 
             def temporary_queue_declare(
-                self, auto_delete=False, exclusive=False, **kwargs
+                self, auto_delete=False, exclusive=False, exchange="", **kwargs
             ):
                 """
                 Declare an auto-named queue that is automatically deleted on test end.
@@ -898,6 +898,8 @@ def test_channel(connection_params) -> pika.channel.Channel:
                 ).method.queue
                 if not (auto_delete or exclusive):
                     self.register_cleanup(lambda: self.channel.queue_delete(queue))
+                if exchange:
+                    self.channel.queue_bind(queue, exchange)
                 print(f"Got temporary queue for testing: {queue}")
                 return queue
 
@@ -1073,6 +1075,21 @@ def test_pikathread_send(connection_params, test_channel):
                 "", "unroutable-missing-queue", "Another Message", mandatory=True
             ).result()
 
+    finally:
+        thread.join(stop=True)
+
+
+def test_pikathread_send_named_exchange(connection_params, test_channel):
+    exchange = test_channel.temporary_exchange_declare(
+        exchange_type="topic", auto_delete=True
+    )
+    queue = test_channel.temporary_queue_declare(exchange=exchange)
+    thread = _PikaThread(connection_params)
+    try:
+        thread.start()
+        thread.wait_for_connection()
+        thread.send(exchange, queue, "Test Message").result()
+        assert test_channel.basic_get(queue, auto_ack=True)[2] == b"Test Message"
     finally:
         thread.join(stop=True)
 
