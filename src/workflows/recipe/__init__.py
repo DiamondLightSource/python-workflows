@@ -78,7 +78,7 @@ def _wrap_subscription(
         transport_layer.nack(header)
 
     if mangle_for_receiving:
-        kwargs = kwargs | {"disable_mangling": True}
+        kwargs = {**kwargs, "disable_mangling": True}
     return subscription_call(channel, unwrap_recipe, *args, **kwargs)
 
 
