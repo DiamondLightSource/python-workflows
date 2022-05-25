@@ -211,6 +211,9 @@ class RecipeWrapper:
             and "delay" not in transport_kwargs
         ):
             dest_kwargs["delay"] = self.recipe[destination]["transport-delay"]
+        if "exchange" in self.recipe[destination]:
+            dest_kwargs.setdefault("exchange", self.recipe[destination]["exchange"])
+
         if self.recipe[destination].get("queue"):
             self._retry_transport(
                 self.transport.send,
