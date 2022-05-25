@@ -5,6 +5,7 @@ from unittest import mock
 import pytest
 
 import workflows
+import workflows.transport.common_transport
 from workflows.recipe import Recipe
 from workflows.recipe.wrapper import RecipeWrapper
 
@@ -16,13 +17,18 @@ def generate_recipe_message():
             1: {
                 "service": "A service",
                 "queue": "service.one",
-                "output": {"somewhere": [2], "multi-output": [2, 3, 4]},
+                "output": {
+                    "somewhere": [2],
+                    "multi-output": [2, 3, 4],
+                    "exchange": [5],
+                },
                 "parameter": "some {placeholder} to test replacement",
                 "error": 2,
             },
             2: {"service": "service 2", "queue": "queue.two", "output": [3]},
             3: {"service": "service 3", "topic": "topic.three", "transport-delay": 300},
             4: {"service": "service 4", "queue": "queue.four", "transport-delay": 300},
+            5: {"service": "service 5", "queue": "queue.five", "exchange": "foo"},
             "start": [(1, {"parameter": mock.sentinel.initial_parameter})],
             "error": [2],
         },
@@ -238,6 +244,37 @@ def test_downstream_message_sending_via_recipewrapper_with_unnamed_output():
         )
     ]
     assert t.mock_calls == expected
+
+
+def test_downstream_message_sending_via_recipewrapper_to_exchange():
+    """Test sending to an explicit exchange defined in the recipe step"""
+
+    def downstream_message(dest, payload, path=()):
+        """Helper function to generate expected message contents for downstream
+        recipients."""
+        ds_message = generate_recipe_message()
+        ds_message["recipe-pointer"] = dest
+        ds_message["recipe-path"] = [1] + list(path)
+        ds_message["payload"] = payload
+        return ds_message
+
+    m = downstream_message(1, mock.sentinel.payload)
+    t = mock.create_autospec(workflows.transport.common_transport.CommonTransport)
+    rw = RecipeWrapper(message=m, transport=t)
+    t.reset_mock()
+
+    # This should send the message to an exchange named foo
+    rw.send_to("exchange", mock.sentinel.test_send_to_exchange)
+    expected = [
+        mock.call.send(
+            m["recipe"][5]["queue"],
+            downstream_message(5, mock.sentinel.test_send_to_exchange, path=(1,)),
+            headers={"workflows-recipe": True},
+            exchange="foo",
+        )
+    ]
+    assert t.mock_calls == expected
+    t.reset_mock()
 
 
 def test_checkpointing_via_recipewrapper():
