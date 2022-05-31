@@ -122,13 +122,13 @@ class ServiceStarter:
         )
 
         # Set up on_transport_preparation hook to affect newly created transport objects
-        true_transport_factory_call = transport_factory.__call__
+        true_transport_factory = transport_factory
 
         def on_transport_preparation_hook():
-            transport_object = true_transport_factory_call()
+            transport_object = true_transport_factory()
             return self.on_transport_preparation(transport_object) or transport_object
 
-        transport_factory.__call__ = on_transport_preparation_hook
+        transport_factory = on_transport_preparation_hook
 
         # When service name is specified, check if service exists or can be derived
         if options.service and options.service not in known_services:
