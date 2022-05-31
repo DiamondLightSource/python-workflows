@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import functools
+import inspect
 import logging
 import time
 from typing import TYPE_CHECKING, Callable, Optional
@@ -12,6 +13,20 @@ if TYPE_CHECKING:
     )
 
 logger = logging.getLogger(__name__)
+
+
+def get_callback_source(callable: Callable):
+    if isinstance(callable, functools.partial):
+        # functools.partial objects don't have a __qualname__ attribute
+        # account for possibility of nested stack of functools.partials
+        return get_callback_source(callable.func)
+    else:
+        # if defined, used the __qualname__ attribute, else fallback on the repr
+        qualname = getattr(callable, "__qualname__", repr(callable).split("(")[0])
+    module = inspect.getmodule(callable)
+    if module:
+        return f"{module.__name__}:{qualname}"
+    return qualname
 
 
 class BaseTransportMiddleware:
@@ -156,23 +171,25 @@ class CounterMiddleware(BaseTransportMiddleware):
 
 
 class TimerMiddleware(BaseTransportMiddleware):
+    def __init__(self, logger: logging.Logger = None, level=logging.INFO):
+        if logger is None:
+            logger = logging.getLogger(__name__)
+        self.logger = logger
+        self.level = level
+
     def subscribe(self, call_next: Callable, channel, callback, **kwargs) -> int:
         def wrapped_callback(header, message):
             start_time = time.perf_counter()
             result = callback(header, message)
             end_time = time.perf_counter()
-            logger.info(
-                f"Callback for {header['destination']} took: {end_time - start_time:.3f}"
+            source = get_callback_source(callback)
+            self.logger.log(
+                self.level,
+                f"Callback for {source} took {end_time - start_time:.4f} seconds",
             )
             return result
 
         return call_next(channel, wrapped_callback, **kwargs)
-
-    def send(self, call_next: Callable, destination, message, **kwargs):
-        start_time = time.perf_counter()
-        call_next(destination, message, **kwargs)
-        end_time = time.perf_counter()
-        logger.info(f"send() took: {end_time - start_time:.3f}")
 
 
 def wrap(f: Callable):
