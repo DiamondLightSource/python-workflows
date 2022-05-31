@@ -110,6 +110,42 @@ def test_wrapping_a_subscription_allowing_non_recipe_messages(rw_mock):
 
 
 @mock.patch("workflows.recipe.RecipeWrapper", autospec=True)
+def test_wrapping_a_subscription_with_custom_mangling(rw_mock):
+    """Test queue subscription with recipe wrapper."""
+
+    transport, recipient = mock.Mock(), mock.Mock()
+
+    custom_mangle_has_been_called = False
+
+    def custom_mangle(message):
+        nonlocal custom_mangle_has_been_called
+        custom_mangle_has_been_called = True
+        return message
+
+    sid = workflows.recipe.wrap_subscribe(
+        transport,
+        mock.sentinel.channel,
+        recipient,
+        mangle_for_receiving=custom_mangle,
+    )
+
+    # Channel and any extra arguments must be passed on to transport layer.
+    # Callback function will obviously change.
+    transport.subscribe.assert_called_once_with(
+        mock.sentinel.channel,
+        mock.ANY,
+        disable_mangling=True,
+    )
+    callback = transport.subscribe.call_args[0][1]
+    assert callback != recipient
+    assert sid == transport.subscribe.return_value
+
+    # Part II: Message handling via unwrapper
+    check_message_handling_via_unwrapper(callback, recipient, transport, rw_mock, False)
+    assert custom_mangle_has_been_called
+
+
+@mock.patch("workflows.recipe.RecipeWrapper", autospec=True)
 def test_wrapping_a_broadcast_subscription(rw_mock):
     """Test topic subscription with recipe wrapper."""
     transport, recipient = mock.Mock(), mock.Mock()
@@ -136,6 +172,41 @@ def test_wrapping_a_broadcast_subscription(rw_mock):
 
     # Part II: Message handling via unwrapper
     check_message_handling_via_unwrapper(callback, recipient, transport, rw_mock, False)
+
+
+@mock.patch("workflows.recipe.RecipeWrapper", autospec=True)
+def test_wrapping_a_broadcast_subscription_with_custom_mangling(rw_mock):
+    """Test topic subscription with recipe wrapper."""
+    transport, recipient = mock.Mock(), mock.Mock()
+
+    custom_mangle_has_been_called = False
+
+    def custom_mangle(message):
+        nonlocal custom_mangle_has_been_called
+        custom_mangle_has_been_called = True
+        return message
+
+    sid = workflows.recipe.wrap_subscribe_broadcast(
+        transport,
+        mock.sentinel.channel,
+        recipient,
+        mangle_for_receiving=custom_mangle,
+    )
+
+    # Channel and any extra arguments must be passed on to transport layer.
+    # Callback function will obviously change.
+    transport.subscribe_broadcast.assert_called_once_with(
+        mock.sentinel.channel,
+        mock.ANY,
+        disable_mangling=True,
+    )
+    callback = transport.subscribe_broadcast.call_args[0][1]
+    assert callback != recipient
+    assert sid == transport.subscribe_broadcast.return_value
+
+    # Part II: Message handling via unwrapper
+    check_message_handling_via_unwrapper(callback, recipient, transport, rw_mock, False)
+    assert custom_mangle_has_been_called
 
 
 def test_wrapping_a_subscription_with_log_extension():

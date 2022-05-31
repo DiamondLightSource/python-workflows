@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import time
+from typing import Any, Callable
 
 import workflows.recipe
 
@@ -53,6 +54,7 @@ class RecipeWrapper:
         default channel name, set via the set_default_channel method, or an
         unnamed output definition.
         """
+
         if not self.transport:
             raise ValueError(
                 "This RecipeWrapper object does not contain "
@@ -186,17 +188,36 @@ class RecipeWrapper:
             "recipe-pointer": destination,
         }
 
-    def _send_to_destinations(self, destinations, message, header=None, **kwargs):
+    def _send_to_destinations(
+        self,
+        destinations,
+        message,
+        header=None,
+        mangle_for_sending: Callable[[Any], Any] | None = None,
+        **kwargs,
+    ):
         """Send messages to a list of numbered destinations. This is an internal
         helper method used by the public 'send' methods.
         """
         if not isinstance(destinations, list):
             destinations = (destinations,)
         for destination in destinations:
-            self._send_to_destination(destination, header, message, kwargs)
+            self._send_to_destination(
+                destination,
+                header,
+                message,
+                kwargs,
+                mangle_for_sending=mangle_for_sending,
+            )
 
     def _send_to_destination(
-        self, destination, header, payload, transport_kwargs, add_path_step=True
+        self,
+        destination,
+        header,
+        payload,
+        transport_kwargs,
+        add_path_step=True,
+        mangle_for_sending: Callable[[Any], Any] | None = None,
     ):
         """Helper function to send a message to a specific recipe destination."""
         if header:
@@ -215,18 +236,36 @@ class RecipeWrapper:
             dest_kwargs.setdefault("exchange", self.recipe[destination]["exchange"])
 
         if self.recipe[destination].get("queue"):
+            send = (
+                self.transport.raw_send if mangle_for_sending else self.transport.send
+            )
+            message = self._generate_full_recipe_message(
+                destination, payload, add_path_step
+            )
+            if mangle_for_sending:
+                message = mangle_for_sending(message)
             self._retry_transport(
-                self.transport.send,
+                send,
                 self.recipe[destination]["queue"],
-                self._generate_full_recipe_message(destination, payload, add_path_step),
+                message,
                 headers=header,
                 **dest_kwargs,
             )
         if self.recipe[destination].get("topic"):
+            broadcast = (
+                self.transport.raw_broadcast
+                if mangle_for_sending
+                else self.transport.broadcast
+            )
+            message = self._generate_full_recipe_message(
+                destination, payload, add_path_step
+            )
+            if mangle_for_sending:
+                message = mangle_for_sending(message)
             self._retry_transport(
-                self.transport.broadcast,
+                broadcast,
                 self.recipe[destination]["topic"],
-                self._generate_full_recipe_message(destination, payload, add_path_step),
+                message,
                 headers=header,
                 **dest_kwargs,
             )
