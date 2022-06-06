@@ -6,7 +6,7 @@ from typing import Union
 
 import pkg_resources
 
-default_transport = "StompTransport"
+default_transport = "PikaTransport"
 
 
 def lookup(transport):
