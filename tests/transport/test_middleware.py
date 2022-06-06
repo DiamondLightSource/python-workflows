@@ -48,18 +48,21 @@ def test_counter_middleware():
 def test_timer_middleware(caplog):
     offline = OfflineTransport()
     offline.connect()
-    timer = middleware.TimerMiddleware()
+    timer = middleware.TimerMiddleware(level=logging.DEBUG)
     offline.add_middleware(timer)
 
     def callback(header, message):
         time.sleep(1)
 
     subscription_id = offline.subscribe(str(mock.sentinel.channel), callback)
-    with caplog.at_level(logging.INFO):
+    with caplog.at_level(logging.DEBUG):
         offline.subscription_callback(subscription_id)(
             {"destination": "foo"}, str(mock.sentinel.message)
         )
-        assert "Callback for foo took:" in caplog.text
+        assert (
+            "Callback for test_middleware:test_timer_middleware.<locals>.callback took"
+            in caplog.text
+        )
 
 
 def test_prometheus_middleware():
@@ -142,21 +145,15 @@ example_nested_functools_partial_callback = functools.partial(
 
 
 def test_get_callback_source():
-    from workflows.transport.middleware import prometheus
-
     assert (
-        prometheus.PrometheusMiddleware.get_callback_source(example_callback)
+        middleware.get_callback_source(example_callback)
         == "test_middleware:example_callback"
     )
     assert (
-        prometheus.PrometheusMiddleware.get_callback_source(
-            example_functools_partial_callback
-        )
+        middleware.get_callback_source(example_functools_partial_callback)
         == "test_middleware:example_callback"
     )
     assert (
-        prometheus.PrometheusMiddleware.get_callback_source(
-            example_nested_functools_partial_callback
-        )
+        middleware.get_callback_source(example_nested_functools_partial_callback)
         == "test_middleware:example_callback"
     )

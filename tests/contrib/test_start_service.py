@@ -43,7 +43,7 @@ def test_script_initialises_transport_and_starts_frontend(
     )
     mock_frontend.Frontend.assert_called_once_with(
         service="SomeService",
-        transport=mock_tlookup.return_value,
+        transport=mock.ANY,
         environment={},
     )
     mock_frontend.Frontend.return_value.run.assert_called_once_with()
@@ -68,20 +68,23 @@ def test_add_metrics_option(mock_services, mock_frontend, mock_tlookup, mock_par
         version=mock.sentinel.version,
         add_metrics_option=True,
     )
+    mock_tlookup.assert_called_once_with(mock.sentinel.transport)
     mock_frontend.Frontend.assert_called_once_with(
         service="SomeService",
-        transport=mock_tlookup.return_value,
+        transport=mock.ANY,
         environment={},
     )
 
+    mock_tlookup.reset_mock()
     mock_options.metrics = True
     workflows.contrib.start_service.ServiceStarter().run(
         cmdline_args=["-s", "some", "--metrics"],
         version=mock.sentinel.version,
         add_metrics_option=True,
     )
+    mock_tlookup.assert_called_once_with(mock.sentinel.transport)
     mock_frontend.Frontend.assert_called_with(
         service="SomeService",
-        transport=mock_tlookup.return_value,
+        transport=mock.ANY,
         environment={"metrics": {"port": 4242}},
     )

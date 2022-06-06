@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import functools
-import inspect
 import time
 from typing import Callable, Optional
 
@@ -9,7 +7,7 @@ from prometheus_client import Counter, Gauge, Histogram
 
 from workflows.transport.common_transport import MessageCallback, TemporarySubscription
 
-from . import BaseTransportMiddleware
+from . import BaseTransportMiddleware, get_callback_source
 
 SUBSCRIPTIONS = Counter(
     "workflows_transport_subscriptions_total",
@@ -83,27 +81,13 @@ class PrometheusMiddleware(BaseTransportMiddleware):
     def __init__(self, source: str):
         self.source = source
 
-    @staticmethod
-    def get_callback_source(callable: Callable):
-        if isinstance(callable, functools.partial):
-            # functools.partial objects don't have a __qualname__ attribute
-            # account for possibility of nested stack of functools.partials
-            return PrometheusMiddleware.get_callback_source(callable.func)
-        else:
-            # if defined, used the __qualname__ attribute, else fallback on the repr
-            qualname = getattr(callable, "__qualname__", repr(callable).split("(")[0])
-        module = inspect.getmodule(callable)
-        if module:
-            return f"{module.__name__}:{qualname}"
-        return qualname
-
     def subscribe(self, call_next: Callable, channel, callback, **kwargs) -> int:
         def wrapped_callback(header, message):
             start_time = time.perf_counter()
             result = callback(header, message)
             end_time = time.perf_counter()
             CALLBACK_PROCESSING_TIME.labels(
-                source=self.get_callback_source(callback)
+                source=get_callback_source(callback)
             ).observe(end_time - start_time)
             return result
 
@@ -123,7 +107,7 @@ class PrometheusMiddleware(BaseTransportMiddleware):
             result = callback(header, message)
             end_time = time.perf_counter()
             CALLBACK_PROCESSING_TIME.labels(
-                source=self.get_callback_source(callback)
+                source=get_callback_source(callback)
             ).observe(end_time - start_time)
             return result
 
@@ -139,7 +123,7 @@ class PrometheusMiddleware(BaseTransportMiddleware):
             result = callback(header, message)
             end_time = time.perf_counter()
             CALLBACK_PROCESSING_TIME.labels(
-                source=self.get_callback_source(callback)
+                source=get_callback_source(callback)
             ).observe(end_time - start_time)
             return result
 
