@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-__version__ = "2.24"
+__version__ = "2.24.1"
 
 
 def version():
