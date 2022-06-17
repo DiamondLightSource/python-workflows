@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import functools
 import time
 from typing import Callable, Optional
 
@@ -82,6 +83,7 @@ class PrometheusMiddleware(BaseTransportMiddleware):
         self.source = source
 
     def subscribe(self, call_next: Callable, channel, callback, **kwargs) -> int:
+        @functools.wraps(callback)
         def wrapped_callback(header, message):
             start_time = time.perf_counter()
             result = callback(header, message)
@@ -102,6 +104,7 @@ class PrometheusMiddleware(BaseTransportMiddleware):
         callback: MessageCallback,
         **kwargs,
     ) -> TemporarySubscription:
+        @functools.wraps(callback)
         def wrapped_callback(header, message):
             start_time = time.perf_counter()
             result = callback(header, message)
@@ -118,6 +121,7 @@ class PrometheusMiddleware(BaseTransportMiddleware):
     def subscribe_broadcast(
         self, call_next: Callable, channel, callback, **kwargs
     ) -> int:
+        @functools.wraps(callback)
         def wrapped_callback(header, message):
             start_time = time.perf_counter()
             result = callback(header, message)
