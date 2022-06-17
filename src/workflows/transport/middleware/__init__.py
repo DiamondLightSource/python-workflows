@@ -178,6 +178,45 @@ class TimerMiddleware(BaseTransportMiddleware):
         self.level = level
 
     def subscribe(self, call_next: Callable, channel, callback, **kwargs) -> int:
+        @functools.wraps(callback)
+        def wrapped_callback(header, message):
+            start_time = time.perf_counter()
+            result = callback(header, message)
+            end_time = time.perf_counter()
+            source = get_callback_source(callback)
+            self.logger.log(
+                self.level,
+                f"Callback for {source} took {end_time - start_time:.4f} seconds",
+            )
+            return result
+
+        return call_next(channel, wrapped_callback, **kwargs)
+
+    def subscribe_temporary(
+        self,
+        call_next: Callable,
+        channel_hint: Optional[str],
+        callback: MessageCallback,
+        **kwargs,
+    ) -> TemporarySubscription:
+        @functools.wraps(callback)
+        def wrapped_callback(header, message):
+            start_time = time.perf_counter()
+            result = callback(header, message)
+            end_time = time.perf_counter()
+            source = get_callback_source(callback)
+            self.logger.log(
+                self.level,
+                f"Callback for {source} took {end_time - start_time:.4f} seconds",
+            )
+            return result
+
+        return call_next(channel_hint, wrapped_callback, **kwargs)
+
+    def subscribe_broadcast(
+        self, call_next: Callable, channel, callback, **kwargs
+    ) -> int:
+        @functools.wraps(callback)
         def wrapped_callback(header, message):
             start_time = time.perf_counter()
             result = callback(header, message)

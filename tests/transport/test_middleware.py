@@ -54,15 +54,34 @@ def test_timer_middleware(caplog):
     def callback(header, message):
         time.sleep(1)
 
-    subscription_id = offline.subscribe(str(mock.sentinel.channel), callback)
+    sid_1 = offline.subscribe(str(mock.sentinel.channel), callback)
+    sid_2 = offline.subscribe_broadcast(str(mock.sentinel.channel), callback)
+    ts = offline.subscribe_temporary(str(mock.sentinel.channel), callback)
+
+    expected_text = (
+        "Callback for test_middleware:test_timer_middleware.<locals>.callback took"
+    )
+
     with caplog.at_level(logging.DEBUG):
-        offline.subscription_callback(subscription_id)(
+        offline.subscription_callback(sid_1)(
             {"destination": "foo"}, str(mock.sentinel.message)
         )
-        assert (
-            "Callback for test_middleware:test_timer_middleware.<locals>.callback took"
-            in caplog.text
+        assert expected_text in caplog.text
+        caplog.clear()
+
+    with caplog.at_level(logging.DEBUG):
+        offline.subscription_callback(sid_2)(
+            {"destination": "bar"}, str(mock.sentinel.message)
         )
+        assert expected_text in caplog.text
+        caplog.clear()
+
+    with caplog.at_level(logging.DEBUG):
+        offline.subscription_callback(ts.subscription_id)(
+            {"destination": "foobar"}, str(mock.sentinel.message)
+        )
+        assert expected_text in caplog.text
+        caplog.clear()
 
 
 def test_prometheus_middleware():
