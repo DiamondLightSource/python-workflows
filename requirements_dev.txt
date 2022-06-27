@@ -2,8 +2,8 @@ bidict==0.22.0
 prometheus-client==0.14.1
 pytest==7.1.2
 pytest-cov==3.0.0
-pytest-mock==3.7.0
+pytest-mock==3.8.1
 pytest-timeout==2.1.0
-setuptools==62.3.2
+setuptools==62.6.0
 stomp.py==8.0.1
 pika==1.2.1
