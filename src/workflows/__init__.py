@@ -3,7 +3,7 @@ from __future__ import annotations
 __version__ = "2.24.1"
 
 
-def version():
+def version() -> str:
     """Returns the version number of the installed workflows package."""
     return __version__
 

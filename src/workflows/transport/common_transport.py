@@ -315,6 +315,10 @@ class CommonTransport:
 
         self._broadcast(destination, message, **kwargs)
 
+    def broadcast_status(self, status: dict) -> None:
+        """Broadcast transient status information to all listeners"""
+        raise NotImplementedError
+
     @middleware.wrap
     def ack(self, message, subscription_id: Optional[int] = None, **kwargs):
         """Acknowledge receipt of a message. This only makes sense when the
