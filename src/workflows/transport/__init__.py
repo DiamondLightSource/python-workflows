@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import argparse
 import optparse
-from typing import TYPE_CHECKING, Type, Union
+from typing import TYPE_CHECKING, Type
 
 import pkg_resources
 
@@ -20,7 +20,7 @@ def lookup(transport: str) -> Type[CommonTransport]:
 
 
 def add_command_line_options(
-    parser: Union[argparse.ArgumentParser, optparse.OptionParser],
+    parser: argparse.ArgumentParser | optparse.OptionParser,
     transport_argument: bool = False,
 ) -> None:
     """Add command line options for all available transport layer classes."""
