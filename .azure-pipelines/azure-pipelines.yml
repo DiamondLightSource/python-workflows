@@ -121,7 +121,7 @@ stages:
           pip install --disable-pip-version-check twine
         displayName: Install twine
 
-      - task: TwineAuthenticate@1
+      - task: TwineAuthenticate@1.208.0
         displayName: Set up credentials
         inputs:
           pythonUploadServiceConnection: pypi-workflows
