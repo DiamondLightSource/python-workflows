@@ -36,7 +36,7 @@ steps:
     artifactName: 'package'
     downloadPath: '$(System.ArtifactsDirectory)'
 
-- task: ExtractFiles@1
+- task: ExtractFiles@1.200.0
   displayName: Checkout sources
   inputs:
     archiveFilePatterns: "$(System.ArtifactsDirectory)/package/repo-source.tar.gz"
