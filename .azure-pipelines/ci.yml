@@ -28,7 +28,7 @@ steps:
     versionSpec: '$(PYTHON_VERSION)'
   displayName: 'Use Python $(PYTHON_VERSION)'
 
-- task: DownloadBuildArtifacts@0
+- task: DownloadBuildArtifacts@0.206.0
   displayName: Get pre-built package
   inputs:
     buildType: 'current'

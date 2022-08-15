@@ -109,7 +109,7 @@ stages:
         inputs:
           versionSpec: 3.8
 
-      - task: DownloadBuildArtifacts@0
+      - task: DownloadBuildArtifacts@0.206.0
         displayName: Get pre-built package
         inputs:
           buildType: 'current'
