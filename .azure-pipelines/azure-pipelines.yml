@@ -60,7 +60,7 @@ stages:
           ls -laR dist
         displayName: Build python package
 
-      - task: PublishBuildArtifacts@1
+      - task: PublishBuildArtifacts@1.200.0
         displayName: Store artifact
         inputs:
           pathToPublish: dist/
