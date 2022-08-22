@@ -16,7 +16,7 @@ stages:
       vmImage: ubuntu-20.04
     steps:
       # Use Python >=3.7 for syntax validation
-      - task: UsePythonVersion@0
+      - task: UsePythonVersion@0.206.0
         displayName: Set up python
         inputs:
           versionSpec: 3.7
@@ -41,7 +41,7 @@ stages:
     pool:
       vmImage: ubuntu-20.04
     steps:
-      - task: UsePythonVersion@0
+      - task: UsePythonVersion@0.206.0
         displayName: Set up python
         inputs:
           versionSpec: 3.9
@@ -104,7 +104,7 @@ stages:
     steps:
       - checkout: none
 
-      - task: UsePythonVersion@0
+      - task: UsePythonVersion@0.206.0
         displayName: Set up python
         inputs:
           versionSpec: 3.8
