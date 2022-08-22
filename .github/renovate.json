@@ -2,6 +2,10 @@
   "extends": [
     "config:base"
   ],
+  "azure-pipelines": {
+    "description": "Disable azure pipelines manager",
+    "enabled": false
+  },
   "labels": [
     "dependencies"
   ],
