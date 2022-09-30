@@ -200,7 +200,6 @@ class CommonService:
                 port = metrics["port"]
                 self.log.debug(f"Starting metrics endpoint on port {port}")
                 prometheus_client.start_http_server(port=port)
-
         else:
             self.log.debug("No transport layer defined for service. Skipping.")
 
@@ -239,6 +238,41 @@ class CommonService:
             self.__send_service_status_to_frontend()
         if commands:
             self.__pipe_commands = commands
+
+        if liveness := self._environment.get("liveness"):
+            from wsgiref.simple_server import make_server
+
+            def alive(environ, start_response):
+                self.__alive = False
+                self.__send_to_frontend({"band": "liveness_check"})
+
+                # timeout of liveness check, in seconds
+                timeout = time.time() + liveness.get("timeout", 30)
+                while True:
+                    if self.__alive or time.time() > timeout:
+                        break
+
+                if self.__alive:
+                    status = "200 OK"
+                    retval = [b"ok"]
+                else:
+                    status = "408 Request Timeout"
+                    retval = [b"not ok"]
+
+                headers = [
+                    ("Content-type", "text/plain; charset=utf-8")
+                ]  # HTTP Headers
+                start_response(status, headers)
+                return retval
+
+            port = liveness["port"]
+            httpd = make_server("", port, alive)
+            self.log.debug(f"Serving liveness check on port {port}...")
+
+            # Serve until process is killed
+            t = threading.Thread(target=httpd.serve_forever)
+            t.daemon = True
+            t.start()
 
     @contextlib.contextmanager
     def extend_log(self, field, value):
@@ -500,9 +534,12 @@ class CommonService:
         """Process an incoming command message from the frontend."""
         if command == Commands.SHUTDOWN:
             self.__shutdown = True
+        elif command == Commands.ALIVE:
+            self.__alive = True
 
 
 class Commands:
     """A list of command strings used for communicating with the frontend."""
 
     SHUTDOWN = "shutdown"
+    ALIVE = "alive"

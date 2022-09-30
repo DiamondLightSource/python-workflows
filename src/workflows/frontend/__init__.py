@@ -339,6 +339,11 @@ class Frontend:
         self.log.debug("Status update: " + str(message))
         self.update_status(status_code=message["statuscode"])
 
+    def parse_band_liveness_check(self, message):
+        """Respond by sending message to backend to let it know we are alive."""
+        self.log.debug("Service liveness check: alive!")
+        self.send_command({"band": "command", "payload": "alive"})
+
     def get_host_id(self):
         """Get a cached copy of the host id."""
         return self.__hostid
