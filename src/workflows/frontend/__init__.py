@@ -128,8 +128,8 @@ class Frontend:
         else:
             self.update_status()
 
-        if liveness := self._service_environment.get("liveness"):
-            self._start_liveness_endpoint(liveness)
+        if "liveness" in self._service_environment:
+            self._start_liveness_endpoint(self._service_environment["liveness"])
 
     def update_status(self, status_code=None):
         """Update the service status kept inside the frontend (_service_status).
