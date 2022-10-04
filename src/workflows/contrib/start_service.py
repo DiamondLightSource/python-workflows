@@ -83,7 +83,6 @@ class ServiceStarter:
             + ", ".join(known_services),
         )
         parser.add_option(
-            "-l",
             "--liveness",
             dest="liveness",
             action="store_true",
