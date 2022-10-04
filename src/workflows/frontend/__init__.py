@@ -467,22 +467,14 @@ class Frontend:
             self.__alive = False
             self.send_command({"band": "command", "payload": "liveness_check"})
 
-            # timeout of liveness check, in seconds
-            timeout = time.time() + params.get("timeout", 30)
             while True:
-                if self.__alive or time.time() > timeout:
-                    break
-
-            if self.__alive:
-                status = "200 OK"
-                retval = [b"ok"]
-            else:
-                status = "408 Request Timeout"
-                retval = [b"not ok"]
-
-            headers = [("Content-type", "text/plain; charset=utf-8")]  # HTTP Headers
-            start_response(status, headers)
-            return retval
+                if self.__alive:
+                    status = "200 OK"
+                    headers = [
+                        ("Content-type", "text/plain; charset=utf-8")
+                    ]  # HTTP Headers
+                    start_response(status, headers)
+                    return [b"ok"]
 
         port = params["port"]
         httpd = make_server("", port, alive)
