@@ -128,6 +128,9 @@ class Frontend:
         else:
             self.update_status()
 
+        if liveness := self._service_environment.get("liveness"):
+            self._start_liveness_endpoint(liveness)
+
     def update_status(self, status_code=None):
         """Update the service status kept inside the frontend (_service_status).
         The status is broadcast over the network immediately. If the status
@@ -342,7 +345,7 @@ class Frontend:
     def parse_band_liveness_check(self, message):
         """Respond by sending message to backend to let it know we are alive."""
         self.log.debug("Service liveness check: alive!")
-        self.send_command({"band": "command", "payload": "alive"})
+        self.__alive = True
 
     def get_host_id(self):
         """Get a cached copy of the host id."""
@@ -456,3 +459,36 @@ class Frontend:
             if self._service:
                 self._service.join()  # must wait for process to be actually destroyed
             self._service = None
+
+    def _start_liveness_endpoint(self, params: dict):
+        from wsgiref.simple_server import make_server
+
+        def alive(environ, start_response):
+            self.__alive = False
+            self.send_command({"band": "command", "payload": "liveness_check"})
+
+            # timeout of liveness check, in seconds
+            timeout = time.time() + params.get("timeout", 30)
+            while True:
+                if self.__alive or time.time() > timeout:
+                    break
+
+            if self.__alive:
+                status = "200 OK"
+                retval = [b"ok"]
+            else:
+                status = "408 Request Timeout"
+                retval = [b"not ok"]
+
+            headers = [("Content-type", "text/plain; charset=utf-8")]  # HTTP Headers
+            start_response(status, headers)
+            return retval
+
+        port = params["port"]
+        httpd = make_server("", port, alive)
+        self.log.debug(f"Serving liveness check on port {port}...")
+
+        # Serve until process is killed
+        t = threading.Thread(target=httpd.serve_forever)
+        t.daemon = True
+        t.start()
