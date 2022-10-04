@@ -200,7 +200,6 @@ class CommonService:
                 port = metrics["port"]
                 self.log.debug(f"Starting metrics endpoint on port {port}")
                 prometheus_client.start_http_server(port=port)
-
         else:
             self.log.debug("No transport layer defined for service. Skipping.")
 
@@ -500,9 +499,12 @@ class CommonService:
         """Process an incoming command message from the frontend."""
         if command == Commands.SHUTDOWN:
             self.__shutdown = True
+        elif command == Commands.LIVENESS_CHECK:
+            self.__send_to_frontend({"band": "liveness_check", "payload": "alive"})
 
 
 class Commands:
     """A list of command strings used for communicating with the frontend."""
 
     SHUTDOWN = "shutdown"
+    LIVENESS_CHECK = "liveness_check"

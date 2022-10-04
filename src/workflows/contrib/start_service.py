@@ -82,6 +82,31 @@ class ServiceStarter:
             help="Name of the service to start. Known services: "
             + ", ".join(known_services),
         )
+        parser.add_option(
+            "--liveness",
+            dest="liveness",
+            action="store_true",
+            default=False,
+            help=(
+                "Expose a liveness check endpoint for this service."
+                "A return code of 200 indicates success."
+                "A return code of 408 indicates failure."
+            ),
+        )
+        parser.add_option(
+            "--liveness-port",
+            dest="liveness_port",
+            default=8000,
+            type="int",
+            help="Expose liveness check endpoint on this port.",
+        )
+        parser.add_option(
+            "--liveness-timeout",
+            dest="liveness_timeout",
+            default=30,
+            type="float",
+            help="Timeout for the liveness check (in seconds).",
+        )
         if add_metrics_option:
             parser.add_option(
                 "-m",
@@ -151,6 +176,12 @@ class ServiceStarter:
         kwargs.setdefault("environment", {})
         if add_metrics_option and options.metrics:
             kwargs["environment"]["metrics"] = {"port": options.metrics_port}
+
+        if options.liveness:
+            kwargs["environment"]["liveness"] = {
+                "port": options.liveness_port,
+                "timeout": options.liveness_timeout,
+            }
 
         # Call before_frontend_construction hook
         kwargs = self.before_frontend_construction(kwargs) or kwargs

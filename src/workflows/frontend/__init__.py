@@ -128,6 +128,9 @@ class Frontend:
         else:
             self.update_status()
 
+        if environment and "liveness" in environment:
+            self._start_liveness_endpoint(environment["liveness"]["port"])
+
     def update_status(self, status_code=None):
         """Update the service status kept inside the frontend (_service_status).
         The status is broadcast over the network immediately. If the status
@@ -339,6 +342,11 @@ class Frontend:
         self.log.debug("Status update: " + str(message))
         self.update_status(status_code=message["statuscode"])
 
+    def parse_band_liveness_check(self, message):
+        """Respond by sending message to backend to let it know we are alive."""
+        self.log.debug("Service liveness check: alive!")
+        self.__alive = True
+
     def get_host_id(self):
         """Get a cached copy of the host id."""
         return self.__hostid
@@ -451,3 +459,27 @@ class Frontend:
             if self._service:
                 self._service.join()  # must wait for process to be actually destroyed
             self._service = None
+
+    def _start_liveness_endpoint(self, port: int):
+        from wsgiref.simple_server import make_server
+
+        def alive(environ, start_response):
+            self.__alive = False
+            self.send_command({"band": "command", "payload": "liveness_check"})
+
+            while True:
+                if self.__alive:
+                    status = "200 OK"
+                    headers = [
+                        ("Content-type", "text/plain; charset=utf-8")
+                    ]  # HTTP Headers
+                    start_response(status, headers)
+                    return [b"ok"]
+
+        httpd = make_server("", port, alive)
+        self.log.debug(f"Serving liveness check on port {port}...")
+
+        # Serve until process is killed
+        t = threading.Thread(target=httpd.serve_forever)
+        t.daemon = True
+        t.start()
