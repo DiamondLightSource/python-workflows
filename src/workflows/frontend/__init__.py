@@ -128,8 +128,8 @@ class Frontend:
         else:
             self.update_status()
 
-        if "liveness" in self._service_environment:
-            self._start_liveness_endpoint(self._service_environment["liveness"])
+        if environment and "liveness" in environment:
+            self._start_liveness_endpoint(environment["liveness"]["port"])
 
     def update_status(self, status_code=None):
         """Update the service status kept inside the frontend (_service_status).
@@ -460,7 +460,7 @@ class Frontend:
                 self._service.join()  # must wait for process to be actually destroyed
             self._service = None
 
-    def _start_liveness_endpoint(self, params: dict):
+    def _start_liveness_endpoint(self, port: int):
         from wsgiref.simple_server import make_server
 
         def alive(environ, start_response):
@@ -476,7 +476,6 @@ class Frontend:
                     start_response(status, headers)
                     return [b"ok"]
 
-        port = params["port"]
         httpd = make_server("", port, alive)
         self.log.debug(f"Serving liveness check on port {port}...")
 
