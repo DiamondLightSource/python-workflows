@@ -88,6 +88,8 @@ stages:
           PYTHON_VERSION: 3.9
         python310:
           PYTHON_VERSION: 3.10
+        python311:
+          PYTHON_VERSION: 3.11
     steps:
     - template: ci.yml
 
@@ -107,7 +109,7 @@ stages:
       - task: UsePythonVersion@0
         displayName: Set up python
         inputs:
-          versionSpec: 3.8
+          versionSpec: 3.11
 
       - task: DownloadBuildArtifacts@0
         displayName: Get pre-built package
