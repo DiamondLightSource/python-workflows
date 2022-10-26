@@ -109,7 +109,7 @@ stages:
       - task: UsePythonVersion@0
         displayName: Set up python
         inputs:
-          versionSpec: 3.8
+          versionSpec: 3.11
 
       - task: DownloadBuildArtifacts@0
         displayName: Get pre-built package
