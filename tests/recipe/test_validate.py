@@ -14,11 +14,6 @@ import workflows
 from workflows.recipe.validate import main, validate_recipe
 
 
-def test_validate_returns_type_error_when_called_without_parameters():
-    with pytest.raises(TypeError):
-        validate_recipe()
-
-
 def test_no_errors_when_validating_healthy_recipe(tmpdir):
     healthy_recipe = """
         {
