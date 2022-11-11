@@ -76,6 +76,7 @@ def _wrap_subscription(
         #                    "First 1000 characters of message:\n%s",
         #                    str(header)[:1000], str(message)[:1000])
         transport_layer.nack(header)
+        return None
 
     if mangle_for_receiving:
         kwargs = {**kwargs, "disable_mangling": True}
