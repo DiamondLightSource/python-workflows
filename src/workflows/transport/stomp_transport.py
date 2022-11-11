@@ -379,7 +379,14 @@ class StompTransport(CommonTransport):
         # Callback reference is kept as further messages may already have been received
 
     def _send(
-        self, destination, message, headers=None, delay=None, expiration=None, **kwargs
+        self,
+        destination,
+        message,
+        *,
+        headers=None,
+        delay=None,
+        expiration=None,
+        **kwargs,
     ):
         """Send a message to a queue.
         :param destination: Queue name to send to
@@ -415,7 +422,14 @@ class StompTransport(CommonTransport):
             raise workflows.Disconnected("No connection to stomp host")
 
     def _broadcast(
-        self, destination, message, headers=None, delay=None, expiration=None, **kwargs
+        self,
+        destination,
+        message,
+        *,
+        headers=None,
+        delay=None,
+        expiration=None,
+        **kwargs,
     ):
         """Broadcast a message.
         :param destination: Topic name to send to

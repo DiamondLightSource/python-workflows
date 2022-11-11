@@ -84,12 +84,26 @@ class OfflineTransport(CommonTransport):
         )
 
     def _send(
-        self, destination, message, headers=None, delay=None, expiration=None, **kwargs
+        self,
+        destination,
+        message,
+        *,
+        headers=None,
+        delay=None,
+        expiration=None,
+        **kwargs,
     ):
         self._output(f"Sending {len(message)} bytes to {destination}", message)
 
     def _broadcast(
-        self, destination, message, headers=None, delay=None, expiration=None, **kwargs
+        self,
+        destination,
+        message,
+        *,
+        headers=None,
+        delay=None,
+        expiration=None,
+        **kwargs,
     ):
         self._output(f"Broadcasting {len(message)} bytes to {destination}", message)
 
