@@ -299,6 +299,7 @@ def test_downstream_message_sending_via_recipewrapper_with_custom_mangling():
         return {**message, "foo": "bar"}
 
     # Messages sent to defined outputs are sent
+    t.reset_mock()
     rw.send_to(
         "somewhere",
         mock.sentinel.message_text,
@@ -311,6 +312,7 @@ def test_downstream_message_sending_via_recipewrapper_with_custom_mangling():
             headers={"workflows-recipe": True},
         )
     ]
+    t.assert_has_calls(expected)
 
     t.reset_mock()
     rw.send_to("a-topic", mock.sentinel.message_text, mangle_for_sending=custom_mangle)
@@ -319,8 +321,10 @@ def test_downstream_message_sending_via_recipewrapper_with_custom_mangling():
             m["recipe"][3]["topic"],
             {**downstream_message(3, mock.sentinel.message_text), "foo": "bar"},
             headers={"workflows-recipe": True},
+            delay=300,
         )
     ]
+    t.assert_has_calls(expected)
 
     t.reset_mock()
     rw.set_default_channel("somewhere")
@@ -338,7 +342,7 @@ def test_downstream_message_sending_via_recipewrapper_with_custom_mangling():
         )
     ]
 
-    assert t.mock_calls == expected
+    t.assert_has_calls(expected)
     t.reset_mock()
 
 
