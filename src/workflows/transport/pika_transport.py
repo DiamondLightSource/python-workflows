@@ -558,8 +558,6 @@ class PikaTransport(CommonTransport):
 
         if not headers:
             headers = {}
-        # if delay:
-        #     headers["x-delay"] = 1000 * delay
 
         properties = pika.BasicProperties(
             headers=headers,
