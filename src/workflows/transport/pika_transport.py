@@ -95,6 +95,7 @@ class PikaTransport(CommonTransport):
             try:
                 cls.defaults[target] = cfgparser.get("rabbit", cfgoption)
             except configparser.NoOptionError:
+                # Option not in config file, fall back to default
                 pass
 
     @classmethod
@@ -819,11 +820,11 @@ class _PikaThread(threading.Thread):
 
         self._please_stop.set()
         # We might be waiting for an event, so give the event loop one...
-        # We might already be closed or shutting down, so ignore errors for that
         try:
             if self._connection:
                 self._connection.add_callback_threadsafe(lambda: None)
         except pika.exceptions.ConnectionWrongStateError:
+            # We might already be closed or shutting down, so ignore errors for that
             pass
 
     def join(

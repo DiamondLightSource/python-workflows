@@ -70,6 +70,7 @@ class StompTransport(CommonTransport):
             try:
                 cls.defaults[target] = cfgparser.get("stomp", cfgoption)
             except configparser.NoOptionError:
+                # Option not in config file, fall back to default
                 pass
 
     @classmethod
