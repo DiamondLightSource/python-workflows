@@ -19,4 +19,26 @@ class SamplePipethrough(CommonService):
 
     def initializing(self):
         """Subscribe to a channel."""
+        workflows.recipe.wrap_subscribe(
+            self._transport,
+            "sample_pipethrough",
+            self.process,
+        ) 
+
+    def process(self, rw, header, message):
+        """Consume message and send to output pipe."""
+        t = (time.time() % 1000) * 1000
+
+        if header:
+            header_str = json.dumps(header, indent=2) + "\n" + "----------------" + "\n"
+        else:
+            header_str = ""
+        if isinstance(message, dict):
+            message = json.dumps(message, indent=2) + "\n" + "----------------" + "\n"
+
+        self.log.info(
+            f"=== Consume ====\n{header_str}{message}\nReceived message @{t:10.3f} ms"
+        )
+        
+        rw.send()
 
