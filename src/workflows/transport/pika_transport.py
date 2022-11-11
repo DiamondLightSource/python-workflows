@@ -1021,7 +1021,7 @@ class _PikaThread(threading.Thread):
                     )
                     self._add_subscription(subscription_id, temporary_subscription)
                     result.set_result(temporary_queue_name)
-            except BaseException as e:
+            except Exception as e:
                 result.set_exception(e)
                 raise
 
@@ -1056,7 +1056,7 @@ class _PikaThread(threading.Thread):
                         self._transaction_on_channel.pop(channel, None)
 
                     result.set_result(None)
-            except BaseException as e:
+            except Exception as e:
                 result.set_exception(e)
 
         self._register_future_and_callback(result, _unsubscribe)
@@ -1095,7 +1095,7 @@ class _PikaThread(threading.Thread):
                         mandatory=mandatory,
                     )
                     future.set_result(None)
-                except BaseException as e:
+                except Exception as e:
                     future.set_exception(e)
                     raise
 
@@ -1220,7 +1220,7 @@ class _PikaThread(threading.Thread):
                     self._channel_is_transactional[channel] = True
 
                     future.set_result(None)
-                except BaseException as e:
+                except Exception as e:
                     future.set_exception(e)
                     raise
 
@@ -1249,7 +1249,7 @@ class _PikaThread(threading.Thread):
                     channel.tx_rollback()
                     self._channel_has_active_tx.pop(channel, None)
                     future.set_result(None)
-                except BaseException as e:
+                except Exception as e:
                     future.set_exception(e)
                     raise
 
@@ -1278,7 +1278,7 @@ class _PikaThread(threading.Thread):
                     channel.tx_commit()
                     self._channel_has_active_tx.pop(channel, None)
                     future.set_result(None)
-                except BaseException as e:
+                except Exception as e:
                     future.set_exception(e)
                     raise
 
@@ -1340,7 +1340,7 @@ class _PikaThread(threading.Thread):
         try:
             for subscription_id, subscription in old_subscriptions.items():
                 self._add_subscription(subscription_id, subscription)
-        except BaseException:
+        except Exception:
             # If something goes (temporarily) wrong recreating, then we
             # don't want to only partially resubscribe next time
             self._subscriptions = old_subscriptions
@@ -1484,7 +1484,7 @@ class _PikaThread(threading.Thread):
                     logger.error(f"Initial connection failed: {e!r}")
                     break
                 logger.warning(f"Connection {connection_counter} failed: {e!r}")
-            except BaseException as e:
+            except Exception as e:
                 logger.error(f"Connection failed for unknown reason: {e!r}")
                 self._exc_info = sys.exc_info()
                 break
@@ -1549,6 +1549,6 @@ class _PikaThread(threading.Thread):
                 ), f"Subscription request {subscription_id} rejected due to existing subscription {self._subscriptions[subscription_id]}"
                 self._add_subscription(subscription_id, subscription)
                 result.set_result(self._subscriptions[subscription_id].queue)
-        except BaseException as e:
+        except Exception as e:
             result.set_exception(e)
             raise
