@@ -769,22 +769,22 @@ def test_error_handling_on_subscribing(mockpika, mock_pikathread):
 
 
 @mock.patch("workflows.transport.pika_transport.pika")
-def test_transaction_calls(mockpika):
+def test_transaction_calls(mockpika, mock_pikathread):
     """Test that calls to create, commit, abort transactions are passed to Pika properly."""
-    pytest.xfail("Transactions not implemented in pika transport yet")
     transport = PikaTransport()
     transport.connect()
-    mockconn = mockpika.BlockingConnection
-    mockchannel = mockconn.return_value.channel.return_value
+
     mockproperties = mockpika.BasicProperties
 
-    transport._transaction_begin()
-    mockchannel.tx_select.assert_called_once()
+    transaction_id = 0
+    transport._transaction_begin(transaction_id=transaction_id)
+    mock_pikathread.tx_select.assert_called_once()
 
     transport._send(
         "destination", mock.sentinel.message, transaction=mock.sentinel.txid
     )
-    args, kwargs = mockchannel.basic_publish.call_args
+    mock_pikathread.send.assert_called_once()
+    args, kwargs = mock_pikathread.send.call_args
     assert not args
     assert kwargs == {
         "exchange": "",
@@ -792,14 +792,15 @@ def test_transaction_calls(mockpika):
         "body": mock.sentinel.message,
         "mandatory": True,
         "properties": mock.ANY,
+        "transaction_id": mock.sentinel.txid,
     }
     assert mockproperties.call_args[1] == {"headers": {}, "delivery_mode": 2}
 
-    transport._transaction_abort()
-    mockchannel.tx_rollback.assert_called_once()
+    transport._transaction_abort(transaction_id=transaction_id)
+    mock_pikathread.tx_rollback.assert_called_once()
 
-    transport._transaction_commit()
-    mockchannel.tx_commit.assert_called_once()
+    transport._transaction_commit(transaction_id=transaction_id)
+    mock_pikathread.tx_commit.assert_called_once()
 
 
 def test_ack_message(mock_pikathread):
