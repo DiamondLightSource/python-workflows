@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import time
 
+import workflows.recipe
 from workflows.services.common_service import CommonService
 
 
@@ -21,7 +22,7 @@ class SamplePipethrough(CommonService):
         """Subscribe to a channel."""
         workflows.recipe.wrap_subscribe(
             self._transport,
-            "sample_pipethrough",
+            "transient.destination",
             self.process,
         ) 
 
@@ -40,5 +41,5 @@ class SamplePipethrough(CommonService):
             f"=== Consume ====\n{header_str}{message}\nReceived message @{t:10.3f} ms"
         )
         
-        rw.send()
+        rw.send(0)
 
