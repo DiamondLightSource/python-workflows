@@ -17,3 +17,6 @@ class SamplePipethrough(CommonService):
     # Logger name
     _logger_name = "workflows.service.sample_pipethrough"
 
+    def initializing(self):
+        """Subscribe to a channel."""
+
