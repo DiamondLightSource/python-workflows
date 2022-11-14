@@ -850,7 +850,7 @@ def connection_params():
     # Try a connection here to make sure this is valid
     try:
         bc = pika.BlockingConnection(params)
-    except Exception:
+    except BaseException:
         pytest.skip("Failed to create test RabbitMQ connection")
     else:
         bc.close()
@@ -919,7 +919,7 @@ def test_channel(connection_params) -> pika.channel.Channel:
                 try:
                     print(f"Cleaning up from {filename}:{lineno}")
                     task()
-                except Exception as e:
+                except BaseException as e:
                     print(
                         f"Encountered error cleaning up test channel, cleanup from {filename}:{lineno} may not be complete: {e}",
                     )
