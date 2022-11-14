@@ -203,6 +203,10 @@ class CommonService:
         else:
             self.log.debug("No transport layer defined for service. Skipping.")
 
+        from workflows.transport.middleware.tracer import TracerMiddleware
+        instrument = TracerMiddleware(self.__class__.__name__)
+        self._transport.add_middleware(instrument)
+
     def stop_transport(self):
         """If a transport object has been defined then tear it down."""
         if self.transport:
