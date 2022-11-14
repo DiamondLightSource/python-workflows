@@ -18,23 +18,26 @@ from opentelemetry.trace.propagation.tracecontext \
 from opentelemetry.exporter.otlp.proto.http.trace_exporter \
         import OTLPSpanExporter
 
-resource = Resource(attributes={
-    SERVICE_NAME: "Common Service"
-})
-
-processor = BatchSpanProcessor(OTLPSpanExporter( \
-        endpoint="http://localhost:4318/v1/traces"))
-provider = TracerProvider(resource = resource)
-# A provider provides tracers:
-provider = TracerProvider(resource=resource)
-provider.add_span_processor(processor)
-# In python trace is global:
-trace.set_tracer_provider(provider)
-tracer = trace.get_tracer(__name__)
-
 class TracerMiddleware(BaseTransportMiddleware):
     def __init__(self, service_name: str):
         self.service_name = service_name
+        self._initiate_tracers(service_name)
+
+    def _initiate_tracers(self, service_name):
+        resource = Resource(attributes={
+            SERVICE_NAME: service_name 
+        })
+
+        processor = BatchSpanProcessor(OTLPSpanExporter( \
+                endpoint="http://localhost:4318/v1/traces"))
+        # A provider provides tracers:
+        provider = TracerProvider(resource=resource)
+        provider.add_span_processor(processor)
+        # In python trace is global:
+        trace.set_tracer_provider(provider)
+        self.tracer = trace.get_tracer(__name__)
+
+
 
     def _extract_trace_context(self, message):
         """Retrieves span context from message"""
@@ -59,7 +62,7 @@ class TracerMiddleware(BaseTransportMiddleware):
         @functools.wraps(callback)
         def wrapped_callback(header, message):
             ctx = self._extract_trace_context(message)
-            with tracer.start_as_current_span(self.service_name, context=ctx) as span:
+            with self.tracer.start_as_current_span(self.service_name, context=ctx) as span:
                 if ctx == {}:
                     self._inject_trace_context(message)
                 return callback(header, message)
