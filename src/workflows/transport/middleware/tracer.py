@@ -36,35 +36,36 @@ class TracerMiddleware(BaseTransportMiddleware):
     def __init__(self, service_name: str):
         self.service_name = service_name
 
-    def _get_trace_context(self, message):
-        """If a trace context exists in the recipe wrapper's environment, get it"""
+    def _extract_trace_context(self, message):
+        """Retrieves span context from message"""
         try:
-            #carrier = message['environment']['trace_context']
             carrier = message['trace_context']
             ctx = TraceContextTextMapPropagator().extract(carrier=carrier) 
+            print(f"Extracting {ctx}")
             return ctx
         except KeyError:
+            print(f"Extracted nothing")
             return {}
 
-    def subscribe(self, call_next: Callable, channel, callback, **kwargs) -> int:
-        print(f"call_next: {call_next}, channel: {channel}, callback: {callback}, kwargs: {kwargs}")
+    def _inject_trace_context(self, message):
+        """Inserts trace context into message"""
+        carrier = {}
+        TraceContextTextMapPropagator().inject(carrier)
+        message['trace_context'] = carrier
+        print(f"injecting {carrier}")
 
+
+    def subscribe(self, call_next: Callable, channel, callback, **kwargs) -> int:
         @functools.wraps(callback)
         def wrapped_callback(header, message):
-            print(f"wrapped_callback header: {header}, message: {message}")
-            
-            ctx = self._get_trace_context(message)
+            ctx = self._extract_trace_context(message)
             with tracer.start_as_current_span(self.service_name, context=ctx) as span:
                 if ctx == {}:
-                    print("inserting trace_context into message")
-                    message['trace_context'] = "foo"
+                    self._inject_trace_context(message)
                 return callback(header, message)
 
         return call_next(channel, wrapped_callback, **kwargs)
 
     def send(self, call_next: Callable, destination, message, **kwargs):
-        carrier = {}
-        TraceContextTextMapPropagator().inject(carrier)
-        message['trace_context'] = carrier
-
+        self._inject_trace_context(message)
         call_next(destination, message, **kwargs)
