@@ -18,47 +18,52 @@ from opentelemetry.trace.propagation.tracecontext \
 from opentelemetry.exporter.otlp.proto.http.trace_exporter \
         import OTLPSpanExporter
 
+
 class TracerMiddleware(BaseTransportMiddleware):
     def __init__(self, service_name: str):
         self.service_name = service_name
         self._initiate_tracers(service_name)
 
     def _initiate_tracers(self, service_name):
+        """Initiates everything needed for tracing"""
+        # Label this resource as its service:
         resource = Resource(attributes={
             SERVICE_NAME: service_name 
         })
-
+        # Export to OpenTelemetry Collector:
         processor = BatchSpanProcessor(OTLPSpanExporter( \
                 endpoint="http://localhost:4318/v1/traces"))
         # A provider provides tracers:
         provider = TracerProvider(resource=resource)
         provider.add_span_processor(processor)
-        # In python trace is global:
+        # A tracer provides traces:
         trace.set_tracer_provider(provider)
         self.tracer = trace.get_tracer(__name__)
 
-
-
     def _extract_trace_context(self, message):
-        """Retrieves span context from message"""
+        """Retrieves Context object from message"""
         try:
+            # Deserialise serialised context into a Context object:
             carrier = message['trace_context']
             ctx = TraceContextTextMapPropagator().extract(carrier=carrier) 
-            print(f"Extracting {ctx}")
             return ctx
         except KeyError:
-            print(f"Extracted nothing")
+            # If no context, leave empty:
             return {}
 
     def _inject_trace_context(self, message):
-        """Inserts trace context into message"""
+        """Inserts serialized trace context into message"""
         carrier = {}
+        # If called outside of a span context, just leave carrier empty
+        # (very safe!)
         TraceContextTextMapPropagator().inject(carrier)
         message['trace_context'] = carrier
-        print(f"injecting {carrier}")
-
 
     def subscribe(self, call_next: Callable, channel, callback, **kwargs) -> int:
+        """The callback includes 'everything' that happens in a service that
+            we care about, so we wrap it in a span context.
+            To link the current span context with others from the same request
+            we inject/extract the serialized trace context in the recipe message"""
         @functools.wraps(callback)
         def wrapped_callback(header, message):
             ctx = self._extract_trace_context(message)
@@ -70,5 +75,7 @@ class TracerMiddleware(BaseTransportMiddleware):
         return call_next(channel, wrapped_callback, **kwargs)
 
     def send(self, call_next: Callable, destination, message, **kwargs):
+        # Because send is usually called within a callback, it is inside a span
+        # context, so we can inject its trace context into the message:
         self._inject_trace_context(message)
         call_next(destination, message, **kwargs)
