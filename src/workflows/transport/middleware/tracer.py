@@ -25,7 +25,7 @@ class TracerMiddleware(BaseTransportMiddleware):
         self._initiate_tracers(service_name)
 
     def _initiate_tracers(self, service_name):
-        """Initiates everything needed for tracing"""
+        """Initiates everything needed for tracing."""
         # Label this resource as its service:
         resource = Resource(attributes={
             SERVICE_NAME: service_name 
@@ -41,7 +41,7 @@ class TracerMiddleware(BaseTransportMiddleware):
         self.tracer = trace.get_tracer(__name__)
 
     def _extract_trace_context(self, message):
-        """Retrieves Context object from message"""
+        """Retrieves Context object from message."""
         carrier = message.get('trace_context')
         if carrier:
             # Deserialise serialised context into a Context object:
@@ -51,7 +51,10 @@ class TracerMiddleware(BaseTransportMiddleware):
         return {}
 
     def _inject_trace_context(self, message):
-        """Inserts serialized trace context into message"""
+        """Inserts serialized trace context into message."""
+        if type(message) == str:
+            print("Warning: string message received")
+            return
         carrier = {}
         # If called outside of a span context, just leave carrier empty
         # (very safe!)
@@ -60,9 +63,9 @@ class TracerMiddleware(BaseTransportMiddleware):
 
     def subscribe(self, call_next: Callable, channel, callback, **kwargs) -> int:
         """The callback includes 'everything' that happens in a service that
-            we care about, so we wrap it in a span context.
-            To link the current span context with others from the same request
-            we inject/extract the serialized trace context in the recipe message"""
+        we care about, so we wrap it in a span context.
+        To link the current span context with others from the same request
+        we inject/extract the serialized trace context in the recipe message."""
         @functools.wraps(callback)
         def wrapped_callback(header, message):
             ctx = self._extract_trace_context(message)
@@ -74,7 +77,7 @@ class TracerMiddleware(BaseTransportMiddleware):
         return call_next(channel, wrapped_callback, **kwargs)
 
     def send(self, call_next: Callable, destination, message, **kwargs):
-        # Because send is usually called within a callback, it is inside a span
-        # context, so we can inject its trace context into the message:
+        """Because send is usually called within a callback, it is inside a span
+        context, so we can inject its trace context into the message."""
         self._inject_trace_context(message)
         call_next(destination, message, **kwargs)
