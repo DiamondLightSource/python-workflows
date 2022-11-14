@@ -42,14 +42,13 @@ class TracerMiddleware(BaseTransportMiddleware):
 
     def _extract_trace_context(self, message):
         """Retrieves Context object from message"""
-        try:
+        carrier = message.get('trace_context')
+        if carrier:
             # Deserialise serialised context into a Context object:
-            carrier = message['trace_context']
             ctx = TraceContextTextMapPropagator().extract(carrier=carrier) 
             return ctx
-        except KeyError:
-            # If no context, leave empty:
-            return {}
+        # If no context, leave empty:
+        return {}
 
     def _inject_trace_context(self, message):
         """Inserts serialized trace context into message"""
