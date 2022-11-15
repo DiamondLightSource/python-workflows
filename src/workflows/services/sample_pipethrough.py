@@ -40,6 +40,6 @@ class SamplePipethrough(CommonService):
         self.log.info(
             f"=== Consume ====\n{header_str}{message}\nReceived message @{t:10.3f} ms"
         )
- 
+
         rw.send(0)
 
