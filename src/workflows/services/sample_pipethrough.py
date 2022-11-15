@@ -24,7 +24,7 @@ class SamplePipethrough(CommonService):
             self._transport,
             "transient.destination",
             self.process,
-        ) 
+        )
 
     def process(self, rw, header, message):
         """Consume message and send to output pipe."""
@@ -40,6 +40,6 @@ class SamplePipethrough(CommonService):
         self.log.info(
             f"=== Consume ====\n{header_str}{message}\nReceived message @{t:10.3f} ms"
         )
-        
+ 
         rw.send(0)
 
