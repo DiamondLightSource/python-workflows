@@ -72,6 +72,12 @@ class TracerMiddleware(BaseTransportMiddleware):
             with self.tracer.start_as_current_span(self.service_name, context=ctx) as span:
                 if ctx == {}:
                     self._inject_trace_context(message)
+
+                # Insert header and message info:
+                for key, value in header.items():
+                    span.set_attribute(str(key), str(value))
+                for key, value in message.items():
+                    span.set_attribute(str(key), str(value))
                 return callback(header, message)
 
         return call_next(channel, wrapped_callback, **kwargs)
