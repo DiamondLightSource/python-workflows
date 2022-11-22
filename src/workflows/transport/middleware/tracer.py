@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import functools
 from typing import Callable
+import logging
 
 from . import BaseTransportMiddleware
 
@@ -18,6 +19,7 @@ from opentelemetry.trace.propagation.tracecontext \
 from opentelemetry.exporter.otlp.proto.http.trace_exporter \
         import OTLPSpanExporter
 
+logger = logging.getLogger(__name__)
 
 class TracerMiddleware(BaseTransportMiddleware):
     def __init__(self, service_name: str):
@@ -39,6 +41,7 @@ class TracerMiddleware(BaseTransportMiddleware):
         # A tracer provides traces:
         trace.set_tracer_provider(provider)
         self.tracer = trace.get_tracer(__name__)
+        logger.info(f"initialized tracer as {service_name}")
 
     def _extract_trace_context(self, message):
         """Retrieves Context object from message."""
@@ -46,20 +49,23 @@ class TracerMiddleware(BaseTransportMiddleware):
         if carrier:
             # Deserialise serialised context into a Context object:
             ctx = TraceContextTextMapPropagator().extract(carrier=carrier) 
+            logger.info(f"extracted trace context from {self.service_name}")
             return ctx
         # If no context, leave empty:
+        logger.warning(f"no context found for {self.service_name}, could not extract")
         return {}
 
     def _inject_trace_context(self, message):
         """Inserts serialized trace context into message."""
         if type(message) == str:
-            print("Warning: string message received")
+            logger.warning(f"received string message in {self.service_name}, could not extract trace context")
             return
         carrier = {}
         # If called outside of a span context, just leave carrier empty
         # (very safe!)
         TraceContextTextMapPropagator().inject(carrier)
         message['trace_context'] = carrier
+        logger.info(f"injected trace context into {self.service_name}")
 
     def subscribe(self, call_next: Callable, channel, callback, **kwargs) -> int:
         """The callback includes 'everything' that happens in a service that
