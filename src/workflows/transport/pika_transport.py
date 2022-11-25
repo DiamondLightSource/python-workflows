@@ -342,7 +342,6 @@ class PikaTransport(CommonTransport):
             }
         )
         target_function = self.subscription_callback(subscription_id)
-
         target_function(
             merged_headers,
             body,
