@@ -15,11 +15,11 @@ stages:
     pool:
       vmImage: ubuntu-20.04
     steps:
-      # Use Python >=3.7 for syntax validation
+      # Use Python >=3.8 for syntax validation
       - task: UsePythonVersion@0
         displayName: Set up python
         inputs:
-          versionSpec: 3.7
+          versionSpec: 3.8
 
       # Run syntax validation on a shallow clone
       - bash: |
@@ -80,8 +80,6 @@ stages:
       vmImage: ubuntu-20.04
     strategy:
       matrix:
-        python37:
-          PYTHON_VERSION: 3.7
         python38:
           PYTHON_VERSION: 3.8
         python39:
