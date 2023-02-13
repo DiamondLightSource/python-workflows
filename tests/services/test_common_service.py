@@ -129,7 +129,7 @@ def test_log_message_fieldvalue_pairs_are_attached_to_unhandled_exceptions_and_l
 
     try:
         with service.extend_log("something", "otherthing"):
-            nonsense = 7 / 0  # noqa
+            7 / 0  # noqa
         assert False  # Getting to this point means something went horribly wrong.
     except ZeroDivisionError as e:
         assert getattr(e, "workflows_log_something", None) == "otherthing"

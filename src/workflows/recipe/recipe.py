@@ -351,18 +351,4 @@ class Recipe:
                 else:
                     new_recipe["error"].append(translate(other.recipe["error"]))
 
-        #   # Minimize DAG
-        #   queuehash, topichash = {}, {}
-        #   for k, v in new_recipe.items():
-        #     if isinstance(v, dict):
-        #       if 'queue' in v:
-        #         queuehash[v['queue']] = queuehash.get(v['queue'], [])
-        #         queuehash[v['queue']].append(k)
-        #       if 'topic' in v:
-        #         topichash[v['topic']] = topichash.get(v['topic'], [])
-        #         topichash[v['topic']].append(k)
-        #
-        #   print queuehash
-        #   print topichash
-
         return Recipe(new_recipe)

@@ -95,6 +95,7 @@ class PikaTransport(CommonTransport):
             try:
                 cls.defaults[target] = cfgparser.get("rabbit", cfgoption)
             except configparser.NoOptionError:
+                # Option not in config file, fall back to default
                 pass
 
     @classmethod
@@ -491,6 +492,7 @@ class PikaTransport(CommonTransport):
         self,
         destination,
         message,
+        *,
         headers=None,
         delay=None,
         expiration=None,
@@ -538,6 +540,7 @@ class PikaTransport(CommonTransport):
         self,
         destination,
         message,
+        *,
         headers=None,
         delay=None,
         expiration: Optional[int] = None,
@@ -559,8 +562,6 @@ class PikaTransport(CommonTransport):
 
         if not headers:
             headers = {}
-        # if delay:
-        #     headers["x-delay"] = 1000 * delay
 
         properties = pika.BasicProperties(
             headers=headers,
@@ -822,11 +823,11 @@ class _PikaThread(threading.Thread):
 
         self._please_stop.set()
         # We might be waiting for an event, so give the event loop one...
-        # We might already be closed or shutting down, so ignore errors for that
         try:
             if self._connection:
                 self._connection.add_callback_threadsafe(lambda: None)
         except pika.exceptions.ConnectionWrongStateError:
+            # We might already be closed or shutting down, so ignore errors for that
             pass
 
     def join(

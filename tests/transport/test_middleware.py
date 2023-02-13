@@ -128,7 +128,7 @@ def test_prometheus_middleware():
     txid = offline.transaction_begin()
     offline.transaction_commit(txid)
 
-    txid = offline.transaction_begin()
+    offline.transaction_begin()
 
     data = prometheus_client.generate_latest().decode("ascii")
     expected_output = """
