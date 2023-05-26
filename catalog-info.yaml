@@ -15,5 +15,5 @@ spec:
   type: library
   lifecycle: production
   owner: group:data-analysis
-dependsOn:
-  - resource:zocalo-rabbitmq
+  dependsOn:
+    - resource:zocalo-rabbitmq
