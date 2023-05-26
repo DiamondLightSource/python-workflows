@@ -2,6 +2,7 @@ apiVersion: backstage.io/v1alpha1
 kind: Component
 metadata:
   name: workflows
+  title: Workflows
   description: >
     Workflows enables light-weight services to process tasks in a
     message-oriented environment.
@@ -14,3 +15,5 @@ spec:
   type: library
   lifecycle: production
   owner: group:data-analysis
+dependsOn:
+  - resource:rabbitmq
