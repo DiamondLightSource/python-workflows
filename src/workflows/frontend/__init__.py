@@ -24,8 +24,6 @@ class Frontend:
     service.
     """
 
-    _service_factory: Type[CommonService] | None
-
     def __init__(
         self,
         transport: Type[CommonTransport] | str | None = None,
@@ -61,7 +59,9 @@ class Frontend:
             None  # pointer to the service instance
         )
         self._service_class_name: str | None = None
-        self._service_factory = None  # pointer to the service class
+        self._service_factory: Type[
+            CommonService
+        ] | str | None = None  # pointer to the service class
         self._service_name: str | None = None
         self._service_starttime: float | None = None
         self._service_rapidstarts = None
@@ -415,7 +415,10 @@ class Frontend:
             if isinstance(new_service, type) and issubclass(new_service, CommonService):
                 self._service_factory = new_service
             else:
-                self._service_factory = workflows.services.lookup(new_service)
+                assert not isinstance(self._service_factory, type)  # Placate mypy
+                self._service_factory = workflows.services.lookup(
+                    new_service or self._service_factory
+                )
             if not self._service_factory:
                 return False
 
