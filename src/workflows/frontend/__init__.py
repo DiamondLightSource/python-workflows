@@ -4,6 +4,7 @@ import logging
 import multiprocessing
 import threading
 import time
+from typing import Type
 
 import workflows
 import workflows.frontend.utilization
@@ -11,8 +12,6 @@ import workflows.services
 import workflows.transport
 import workflows.util
 from workflows.services.common_service import CommonService
-
-basestring = (str, bytes)
 
 
 class Frontend:
@@ -101,7 +100,7 @@ class Frontend:
         self.log.warn = self.log.warning  # Add support for deprecated .warn
 
         # Connect to the network transport layer
-        if transport is None or isinstance(transport, basestring):
+        if transport is None or isinstance(transport, str):
             self._transport_factory = workflows.transport.lookup(transport)
         else:
             self._transport_factory = transport
@@ -368,7 +367,8 @@ class Frontend:
 
     def exponential_backoff(self):
         """A function that keeps waiting longer and longer the more rapidly it is called.
-        It can be used to increasingly slow down service starts when they keep failing."""
+        It can be used to increasingly slow down service starts when they keep failing.
+        """
         last_service_switch = self._service_starttime
         if not last_service_switch:
             return
@@ -386,21 +386,29 @@ class Frontend:
         self.log.debug("Slowing down service starts (%.1f seconds)", minimum_wait)
         time.sleep(minimum_wait)
 
-    def switch_service(self, new_service=None):
-        """Start a new service in a subprocess.
-        :param new_service: Either a service name or a service class. If not set,
-                            start up a new instance of the previous class
-        :return: True on success, False on failure.
+    def switch_service(
+        self, new_service: Type[CommonService] | str | None = None
+    ) -> bool:
         """
-        if new_service:
-            self._service_factory = new_service
+        Start a new service in a subprocess.
+
+        Args:
+            new_service:
+                Either a service name or a service class. If not set,
+                start up a new instance of the previous class.
+
+        Returns:
+            True on success, False on failure.
+        """
         with self.__lock:
             # Terminate existing service if necessary
             if self._service is not None:
                 self._terminate_service()
 
             # Find service class if necessary
-            if isinstance(self._service_factory, basestring):
+            if isinstance(new_service, CommonService):
+                self._service_factory = new_service
+            else:
                 self._service_factory = workflows.services.lookup(self._service_factory)
             if not self._service_factory:
                 return False
