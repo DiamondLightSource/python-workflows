@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+from typing import Type
+
 import pkg_resources
 
+from .common_service import CommonService
 
-def lookup(service: str):
+
+def lookup(service: str | None) -> Type[CommonService] | None:
     """Find a service class based on a name.
     :param service: Name of the service
     :return: A service class

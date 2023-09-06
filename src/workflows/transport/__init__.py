@@ -12,10 +12,10 @@ if TYPE_CHECKING:
 default_transport = "PikaTransport"
 
 
-def lookup(transport: str) -> Type[CommonTransport]:
+def lookup(transport: str | None) -> Type[CommonTransport]:
     """Get a transport layer class based on its name."""
     return get_known_transports().get(
-        transport, get_known_transports()[default_transport]
+        transport, get_known_transports()[default_transport]  # type: ignore
     )
 
 

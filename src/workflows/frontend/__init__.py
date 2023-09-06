@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import logging
 import multiprocessing
+import sys
 import threading
 import time
-from typing import Type
+from multiprocessing.connection import Connection
+from typing import Any, Type
 
 import workflows
 import workflows.frontend.utilization
@@ -12,6 +14,7 @@ import workflows.services
 import workflows.transport
 import workflows.util
 from workflows.services.common_service import CommonService
+from workflows.transport.common_transport import CommonTransport
 
 
 class Frontend:
@@ -21,14 +24,16 @@ class Frontend:
     service.
     """
 
+    _service_factory: Type[CommonService] | None
+
     def __init__(
         self,
-        transport=None,
+        transport: Type[CommonTransport] | str | None = None,
         service=None,
         transport_command_channel=None,
         restart_service=False,
         verbose_service=False,
-        environment=None,
+        environment: dict[str, Any] | None = None,
     ):
         """Create a frontend instance. Connect to the transport layer, start any
         requested service, begin broadcasting status information and listen
@@ -52,14 +57,16 @@ class Frontend:
         """
         self.__lock = threading.RLock()
         self.__hostid = workflows.util.generate_unique_host_id()
-        self._service = None  # pointer to the service instance
-        self._service_class_name = None
+        self._service: multiprocessing.Process | None = (
+            None  # pointer to the service instance
+        )
+        self._service_class_name: str | None = None
         self._service_factory = None  # pointer to the service class
-        self._service_name = None
-        self._service_starttime = None
+        self._service_name: str | None = None
+        self._service_starttime: float | None = None
         self._service_rapidstarts = None
-        self._pipe_commands = None  # frontend -> service
-        self._pipe_service = None  # frontend <- service
+        self._pipe_commands: Connection | None = None  # frontend -> service
+        self._pipe_service: Connection | None = None  # frontend <- service
         self._service_status = CommonService.SERVICE_STATUS_NONE
         self._service_status_announced = CommonService.SERVICE_STATUS_NONE
 
@@ -95,9 +102,8 @@ class Frontend:
                 return self.status.__getitem__(key)
 
         self.log = logging.LoggerAdapter(
-            logging.getLogger("workflows.frontend"), LogAdapter()
+            logging.getLogger("workflows.frontend"), LogAdapter()  # type: ignore
         )
-        self.log.warn = self.log.warning  # Add support for deprecated .warn
 
         # Connect to the network transport layer
         if transport is None or isinstance(transport, str):
@@ -406,10 +412,10 @@ class Frontend:
                 self._terminate_service()
 
             # Find service class if necessary
-            if isinstance(new_service, CommonService):
+            if isinstance(new_service, type) and issubclass(new_service, CommonService):
                 self._service_factory = new_service
             else:
-                self._service_factory = workflows.services.lookup(self._service_factory)
+                self._service_factory = workflows.services.lookup(new_service)
             if not self._service_factory:
                 return False
 
@@ -422,6 +428,11 @@ class Frontend:
             svc_commands, self._pipe_commands = multiprocessing.Pipe(False)
             self._pipe_service, svc_tofrontend = multiprocessing.Pipe(False)
             service_instance.connect(commands=svc_commands, frontend=svc_tofrontend)
+
+            if multiprocessing.get_start_method() != "fork":
+                sys.exit(
+                    "Error: Can only run services on multiprocessing platforms with fork"
+                )
 
             # Set up transport layer for new service
             service_instance.transport = self._transport_factory()
