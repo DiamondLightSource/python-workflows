@@ -47,12 +47,12 @@ class ServiceStarter:
         value is returned here it will replace the Frontend object."""
 
     def run(
-        self,
-        cmdline_args=None,
-        program_name="start_service",
-        version=None,
-        add_metrics_option: bool = False,
-        **kwargs,
+            self,
+            cmdline_args=None,
+            program_name="start_service",
+            version=None,
+            add_metrics_option: bool = False,
+            **kwargs,
     ):
         """Example command line interface to start services.
         :param cmdline_args: List of command line arguments to pass to parser
@@ -115,13 +115,12 @@ class ServiceStarter:
                 action="store_true",
                 default=False,
                 help=(
-                    "Record metrics for this service and expose them on the port defined by"
-                    "the --metrics-port option."
+                    "Record metrics for this service and expose them on the port "
+                    "defined by the --metrics-port option."
                 ),
             )
             parser.add_option(
                 "--metrics-port",
-                dest="metrics_port",
                 default=8080,
                 type="int",
                 help="Expose metrics via a prometheus endpoint on this port.",
@@ -142,8 +141,8 @@ class ServiceStarter:
 
         # Call on_transport_factory_preparation hook
         transport_factory = (
-            self.on_transport_factory_preparation(transport_factory)
-            or transport_factory
+                self.on_transport_factory_preparation(transport_factory)
+                or transport_factory
         )
 
         # Set up on_transport_preparation hook to affect newly created transport objects
