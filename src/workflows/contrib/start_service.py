@@ -49,12 +49,12 @@ class ServiceStarter:
         value is returned here it will replace the Frontend object."""
 
     def run(
-            self,
-            cmdline_args=None,
-            program_name="start_service",
-            version=None,
-            add_metrics_option: bool = False,
-            **kwargs,
+        self,
+        cmdline_args=None,
+        program_name="start_service",
+        version=None,
+        add_metrics_option: bool = False,
+        **kwargs,
     ):
         """Example command line interface to start services.
         :param cmdline_args: List of command line arguments to pass to parser
@@ -141,8 +141,8 @@ class ServiceStarter:
 
         # Call on_transport_factory_preparation hook
         transport_factory = (
-                self.on_transport_factory_preparation(transport_factory)
-                or transport_factory
+            self.on_transport_factory_preparation(transport_factory)
+            or transport_factory
         )
 
         # Set up on_transport_preparation hook to affect newly created transport objects
@@ -157,28 +157,29 @@ class ServiceStarter:
         # When service name is specified, check if service exists or can be derived.
         if options.service not in known_services:
             # First check whether the provided service name is a case-insensitive match.
-            svc_lower = options.service.lower()
-            match = {s.lower(): s for s in known_services}.get(svc_lower, None)
-            match = [match] if match else []
+            service_lower = options.service.lower()
+            match = {s.lower(): s for s in known_services}.get(service_lower, None)
+            match = (
+                [match]
+                if match
+                # Next, check whether the provided service name is a partial
+                # case-sensitive match.
+                else [s for s in known_services if s.startswith(options.service)]
+                # Next check whether the provided service name is a partial
+                # case-insensitive match.
+                or [s for s in known_services if s.lower().startswith(service_lower)]
+            )
 
-            # Next, check whether the provided service name is a unique partial
-            # case-sensitive match.
-            if not match:
-                match = [s for s in known_services if s.startswith(options.service)]
-
-            # Next check whether the provided service name is a unique partial
-            # case-insensitive match.
-            if not match:
-                match = [s for s in known_services if s.lower().startswith(svc_lower)]
-
-            # Set the service name to the derived value, or exit with an error.
+            # Catch ambiguous partial matches and exit with an error.
             if len(match) > 1:
                 sys.exit(
                     f"Specified service name {options.service} is ambiguous, partially "
                     f"matching each of these known services: " + ", ".join(match)
                 )
+            # Otherwise, set the derived service name, if there's a unique match.
             elif match:
-                options.service, = match
+                (options.service,) = match
+            # Otherwise, exit with an error.
             else:
                 sys.exit(f"Please specify a valid service name. {known_services_help}")
 
