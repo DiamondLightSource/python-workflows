@@ -62,6 +62,7 @@ class ServiceStarter:
 
         # Enumerate all known services
         known_services = sorted(workflows.services.get_known_services())
+        known_services_help = "Known services: " + ", ".join(known_services)
 
         if version:
             version = f"{version} (workflows {workflows.version()})"
@@ -76,15 +77,11 @@ class ServiceStarter:
         parser.add_option(
             "-s",
             "--service",
-            dest="service",
             metavar="SVC",
-            default=None,
-            help="Name of the service to start. Known services: "
-            + ", ".join(known_services),
+            help=f"Name of the service to start. {known_services_help}",
         )
         parser.add_option(
             "--liveness",
-            dest="liveness",
             action="store_true",
             default=False,
             help=(
@@ -95,14 +92,12 @@ class ServiceStarter:
         )
         parser.add_option(
             "--liveness-port",
-            dest="liveness_port",
             default=8000,
             type="int",
             help="Expose liveness check endpoint on this port.",
         )
         parser.add_option(
             "--liveness-timeout",
-            dest="liveness_timeout",
             default=30,
             type="float",
             help="Timeout for the liveness check (in seconds).",
@@ -111,7 +106,6 @@ class ServiceStarter:
             parser.add_option(
                 "-m",
                 "--metrics",
-                dest="metrics",
                 action="store_true",
                 default=False,
                 help=(
@@ -135,6 +129,10 @@ class ServiceStarter:
 
         # Call on_parsing hook
         (options, args) = self.on_parsing(options, args) or (options, args)
+
+        # Exit with error if no service has been specified.
+        if not options.service:
+            parser.error(f"Please specify a service name. {known_services_help}")
 
         # Create Transport factory
         transport_factory = workflows.transport.lookup(options.transport)
