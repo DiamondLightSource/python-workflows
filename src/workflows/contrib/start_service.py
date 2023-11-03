@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import sys
+
 from optparse import SUPPRESS_HELP, OptionParser
 
 import workflows
@@ -152,17 +154,33 @@ class ServiceStarter:
 
         transport_factory = on_transport_preparation_hook
 
-        # When service name is specified, check if service exists or can be derived
-        if options.service and options.service not in known_services:
-            matching = [s for s in known_services if s.startswith(options.service)]
-            if not matching:
-                matching = [
-                    s
-                    for s in known_services
-                    if s.lower().startswith(options.service.lower())
-                ]
-            if matching and len(matching) == 1:
-                options.service = matching[0]
+        # When service name is specified, check if service exists or can be derived.
+        if options.service not in known_services:
+            # First check whether the provided service name is a case-insensitive match.
+            svc_lower = options.service.lower()
+            match = {s.lower(): s for s in known_services}.get(svc_lower, None)
+            match = [match] if match else []
+
+            # Next, check whether the provided service name is a unique partial
+            # case-sensitive match.
+            if not match:
+                match = [s for s in known_services if s.startswith(options.service)]
+
+            # Next check whether the provided service name is a unique partial
+            # case-insensitive match.
+            if not match:
+                match = [s for s in known_services if s.lower().startswith(svc_lower)]
+
+            # Set the service name to the derived value, or exit with an error.
+            if len(match) > 1:
+                sys.exit(
+                    f"Specified service name {options.service} is ambiguous, partially "
+                    f"matching each of these known services: " + ", ".join(match)
+                )
+            elif match:
+                options.service, = match
+            else:
+                sys.exit(f"Please specify a valid service name. {known_services_help}")
 
         kwargs.update(
             {
