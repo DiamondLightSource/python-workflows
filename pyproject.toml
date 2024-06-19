@@ -1,6 +1,91 @@
 [build-system]
-requires = ["setuptools >= 40.6.0", "wheel"]
+requires = ["setuptools >= 61.2"]
 build-backend = "setuptools.build_meta"
+
+[project]
+name = "workflows"
+version = "2.27"
+description = "Data processing in distributed environments"
+readme = "README.rst"
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: BSD License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Operating System :: OS Independent",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+requires-python = ">=3.8"
+dependencies = [
+    "bidict",
+    "pika",
+    "setuptools",
+    "stomp-py>=7",
+]
+
+
+[[project.authors]]
+name = "Diamond Light Source - Scientific Software et al."
+email = "scientificsoftware@diamond.ac.uk"
+
+[project.license]
+text = "BSD"
+
+[project.urls]
+Download = "https://github.com/DiamondLightSource/python-workflows/releases"
+Documentation = "https://github.com/DiamondLightSource/python-workflows"
+GitHub = "https://github.com/DiamondLightSource/python-workflows"
+Bug-Tracker = "https://github.com/DiamondLightSource/python-workflows/issues"
+
+[project.optional-dependencies]
+prometheus = [
+    "prometheus-client",
+]
+
+[project.entry-points."libtbx.dispatcher.script"]
+"workflows.validate_recipe" = "workflows.validate_recipe"
+
+[project.entry-points."libtbx.precommit"]
+workflows = "workflows"
+
+[project.entry-points."workflows.services"]
+SampleConsumer = "workflows.services.sample_consumer:SampleConsumer"
+SampleProducer = "workflows.services.sample_producer:SampleProducer"
+SampleTxn = "workflows.services.sample_transaction:SampleTxn"
+SampleTxnProducer = "workflows.services.sample_transaction:SampleTxnProducer"
+
+[project.entry-points."workflows.transport"]
+PikaTransport = "workflows.transport.pika_transport:PikaTransport"
+StompTransport = "workflows.transport.stomp_transport:StompTransport"
+OfflineTransport = "workflows.transport.offline_transport:OfflineTransport"
+
+[project.entry-points."zocalo.configuration.plugins"]
+pika = "workflows.util.zocalo.configuration:Pika"
+stomp = "workflows.util.zocalo.configuration:Stomp"
+transport = "workflows.util.zocalo.configuration:DefaultTransport"
+
+[project.scripts]
+"workflows.validate_recipe" = "workflows.recipe.validate:main"
+
+[tool.setuptools]
+zip-safe = false
+include-package-data = true
+license-files = [
+    "LICENSE",
+]
+
+[tool.setuptools.package-dir]
+"" = "src"
+
+[tool.setuptools.packages.find]
+where = [
+    "src",
+]
+namespaces = false
 
 [tool.pytest.ini_options]
 addopts = "-ra"
