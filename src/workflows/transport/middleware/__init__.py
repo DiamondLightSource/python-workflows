@@ -94,12 +94,12 @@ class BaseTransportMiddleware:
         return call_next(subscription_id=subscription_id, **kwargs)
 
     def transaction_abort(
-        self, call_next: Callable, transaction_id: int = None, **kwargs
+        self, call_next: Callable, transaction_id: int | None = None, **kwargs
     ):
         call_next(transaction_id, **kwargs)
 
     def transaction_commit(
-        self, call_next: Callable, transaction_id: int = None, **kwargs
+        self, call_next: Callable, transaction_id: int | None = None, **kwargs
     ):
         call_next(transaction_id, **kwargs)
 
@@ -171,7 +171,7 @@ class CounterMiddleware(BaseTransportMiddleware):
 
 
 class TimerMiddleware(BaseTransportMiddleware):
-    def __init__(self, logger: logging.Logger = None, level=logging.INFO):
+    def __init__(self, logger: logging.Logger | None = None, level=logging.INFO):
         if logger is None:
             logger = logging.getLogger(__name__)
         self.logger = logger

@@ -34,7 +34,7 @@ class StompTransport(CommonTransport):
     config: Dict[Any, Any] = {}
 
     def __init__(
-        self, middleware: list[Type[middleware.BaseTransportMiddleware]] = None
+        self, middleware: list[Type[middleware.BaseTransportMiddleware]] | None = None
     ):
         self._connected = False
         self._namespace = ""
