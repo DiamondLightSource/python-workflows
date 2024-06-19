@@ -26,11 +26,11 @@ stages:
           python .azure-pipelines/syntax-validation.py
         displayName: Syntax validation
 
-      # Run flake8 validation on a shallow clone
+      # Run Ruff validation on a shallow clone
       - bash: |
-          pip install --disable-pip-version-check flake8
-          python .azure-pipelines/flake8-validation.py
-        displayName: Flake8 validation
+          pip install --disable-pip-version-check ruff
+          python .azure-pipelines/lint-validation.py
+        displayName: Ruff validation
 
 - stage: build
   displayName: Build
