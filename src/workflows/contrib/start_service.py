@@ -153,7 +153,7 @@ class ServiceStarter:
             transport_object = true_transport_factory()
             return self.on_transport_preparation(transport_object) or transport_object
 
-        transport_factory = on_transport_preparation_hook
+        transport_factory = on_transport_preparation_hook  # type: ignore
 
         # When service name is specified, check if service exists or can be derived
         if options.service and options.service not in known_services:
