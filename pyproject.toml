@@ -17,6 +17,7 @@ ignore = ["E501", "E741"]
 # "**/__init__.py" = ["F401"]
 
 [tool.ruff.lint.isort]
+known-first-party = ["workflows"]
 required-imports = ["from __future__ import annotations"]
 
 [tool.mypy]

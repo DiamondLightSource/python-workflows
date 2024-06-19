@@ -1158,7 +1158,6 @@ def test_pikathread_unsubscribe(test_channel, connection_params):
 
 
 def test_pikathread_ack_transaction(test_channel, connection_params):
-
     queue = test_channel.temporary_queue_declare()
     thread = _PikaThread(connection_params)
     try:
@@ -1205,7 +1204,6 @@ def test_pikathread_ack_transaction(test_channel, connection_params):
 
 
 def test_pikathread_nack_transaction(test_channel, connection_params):
-
     queue = test_channel.temporary_queue_declare()
     thread = _PikaThread(connection_params)
     try:
@@ -1254,7 +1252,6 @@ def test_pikathread_nack_transaction(test_channel, connection_params):
 
 
 def test_pikathread_tx_rollback_nack(test_channel, connection_params):
-
     queue = test_channel.temporary_queue_declare()
     thread = _PikaThread(connection_params)
     try:
