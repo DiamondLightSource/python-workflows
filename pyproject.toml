@@ -1,10 +1,133 @@
 [build-system]
-requires = ["setuptools >= 40.6.0", "wheel"]
+requires = ["setuptools >= 61.2"]
 build-backend = "setuptools.build_meta"
 
-[tool.isort]
-profile = "black"
+[project]
+name = "workflows"
+version = "2.27"
+description = "Data processing in distributed environments"
+readme = "README.rst"
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: BSD License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Operating System :: OS Independent",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+requires-python = ">=3.8"
+dependencies = [
+    "bidict",
+    "pika",
+    "setuptools",
+    "stomp-py>=7",
+]
+
+
+[[project.authors]]
+name = "Diamond Light Source - Scientific Software et al."
+email = "scientificsoftware@diamond.ac.uk"
+
+[project.license]
+text = "BSD"
+
+[project.urls]
+Download = "https://github.com/DiamondLightSource/python-workflows/releases"
+Documentation = "https://github.com/DiamondLightSource/python-workflows"
+GitHub = "https://github.com/DiamondLightSource/python-workflows"
+Bug-Tracker = "https://github.com/DiamondLightSource/python-workflows/issues"
+
+[project.optional-dependencies]
+prometheus = [
+    "prometheus-client",
+]
+
+[project.entry-points."libtbx.dispatcher.script"]
+"workflows.validate_recipe" = "workflows.validate_recipe"
+
+[project.entry-points."libtbx.precommit"]
+workflows = "workflows"
+
+[project.entry-points."workflows.services"]
+SampleConsumer = "workflows.services.sample_consumer:SampleConsumer"
+SampleProducer = "workflows.services.sample_producer:SampleProducer"
+SampleTxn = "workflows.services.sample_transaction:SampleTxn"
+SampleTxnProducer = "workflows.services.sample_transaction:SampleTxnProducer"
+
+[project.entry-points."workflows.transport"]
+PikaTransport = "workflows.transport.pika_transport:PikaTransport"
+StompTransport = "workflows.transport.stomp_transport:StompTransport"
+OfflineTransport = "workflows.transport.offline_transport:OfflineTransport"
+
+[project.entry-points."zocalo.configuration.plugins"]
+pika = "workflows.util.zocalo.configuration:Pika"
+stomp = "workflows.util.zocalo.configuration:Stomp"
+transport = "workflows.util.zocalo.configuration:DefaultTransport"
+
+[project.scripts]
+"workflows.validate_recipe" = "workflows.recipe.validate:main"
+
+[tool.setuptools]
+zip-safe = false
+include-package-data = true
+license-files = [
+    "LICENSE",
+]
+
+[tool.setuptools.package-dir]
+"" = "src"
+
+[tool.setuptools.packages.find]
+where = [
+    "src",
+]
+namespaces = false
 
 [tool.pytest.ini_options]
 addopts = "-ra"
 required_plugins = "pytest-timeout"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "C4", "I"]
+unfixable = ["F841"]
+# E501 line too long (handled by formatter)
+# E741 Ambiguous variable name (We have lots of meaningful I, L, l)
+ignore = ["E501", "E741"]
+
+[tool.ruff.lint.per-file-ignores]
+# "**/__init__.py" = ["F401"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["workflows"]
+required-imports = ["from __future__ import annotations"]
+
+[tool.mypy]
+no_implicit_optional = true
+mypy_path = "src/"
+
+[tool.bumpversion]
+current_version = "2.27"
+tag = true
+commit = true
+
+parse = "(?P<major>\\d+)\\.(?P<minor>\\d+)"
+serialize = ["{major}.{minor}"]
+search = "{current_version}"
+replace = "{new_version}"
+
+# regex = false
+# ignore_missing_version = false
+# ignore_missing_files = false
+# sign_tags = false
+# tag_name = "v{new_version}"
+# tag_message = "Bump version: {current_version} → {new_version}"
+# allow_dirty = false
+# message = "Bump version: {current_version} → {new_version}"
+# commit_args = ""
+
+[[tool.bumpversion.files]]
+filename = "src/workflows/__init__.py"

@@ -94,12 +94,12 @@ class BaseTransportMiddleware:
         return call_next(subscription_id=subscription_id, **kwargs)
 
     def transaction_abort(
-        self, call_next: Callable, transaction_id: int = None, **kwargs
+        self, call_next: Callable, transaction_id: int | None = None, **kwargs
     ):
         call_next(transaction_id, **kwargs)
 
     def transaction_commit(
-        self, call_next: Callable, transaction_id: int = None, **kwargs
+        self, call_next: Callable, transaction_id: int | None = None, **kwargs
     ):
         call_next(transaction_id, **kwargs)
 
@@ -171,7 +171,7 @@ class CounterMiddleware(BaseTransportMiddleware):
 
 
 class TimerMiddleware(BaseTransportMiddleware):
-    def __init__(self, logger: logging.Logger = None, level=logging.INFO):
+    def __init__(self, logger: logging.Logger | None = None, level=logging.INFO):
         if logger is None:
             logger = logging.getLogger(__name__)
         self.logger = logger
@@ -234,7 +234,6 @@ class TimerMiddleware(BaseTransportMiddleware):
 def wrap(f: Callable):
     @functools.wraps(f)
     def wrapper(self, *args, **kwargs):
-
         return functools.reduce(
             lambda call_next, m: lambda *args, **kwargs: getattr(m, f.__name__)(
                 call_next, *args, **kwargs

@@ -55,7 +55,6 @@ def test_script_initialises_transport_and_starts_frontend(
 @mock.patch("workflows.contrib.start_service.workflows.frontend")
 @mock.patch("workflows.contrib.start_service.workflows.services")
 def test_add_metrics_option(mock_services, mock_frontend, mock_tlookup, mock_parser):
-
     mock_options = mock.Mock()
     mock_options.service = "someservice"
     mock_options.transport = mock.sentinel.transport

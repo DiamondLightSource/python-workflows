@@ -32,7 +32,7 @@ class CommonTransport:
     #
 
     def __init__(
-        self, middleware: list[Type[middleware.BaseTransportMiddleware]] = None
+        self, middleware: list[Type[middleware.BaseTransportMiddleware]] | None = None
     ):
         if middleware is None:
             self.middleware = []

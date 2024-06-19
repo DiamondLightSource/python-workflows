@@ -363,8 +363,6 @@ def test_merging_recipes():
 
     # There is a 'C service'
     assert any(
-        map(
-            lambda x: (isinstance(x, dict) and x.get("service") == "C service"),
-            C.recipe.values(),
-        )
+        isinstance(x, dict) and x.get("service") == "C service"
+        for x in C.recipe.values()
     )

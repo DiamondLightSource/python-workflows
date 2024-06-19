@@ -121,7 +121,8 @@ def test_log_message_fieldvalue_pairs_are_removed_outside_their_context():
 
 def test_log_message_fieldvalue_pairs_are_attached_to_unhandled_exceptions_and_logged_properly():
     """When an exception falls through the extend_log context handler the fields are removed from future log messages,
-    but they are also attached to the exception object, as they may contain valuable information for debugging."""
+    but they are also attached to the exception object, as they may contain valuable information for debugging.
+    """
     fe_pipe = mock.Mock()
     service = CommonService()
     service.connect(frontend=fe_pipe)
