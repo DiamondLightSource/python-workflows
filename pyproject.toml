@@ -108,3 +108,26 @@ required-imports = ["from __future__ import annotations"]
 [tool.mypy]
 no_implicit_optional = true
 mypy_path = "src/"
+
+[tool.bumpversion]
+current_version = "2.27"
+tag = true
+commit = true
+
+parse = "(?P<major>\\d+)\\.(?P<minor>\\d+)"
+serialize = ["{major}.{minor}"]
+search = "{current_version}"
+replace = "{new_version}"
+
+# regex = false
+# ignore_missing_version = false
+# ignore_missing_files = false
+# sign_tags = false
+# tag_name = "v{new_version}"
+# tag_message = "Bump version: {current_version} → {new_version}"
+# allow_dirty = false
+# message = "Bump version: {current_version} → {new_version}"
+# commit_args = ""
+
+[[tool.bumpversion.files]]
+filename = "src/workflows/__init__.py"
