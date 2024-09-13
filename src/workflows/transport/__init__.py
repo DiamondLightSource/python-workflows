@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import argparse
 import optparse
-from importlib.metadata import entry_points
 from typing import TYPE_CHECKING, Type
+
+from workflows.util.importlib_shim import entry_points_for_group
 
 if TYPE_CHECKING:
     from .common_transport import CommonTransport
@@ -60,6 +61,6 @@ def get_known_transports() -> dict[str, Type[CommonTransport]]:
         setattr(
             get_known_transports,
             "cache",
-            {e.name: e.load() for e in entry_points()["workflows.transport"]},
+            {e.name: e.load() for e in (entry_points_for_group("workflows.transport"))},
         )
     return get_known_transports.cache.copy()  # type: ignore

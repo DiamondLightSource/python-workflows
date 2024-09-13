@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from importlib.metadata import entry_points
+from workflows.util.importlib_shim import entry_points_for_group
 
 
 def lookup(service: str):
@@ -25,7 +25,7 @@ def get_known_services():
         setattr(
             get_known_services,
             "cache",
-            {e.name: e.load for e in entry_points()["workflows.services"]},
+            {e.name: e.load for e in entry_points_for_group("workflows.services")},
         )
     register = get_known_services.cache.copy()
     return register
