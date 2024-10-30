@@ -60,6 +60,6 @@ def get_known_transports() -> dict[str, Type[CommonTransport]]:
         setattr(
             get_known_transports,
             "cache",
-            {e.name: e.load() for e in entry_points()["workflows.transport"]},
+            {e.name: e.load() for e in entry_points(group="workflows.transport")},
         )
     return get_known_transports.cache.copy()  # type: ignore

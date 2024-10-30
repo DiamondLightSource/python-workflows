@@ -25,7 +25,7 @@ def get_known_services():
         setattr(
             get_known_services,
             "cache",
-            {e.name: e.load for e in entry_points()["workflows.services"]},
+            {e.name: e.load for e in entry_points(group="workflows.services")},
         )
     register = get_known_services.cache.copy()
     return register
