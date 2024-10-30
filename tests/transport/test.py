@@ -16,7 +16,7 @@ def test_enumerate_transports():
     transports = workflows.transport.get_known_transports()
     assert transports.keys() == {"OfflineTransport", "PikaTransport", "StompTransport"}
     assert all(
-        [issubclass(transport, CommonTransport) for transport in transports.values()]
+        issubclass(transport, CommonTransport) for transport in transports.values()
     )
 
 

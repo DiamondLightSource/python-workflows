@@ -18,4 +18,4 @@ def test_enumerate_services():
         "SampleTxn",
         "SampleTxnProducer",
     }
-    assert all([issubclass(service(), CommonService) for service in services.values()])
+    assert all(issubclass(service(), CommonService) for service in services.values())
