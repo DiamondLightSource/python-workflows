@@ -13,7 +13,6 @@ from unittest import mock
 
 import pika
 import pytest
-
 import workflows.transport.pika_transport
 from workflows.transport.common_transport import TemporarySubscription
 from workflows.transport.pika_transport import PikaTransport, _PikaThread
@@ -353,7 +352,8 @@ def test_sending_message_with_expiration(mockpika, mock_pikathread):
 @mock.patch("workflows.transport.pika_transport.pika")
 def test_error_handling_on_send(mockpika, mock_pikathread):
     """Unrecoverable errors during sending should lead to one reconnection attempt.
-    Further errors should raise an Exception, further send attempts to try to reconnect."""
+    Further errors should raise an Exception, further send attempts to try to reconnect.
+    """
 
     pytest.xfail("Don't understand send failure modes yet")
 
@@ -468,7 +468,8 @@ def test_broadcasting_message_with_expiration(mockpika, mock_pikathread):
 @mock.patch("workflows.transport.pika_transport.pika")
 def test_error_handling_on_broadcast(mockpika):
     """Unrecoverable errors during broadcasting should lead to one reconnection attempt.
-    Further errors should raise an Exception, further send attempts to try to reconnect."""
+    Further errors should raise an Exception, further send attempts to try to reconnect.
+    """
     pytest.xfail("Don't understand send lifecycle errors yet")
     transport = PikaTransport()
     transport.connect()
@@ -913,7 +914,7 @@ def test_channel(connection_params) -> pika.channel.Channel:
             yield channel
         finally:
             # Make an attempt to run all of the shutdown tasks
-            for (filename, lineno, task) in reversed(channel._on_close):
+            for filename, lineno, task in reversed(channel._on_close):
                 try:
                     print(f"Cleaning up from {filename}:{lineno}")
                     task()
@@ -1156,7 +1157,6 @@ def test_pikathread_unsubscribe(test_channel, connection_params):
 
 
 def test_pikathread_ack_transaction(test_channel, connection_params):
-
     queue = test_channel.temporary_queue_declare()
     thread = _PikaThread(connection_params)
     try:
@@ -1203,7 +1203,6 @@ def test_pikathread_ack_transaction(test_channel, connection_params):
 
 
 def test_pikathread_nack_transaction(test_channel, connection_params):
-
     queue = test_channel.temporary_queue_declare()
     thread = _PikaThread(connection_params)
     try:
@@ -1252,7 +1251,6 @@ def test_pikathread_nack_transaction(test_channel, connection_params):
 
 
 def test_pikathread_tx_rollback_nack(test_channel, connection_params):
-
     queue = test_channel.temporary_queue_declare()
     thread = _PikaThread(connection_params)
     try:

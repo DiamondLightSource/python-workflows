@@ -6,7 +6,7 @@ import json
 import logging
 import pprint
 import uuid
-from typing import Any, Dict, Optional, Type
+from typing import Any
 
 import workflows.util
 from workflows.transport import middleware
@@ -23,12 +23,12 @@ class OfflineTransport(CommonTransport):
     """Abstraction layer for messaging infrastructure. Here we.. do nothing."""
 
     # Add for compatibility
-    defaults: Dict[Any, Any] = {}
+    defaults: dict[Any, Any] = {}
     # Effective configuration
-    config: Dict[Any, Any] = {}
+    config: dict[Any, Any] = {}
 
     def __init__(
-        self, middleware: list[Type[middleware.BaseTransportMiddleware]] = None
+        self, middleware: list[type[middleware.BaseTransportMiddleware]] = None
     ):
         self._connected = False
         super().__init__(middleware=middleware)
@@ -60,7 +60,7 @@ class OfflineTransport(CommonTransport):
     def _subscribe_temporary(
         self,
         sub_id: int,
-        channel_hint: Optional[str],
+        channel_hint: str | None,
         callback: MessageCallback,
         **kwargs,
     ) -> str:

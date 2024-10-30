@@ -4,7 +4,8 @@ import functools
 import inspect
 import logging
 import time
-from typing import TYPE_CHECKING, Callable, Optional
+from collections.abc import Callable
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from workflows.transport.common_transport import (
@@ -36,7 +37,7 @@ class BaseTransportMiddleware:
     def subscribe_temporary(
         self,
         call_next: Callable,
-        channel_hint: Optional[str],
+        channel_hint: str | None,
         callback: MessageCallback,
         **kwargs,
     ) -> TemporarySubscription:
@@ -74,7 +75,7 @@ class BaseTransportMiddleware:
         self,
         call_next: Callable,
         message,
-        subscription_id: Optional[int] = None,
+        subscription_id: int | None = None,
         **kwargs,
     ):
         call_next(message, subscription_id=subscription_id, **kwargs)
@@ -83,13 +84,13 @@ class BaseTransportMiddleware:
         self,
         call_next: Callable,
         message,
-        subscription_id: Optional[int] = None,
+        subscription_id: int | None = None,
         **kwargs,
     ):
         call_next(message, subscription_id=subscription_id, **kwargs)
 
     def transaction_begin(
-        self, call_next: Callable, subscription_id: Optional[int] = None, **kwargs
+        self, call_next: Callable, subscription_id: int | None = None, **kwargs
     ) -> int:
         return call_next(subscription_id=subscription_id, **kwargs)
 
@@ -136,7 +137,7 @@ class CounterMiddleware(BaseTransportMiddleware):
         self,
         call_next: Callable,
         message,
-        subscription_id: Optional[int] = None,
+        subscription_id: int | None = None,
         **kwargs,
     ):
         call_next(message, subscription_id=subscription_id, **kwargs)
@@ -147,7 +148,7 @@ class CounterMiddleware(BaseTransportMiddleware):
         self,
         call_next: Callable,
         message,
-        subscription_id: Optional[int] = None,
+        subscription_id: int | None = None,
         **kwargs,
     ):
         call_next(message, subscription_id=subscription_id, **kwargs)
@@ -195,7 +196,7 @@ class TimerMiddleware(BaseTransportMiddleware):
     def subscribe_temporary(
         self,
         call_next: Callable,
-        channel_hint: Optional[str],
+        channel_hint: str | None,
         callback: MessageCallback,
         **kwargs,
     ) -> TemporarySubscription:
@@ -234,7 +235,6 @@ class TimerMiddleware(BaseTransportMiddleware):
 def wrap(f: Callable):
     @functools.wraps(f)
     def wrapper(self, *args, **kwargs):
-
         return functools.reduce(
             lambda call_next, m: lambda *args, **kwargs: getattr(m, f.__name__)(
                 call_next, *args, **kwargs

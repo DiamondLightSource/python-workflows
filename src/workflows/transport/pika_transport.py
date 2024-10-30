@@ -10,9 +10,10 @@ import sys
 import threading
 import time
 import uuid
+from collections.abc import Callable, Iterable
 from concurrent.futures import Future
 from enum import Enum, auto
-from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Type, Union
+from typing import Any
 
 import pika.exceptions
 from bidict import bidict
@@ -59,10 +60,10 @@ class PikaTransport(CommonTransport):
     }
 
     # Effective configuration
-    config: Dict[Any, Any] = {}
+    config: dict[Any, Any] = {}
 
     def __init__(
-        self, middleware: list[Type[middleware.BaseTransportMiddleware]] = None
+        self, middleware: list[type[middleware.BaseTransportMiddleware]] = None
     ):
         self._channel = None
         self._conn = None
@@ -240,7 +241,7 @@ class PikaTransport(CommonTransport):
             callback=set_parameter,
         )
 
-    def _generate_connection_parameters(self) -> List[pika.ConnectionParameters]:
+    def _generate_connection_parameters(self) -> list[pika.ConnectionParameters]:
         username = self.config.get("--rabbit-user", self.defaults.get("--rabbit-user"))
         password = self.config.get("--rabbit-pass", self.defaults.get("--rabbit-pass"))
         credentials = pika.PlainCredentials(username, password)
@@ -341,7 +342,8 @@ class PikaTransport(CommonTransport):
                 "subscription": subscription_id,
             }
         )
-        self.subscription_callback(subscription_id)(
+        target_function = self.subscription_callback(subscription_id)
+        target_function(
             merged_headers,
             body,
         )
@@ -439,7 +441,7 @@ class PikaTransport(CommonTransport):
     def _subscribe_temporary(
         self,
         sub_id: int,
-        channel_hint: Optional[str],
+        channel_hint: str | None,
         callback: MessageCallback,
         *,
         acknowledgement: bool = False,
@@ -493,8 +495,8 @@ class PikaTransport(CommonTransport):
         headers=None,
         delay=None,
         expiration=None,
-        transaction: Optional[int] = None,
-        exchange: Optional[str] = None,
+        transaction: int | None = None,
+        exchange: str | None = None,
         **kwargs,
     ):
         """
@@ -539,8 +541,8 @@ class PikaTransport(CommonTransport):
         message,
         headers=None,
         delay=None,
-        expiration: Optional[int] = None,
-        transaction: Optional[int] = None,
+        expiration: int | None = None,
+        transaction: int | None = None,
         **kwargs,
     ):
         """Send a message to a fanout exchange.
@@ -578,7 +580,7 @@ class PikaTransport(CommonTransport):
         ).result()
 
     def _transaction_begin(
-        self, transaction_id: int, *, subscription_id: Optional[int] = None, **kwargs
+        self, transaction_id: int, *, subscription_id: int | None = None, **kwargs
     ) -> None:
         """Start a new transaction.
         :param transaction_id: ID for this transaction in the transport layer.
@@ -723,13 +725,13 @@ class _PikaSubscription:
         reconnectable: Are we allowed to reconnect to this subscription
     """
 
-    arguments: Dict[str, Any]
+    arguments: dict[str, Any]
     auto_ack: bool
     destination: str
     kind: _PikaSubscriptionKind
     on_message_callback: PikaCallback = dataclasses.field(repr=False)
     prefetch_count: int
-    queue: Optional[str] = dataclasses.field(init=False, default=None)
+    queue: str | None = dataclasses.field(init=False, default=None)
     reconnectable: bool
 
 
@@ -762,25 +764,25 @@ class _PikaThread(threading.Thread):
         # Internal store of subscriptions, to resubscribe if necessary. Keys are
         # unique and auto-generated, and known as subscription IDs or consumer tags
         # (strictly: pika/AMQP consumer tags are strings, not integers)
-        self._subscriptions: Dict[int, _PikaSubscription] = {}
+        self._subscriptions: dict[int, _PikaSubscription] = {}
         # The pika connection object
-        self._connection: Optional[pika.BlockingConnection] = None
+        self._connection: pika.BlockingConnection | None = None
         # Index of per-subscription channels.
         self._pika_channels: bidict[int, BlockingChannel] = bidict()
         # Bidirectional index of all ongoing transactions. May include the shared channel
         self._transaction_on_channel: bidict[BlockingChannel, int] = bidict()
         # Information on whether a channel has uncommitted messages
-        self._channel_has_active_tx: Dict[BlockingChannel, bool] = {}
+        self._channel_has_active_tx: dict[BlockingChannel, bool] = {}
         # Information on whether a channel is transactional
-        self._channel_is_transactional: Dict[BlockingChannel, bool] = {}
+        self._channel_is_transactional: dict[BlockingChannel, bool] = {}
         # A common, shared channel, used for sending messages outside of transactions.
-        self._pika_shared_channel: Optional[BlockingChannel]
+        self._pika_shared_channel: BlockingChannel | None
         # Are we allowed to reconnect. Can only be turned off, never on
         self._reconnection_allowed: bool = True
         # Our list of connection parameters, so we know where to connect to
         self._connection_parameters = list(connection_parameters)
         # If we failed with an unexpected exception
-        self._exc_info: Optional[Tuple[Any, Any, Any]] = None
+        self._exc_info: tuple[Any, Any, Any] | None = None
         self._reconnection_attempt_limit = reconnection_attempts
         # General bookkeeping events
 
@@ -828,9 +830,7 @@ class _PikaThread(threading.Thread):
         except pika.exceptions.ConnectionWrongStateError:
             pass
 
-    def join(
-        self, timeout: Optional[float] = None, *, re_raise: bool = False, stop=False
-    ):
+    def join(self, timeout: float | None = None, *, re_raise: bool = False, stop=False):
         """Wait until the thread terminates.
 
         Args:
@@ -1066,10 +1066,10 @@ class _PikaThread(threading.Thread):
         self,
         exchange: str,
         routing_key: str,
-        body: Union[str, bytes],
+        body: str | bytes,
         properties: pika.spec.BasicProperties = None,
         mandatory: bool = True,
-        transaction_id: Optional[int] = None,
+        transaction_id: int | None = None,
     ) -> Future[None]:
         """Send a message. Thread-safe."""
 
@@ -1107,7 +1107,7 @@ class _PikaThread(threading.Thread):
         subscription_id: int,
         *,
         multiple=False,
-        transaction_id: Optional[int],
+        transaction_id: int | None,
     ):
         if subscription_id not in self._subscriptions:
             raise KeyError(f"Could not find subscription {subscription_id} to ACK")
@@ -1146,7 +1146,7 @@ class _PikaThread(threading.Thread):
         *,
         multiple=False,
         requeue=True,
-        transaction_id: Optional[int],
+        transaction_id: int | None,
     ):
         if subscription_id not in self._subscriptions:
             raise KeyError(f"Could not find subscription {subscription_id} to NACK")
@@ -1181,7 +1181,7 @@ class _PikaThread(threading.Thread):
             )
 
     def tx_select(
-        self, transaction_id: int, subscription_id: Optional[int]
+        self, transaction_id: int, subscription_id: int | None
     ) -> Future[None]:
         """Set a channel to transaction mode. Thread-safe.
         :param transaction_id: ID for this transaction in the transport layer.
