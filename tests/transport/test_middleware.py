@@ -6,7 +6,6 @@ import time
 from unittest import mock
 
 import pytest
-
 from workflows.transport import middleware
 from workflows.transport.offline_transport import OfflineTransport
 

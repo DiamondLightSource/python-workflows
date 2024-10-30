@@ -334,7 +334,7 @@ class Recipe:
                 new_recipe[idx]["error"] = translate(new_recipe[idx]["error"])
 
         # Join 'start' nodes
-        for (idx, param) in other.recipe["start"]:
+        for idx, param in other.recipe["start"]:
             new_recipe["start"].append((translate(idx), param))
 
         # Join 'error' nodes
