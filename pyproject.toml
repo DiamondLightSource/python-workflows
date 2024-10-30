@@ -75,6 +75,9 @@ commit = true
 tag = true
 
 [[tool.bumpversion.files]]
+filename = "pyproject.toml"
+
+[[tool.bumpversion.files]]
 filename = "src/workflows/__init__.py"
 
 [tool.ruff.lint]
