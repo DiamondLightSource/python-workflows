@@ -3,7 +3,6 @@ from __future__ import annotations
 from unittest import mock
 
 import pytest
-
 import workflows.transport.common_transport
 from workflows.recipe import Recipe
 from workflows.recipe.wrapper import RecipeWrapper

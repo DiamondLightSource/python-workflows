@@ -7,7 +7,7 @@ import logging
 import queue
 import threading
 import time
-from typing import Any, Dict
+from typing import Any
 
 import workflows
 import workflows.logging
@@ -128,7 +128,7 @@ class CommonService:
 
     # Any keyword arguments set on service invocation
 
-    start_kwargs: Dict[Any, Any] = {}
+    start_kwargs: dict[Any, Any] = {}
 
     # Not so overrideable functions ---------------------------------------------
 
