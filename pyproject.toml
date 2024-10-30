@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "workflows"
-version = "2.27"
+version = "2.28"
 description = "Data processing in distributed environments"
 readme = "README.rst"
 authors = [
@@ -68,7 +68,7 @@ addopts = "-ra"
 required_plugins = "pytest-timeout"
 
 [tool.bumpversion]
-current_version = "2.27"
+current_version = "2.28"
 parse = '(?P<major>\d+)\.(?P<minor>\d+)'
 serialize = ["{major}.{minor}"]
 commit = true
