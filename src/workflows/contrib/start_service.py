@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import sys
+
 from optparse import SUPPRESS_HELP, OptionParser
 
 import workflows
@@ -62,6 +64,7 @@ class ServiceStarter:
 
         # Enumerate all known services
         known_services = sorted(workflows.services.get_known_services())
+        known_services_help = "Known services: " + ", ".join(known_services)
 
         if version:
             version = f"{version} (workflows {workflows.version()})"
@@ -76,15 +79,11 @@ class ServiceStarter:
         parser.add_option(
             "-s",
             "--service",
-            dest="service",
             metavar="SVC",
-            default=None,
-            help="Name of the service to start. Known services: "
-            + ", ".join(known_services),
+            help=f"Name of the service to start. {known_services_help}",
         )
         parser.add_option(
             "--liveness",
-            dest="liveness",
             action="store_true",
             default=False,
             help=(
@@ -95,14 +94,12 @@ class ServiceStarter:
         )
         parser.add_option(
             "--liveness-port",
-            dest="liveness_port",
             default=8000,
             type="int",
             help="Expose liveness check endpoint on this port.",
         )
         parser.add_option(
             "--liveness-timeout",
-            dest="liveness_timeout",
             default=30,
             type="float",
             help="Timeout for the liveness check (in seconds).",
@@ -111,17 +108,15 @@ class ServiceStarter:
             parser.add_option(
                 "-m",
                 "--metrics",
-                dest="metrics",
                 action="store_true",
                 default=False,
                 help=(
-                    "Record metrics for this service and expose them on the port defined by"
-                    "the --metrics-port option."
+                    "Record metrics for this service and expose them on the port "
+                    "defined by the --metrics-port option."
                 ),
             )
             parser.add_option(
                 "--metrics-port",
-                dest="metrics_port",
                 default=8080,
                 type="int",
                 help="Expose metrics via a prometheus endpoint on this port.",
@@ -136,6 +131,10 @@ class ServiceStarter:
 
         # Call on_parsing hook
         (options, args) = self.on_parsing(options, args) or (options, args)
+
+        # Exit with error if no service has been specified.
+        if not options.service:
+            parser.error(f"Please specify a service name. {known_services_help}")
 
         # Create Transport factory
         transport_factory = workflows.transport.lookup(options.transport)
@@ -155,17 +154,34 @@ class ServiceStarter:
 
         transport_factory = on_transport_preparation_hook
 
-        # When service name is specified, check if service exists or can be derived
-        if options.service and options.service not in known_services:
-            matching = [s for s in known_services if s.startswith(options.service)]
-            if not matching:
-                matching = [
-                    s
-                    for s in known_services
-                    if s.lower().startswith(options.service.lower())
-                ]
-            if matching and len(matching) == 1:
-                options.service = matching[0]
+        # When service name is specified, check if service exists or can be derived.
+        if options.service not in known_services:
+            # First check whether the provided service name is a case-insensitive match.
+            service_lower = options.service.lower()
+            match = {s.lower(): s for s in known_services}.get(service_lower, None)
+            match = (
+                [match]
+                if match
+                # Next, check whether the provided service name is a partial
+                # case-sensitive match.
+                else [s for s in known_services if s.startswith(options.service)]
+                # Next check whether the provided service name is a partial
+                # case-insensitive match.
+                or [s for s in known_services if s.lower().startswith(service_lower)]
+            )
+
+            # Catch ambiguous partial matches and exit with an error.
+            if len(match) > 1:
+                sys.exit(
+                    f"Specified service name {options.service} is ambiguous, partially "
+                    f"matching each of these known services: " + ", ".join(match)
+                )
+            # Otherwise, set the derived service name, if there's a unique match.
+            elif match:
+                (options.service,) = match
+            # Otherwise, exit with an error.
+            else:
+                sys.exit(f"Please specify a valid service name. {known_services_help}")
 
         kwargs.update(
             {
