@@ -42,4 +42,3 @@ class SamplePipethrough(CommonService):
         )
 
         rw.send(0)
-
