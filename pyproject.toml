@@ -39,6 +39,7 @@ workflows = "workflows"
 
 [project.entry-points."workflows.services"]
 SampleConsumer = "workflows.services.sample_consumer:SampleConsumer"
+SamplePipethrough = "workflows.services.sample_pipethrough:SamplePipethrough"
 SampleProducer = "workflows.services.sample_producer:SampleProducer"
 SampleTxn = "workflows.services.sample_transaction:SampleTxn"
 SampleTxnProducer = "workflows.services.sample_transaction:SampleTxnProducer"
