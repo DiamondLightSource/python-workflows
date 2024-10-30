@@ -3,7 +3,6 @@ from __future__ import annotations
 from unittest import mock
 
 import pytest
-
 import workflows
 from workflows.transport.common_transport import CommonTransport
 
@@ -167,7 +166,9 @@ def test_callbacks_can_be_intercepted(mangling):
     )
 
     # Pass through (tests the value passed to the interceptor function is sensible)
-    intercept = lambda x: x
+    def intercept(x):
+        return x
+
     ct.subscription_callback_set_intercept(intercept)
 
     ct.subscription_callback(subid)(mock.sentinel.header, mock.sentinel.message)
