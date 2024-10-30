@@ -88,44 +88,7 @@ stages:
           PYTHON_VERSION: 3.10
         python311:
           PYTHON_VERSION: 3.11
+        python312:
+          PYTHON_VERSION: 3.12
     steps:
     - template: ci.yml
-
-- stage: deploy
-  displayName: Publish release
-  dependsOn:
-  - tests
-  condition: and(succeeded(), startsWith(variables['Build.SourceBranch'], 'refs/tags/'))
-  jobs:
-  - job: pypi
-    displayName: Publish pypi release
-    pool:
-      vmImage: ubuntu-20.04
-    steps:
-      - checkout: none
-
-      - task: UsePythonVersion@0
-        displayName: Set up python
-        inputs:
-          versionSpec: 3.11
-
-      - task: DownloadBuildArtifacts@0
-        displayName: Get pre-built package
-        inputs:
-          buildType: 'current'
-          downloadType: 'single'
-          artifactName: 'package'
-          downloadPath: '$(System.ArtifactsDirectory)'
-
-      - script: |
-          pip install --disable-pip-version-check twine
-        displayName: Install twine
-
-      - task: TwineAuthenticate@1
-        displayName: Set up credentials
-        inputs:
-          pythonUploadServiceConnection: pypi-workflows
-
-      - bash: |
-          python -m twine upload -r pypi-workflows --config-file $(PYPIRC_PATH) $(System.ArtifactsDirectory)/package/pypi/*.tar.gz $(System.ArtifactsDirectory)/package/pypi/*.whl
-        displayName: Publish package
