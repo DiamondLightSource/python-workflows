@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import pkg_resources
+from importlib.metadata import entry_points
 
 
 def lookup(service: str):
@@ -25,10 +25,7 @@ def get_known_services():
         setattr(
             get_known_services,
             "cache",
-            {
-                e.name: e.load
-                for e in pkg_resources.iter_entry_points("workflows.services")
-            },
+            {e.name: e.load for e in entry_points(group="workflows.services")},
         )
     register = get_known_services.cache.copy()
     return register

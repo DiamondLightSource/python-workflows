@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import functools
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from workflows.recipe.recipe import Recipe
 from workflows.recipe.validate import validate_recipe
