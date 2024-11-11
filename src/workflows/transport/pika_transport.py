@@ -1484,7 +1484,7 @@ class _PikaThread(threading.Thread):
                     break
                 logger.warning(f"Connection {connection_counter} failed: {e!r}")
             except BaseException as e:
-                logger.error(f"Connection failed for unknown reason: {e!r}")
+                logger.exception(f"Connection failed for unknown reason: {e!r}")
                 self._exc_info = sys.exc_info()
                 break
             # Make sure our connection is closed before reconnecting
