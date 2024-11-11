@@ -330,7 +330,15 @@ class PikaTransport(CommonTransport):
         body: bytes,
     ):
         """Rewrite and redirect a pika callback to the subscription function"""
-        merged_headers = dict(properties.headers)
+        if properties.headers is None:
+            logger.warning(
+                f"""Got unexpected empty header; this could be an error?
+{_channel=}
+{method=}
+{properties=}
+{body=}"""
+            )
+        merged_headers = dict(properties.headers or {})
         merged_headers.update(
             {
                 "consumer_tag": str(method.consumer_tag),
