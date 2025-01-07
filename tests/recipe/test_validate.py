@@ -9,6 +9,7 @@ import sys
 from unittest import mock
 
 import pytest
+
 import workflows
 from workflows.recipe.validate import main, validate_recipe
 
