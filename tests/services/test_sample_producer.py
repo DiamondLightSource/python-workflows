@@ -3,6 +3,7 @@ from __future__ import annotations
 from unittest import mock
 
 import pytest
+
 import workflows.services
 import workflows.services.sample_producer
 from workflows.transport.offline_transport import OfflineTransport

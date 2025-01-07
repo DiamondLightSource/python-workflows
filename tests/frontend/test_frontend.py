@@ -3,6 +3,7 @@ from __future__ import annotations
 from unittest import mock
 
 import pytest
+
 import workflows.frontend
 from workflows.services.common_service import CommonService
 

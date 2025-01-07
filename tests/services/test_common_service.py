@@ -5,6 +5,7 @@ from multiprocessing import Pipe
 from unittest import mock
 
 import pytest
+
 from workflows.services.common_service import Commands, CommonService, Priority
 
 
