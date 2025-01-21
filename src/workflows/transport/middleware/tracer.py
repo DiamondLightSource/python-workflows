@@ -1,25 +1,22 @@
 from __future__ import annotations
 
 import functools
-from typing import Callable
 import logging
+from typing import Callable
+
+from opentelemetry import trace
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+from opentelemetry.sdk.resources import SERVICE_NAME, Resource
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import (
+    BatchSpanProcessor,
+)
+from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
 
 from . import BaseTransportMiddleware
 
-from opentelemetry import trace
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.trace import Status, StatusCode
-from opentelemetry.sdk.trace.export import(
-        BatchSpanProcessor,
-        ConsoleSpanExporter,
-        )
-from opentelemetry.sdk.resources import SERVICE_NAME, Resource
-from opentelemetry.trace.propagation.tracecontext \
-    import TraceContextTextMapPropagator
-from opentelemetry.exporter.otlp.proto.http.trace_exporter \
-        import OTLPSpanExporter
-
 logger = logging.getLogger(__name__)
+
 
 class TracerMiddleware(BaseTransportMiddleware):
     def __init__(self, service_name: str):
@@ -29,12 +26,11 @@ class TracerMiddleware(BaseTransportMiddleware):
     def _initiate_tracers(self, service_name):
         """Initiates everything needed for tracing."""
         # Label this resource as its service:
-        resource = Resource(attributes={
-            SERVICE_NAME: service_name 
-        })
+        resource = Resource(attributes={SERVICE_NAME: service_name})
         # Export to OpenTelemetry Collector:
-        processor = BatchSpanProcessor(OTLPSpanExporter( \
-                endpoint="http://localhost:4318/v1/traces"))
+        processor = BatchSpanProcessor(
+            OTLPSpanExporter(endpoint="http://localhost:4318/v1/traces")
+        )
         # A provider provides tracers:
         provider = TracerProvider(resource=resource)
         provider.add_span_processor(processor)
@@ -45,10 +41,10 @@ class TracerMiddleware(BaseTransportMiddleware):
 
     def _extract_trace_context(self, message):
         """Retrieves Context object from message."""
-        carrier = message.get('trace_context')
+        carrier = message.get("trace_context")
         if carrier:
             # Deserialise serialised context into a Context object:
-            ctx = TraceContextTextMapPropagator().extract(carrier=carrier) 
+            ctx = TraceContextTextMapPropagator().extract(carrier=carrier)
             logger.info(f"extracted trace context from {self.service_name}")
             return ctx
         # If no context, leave empty:
@@ -58,13 +54,15 @@ class TracerMiddleware(BaseTransportMiddleware):
     def _inject_trace_context(self, message):
         """Inserts serialized trace context into message."""
         if type(message) == str:
-            logger.warning(f"received string message in {self.service_name}, could not extract trace context")
+            logger.warning(
+                f"received string message in {self.service_name}, could not extract trace context"
+            )
             return
         carrier = {}
         # If called outside of a span context, just leave carrier empty
         # (very safe!)
         TraceContextTextMapPropagator().inject(carrier)
-        message['trace_context'] = carrier
+        message["trace_context"] = carrier
         logger.info(f"injected trace context into {self.service_name}")
 
     def subscribe(self, call_next: Callable, channel, callback, **kwargs) -> int:
@@ -72,10 +70,13 @@ class TracerMiddleware(BaseTransportMiddleware):
         we care about, so we wrap it in a span context.
         To link the current span context with others from the same request
         we inject/extract the serialized trace context in the recipe message."""
+
         @functools.wraps(callback)
         def wrapped_callback(header, message):
             ctx = self._extract_trace_context(message)
-            with self.tracer.start_as_current_span(self.service_name, context=ctx) as span:
+            with self.tracer.start_as_current_span(
+                self.service_name, context=ctx
+            ) as span:
                 if ctx == {}:
                     self._inject_trace_context(message)
 

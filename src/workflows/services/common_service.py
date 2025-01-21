@@ -204,6 +204,7 @@ class CommonService:
             self.log.debug("No transport layer defined for service. Skipping.")
 
         from workflows.transport.middleware.tracer import TracerMiddleware
+
         instrument = TracerMiddleware(self.__class__.__name__)
         self._transport.add_middleware(instrument)
 
