@@ -28,7 +28,7 @@ class OfflineTransport(CommonTransport):
     config: dict[Any, Any] = {}
 
     def __init__(
-        self, middleware: list[type[middleware.BaseTransportMiddleware]] = None
+        self, middleware: list[type[middleware.BaseTransportMiddleware]] | None = None
     ):
         self._connected = False
         super().__init__(middleware=middleware)
