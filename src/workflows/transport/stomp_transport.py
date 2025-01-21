@@ -5,7 +5,7 @@ import json
 import threading
 import time
 import uuid
-from typing import Any, Dict, Optional, Type
+from typing import Any
 
 import stomp
 
@@ -31,10 +31,10 @@ class StompTransport(CommonTransport):
         "--stomp-prfx": "",
     }
     # Effective configuration
-    config: Dict[Any, Any] = {}
+    config: dict[Any, Any] = {}
 
     def __init__(
-        self, middleware: list[Type[middleware.BaseTransportMiddleware]] = None
+        self, middleware: list[type[middleware.BaseTransportMiddleware]] = None
     ):
         self._connected = False
         self._namespace = ""
@@ -348,7 +348,7 @@ class StompTransport(CommonTransport):
     def _subscribe_temporary(
         self,
         sub_id: int,
-        channel_hint: Optional[str],
+        channel_hint: str | None,
         callback: MessageCallback,
         **kwargs,
     ) -> str:

@@ -13,7 +13,6 @@ from unittest import mock
 
 import pytest
 import stomp as stomppy
-
 import workflows
 import workflows.transport
 from workflows.transport.common_transport import TemporarySubscription

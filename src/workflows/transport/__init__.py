@@ -2,9 +2,8 @@ from __future__ import annotations
 
 import argparse
 import optparse
-from typing import TYPE_CHECKING, Type
-
-import pkg_resources
+from importlib.metadata import entry_points
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from .common_transport import CommonTransport
@@ -12,7 +11,7 @@ if TYPE_CHECKING:
 default_transport = "PikaTransport"
 
 
-def lookup(transport: str) -> Type[CommonTransport]:
+def lookup(transport: str) -> type[CommonTransport]:
     """Get a transport layer class based on its name."""
     return get_known_transports().get(
         transport, get_known_transports()[default_transport]
@@ -55,15 +54,12 @@ def add_command_line_options(
         transport().add_command_line_options(parser)
 
 
-def get_known_transports() -> dict[str, Type[CommonTransport]]:
+def get_known_transports() -> dict[str, type[CommonTransport]]:
     """Return a dictionary of all known transport mechanisms."""
     if not hasattr(get_known_transports, "cache"):
         setattr(
             get_known_transports,
             "cache",
-            {
-                e.name: e.load()
-                for e in pkg_resources.iter_entry_points("workflows.transport")
-            },
+            {e.name: e.load() for e in entry_points(group="workflows.transport")},
         )
     return get_known_transports.cache.copy()  # type: ignore

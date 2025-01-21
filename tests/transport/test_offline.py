@@ -5,7 +5,6 @@ import logging
 from unittest import mock
 
 import pytest
-
 import workflows.transport
 from workflows.transport.offline_transport import OfflineTransport
 

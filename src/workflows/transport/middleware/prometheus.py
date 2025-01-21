@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import functools
 import time
-from typing import Callable, Optional
+from collections.abc import Callable
 
 from prometheus_client import Counter, Gauge, Histogram
 
@@ -100,7 +100,7 @@ class PrometheusMiddleware(BaseTransportMiddleware):
     def subscribe_temporary(
         self,
         call_next: Callable,
-        channel_hint: Optional[str],
+        channel_hint: str | None,
         callback: MessageCallback,
         **kwargs,
     ) -> TemporarySubscription:
@@ -155,7 +155,7 @@ class PrometheusMiddleware(BaseTransportMiddleware):
         self,
         call_next: Callable,
         message,
-        subscription_id: Optional[int] = None,
+        subscription_id: int | None = None,
         **kwargs,
     ):
         ACKS.labels(source=self.source).inc()
@@ -165,7 +165,7 @@ class PrometheusMiddleware(BaseTransportMiddleware):
         self,
         call_next: Callable,
         message,
-        subscription_id: Optional[int] = None,
+        subscription_id: int | None = None,
         **kwargs,
     ):
         NACKS.labels(source=self.source).inc()

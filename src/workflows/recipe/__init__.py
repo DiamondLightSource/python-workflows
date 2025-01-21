@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import functools
-from typing import Any, Callable
+import logging
+from collections.abc import Callable
+from typing import Any
 
 from workflows.recipe.recipe import Recipe
 from workflows.recipe.validate import validate_recipe
@@ -14,6 +16,8 @@ __all__ = [
     "wrap_subscribe",
     "wrap_subscribe_broadcast",
 ]
+
+logger = logging.getLogger("workflows.recipe")
 
 
 def _wrap_subscription(
@@ -75,6 +79,10 @@ def _wrap_subscription(
         #                    "First 1000 characters of header:\n%s\n" + \
         #                    "First 1000 characters of message:\n%s",
         #                    str(header)[:1000], str(message)[:1000])
+        logger.error(
+            "The input to this service is not a wrapped recipe. "
+            "Unable to process incoming message."
+        )
         transport_layer.nack(header)
 
     if mangle_for_receiving:
