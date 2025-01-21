@@ -51,9 +51,9 @@ class TracerMiddleware(BaseTransportMiddleware):
         logger.warning(f"no context found for {self.service_name}, could not extract")
         return {}
 
-    def _inject_trace_context(self, message):
+    def _inject_trace_context(self, message) -> None:
         """Inserts serialized trace context into message."""
-        if type(message) == str:
+        if isinstance(message, str):
             logger.warning(
                 f"received string message in {self.service_name}, could not extract trace context"
             )
