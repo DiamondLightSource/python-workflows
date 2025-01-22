@@ -100,7 +100,8 @@ class Frontend:
                 return self.status.__getitem__(key)
 
         self.log = logging.LoggerAdapter(
-            logging.getLogger("workflows.frontend"), LogAdapter()
+            logging.getLogger("workflows.frontend"),
+            LogAdapter(),  # type: ignore
         )
 
         # Connect to the network transport layer
