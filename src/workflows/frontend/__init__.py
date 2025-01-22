@@ -4,6 +4,7 @@ import logging
 import multiprocessing
 import threading
 import time
+from collections.abc import Callable
 
 import workflows
 import workflows.frontend.utilization
@@ -11,6 +12,7 @@ import workflows.services
 import workflows.transport
 import workflows.util
 from workflows.services.common_service import CommonService
+from workflows.transport.common_transport import CommonTransport
 
 basestring = (str, bytes)
 
@@ -22,9 +24,11 @@ class Frontend:
     service.
     """
 
+    _transport_factory: Callable[[], CommonTransport]
+
     def __init__(
         self,
-        transport=None,
+        transport: Callable[[], CommonTransport] | str | None = None,
         service=None,
         transport_command_channel=None,
         restart_service=False,
