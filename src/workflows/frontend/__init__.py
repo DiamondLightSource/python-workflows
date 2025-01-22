@@ -102,7 +102,6 @@ class Frontend:
         self.log = logging.LoggerAdapter(
             logging.getLogger("workflows.frontend"), LogAdapter()
         )
-        self.log.warn = self.log.warning  # Add support for deprecated .warn
 
         # Connect to the network transport layer
         if transport is None or isinstance(transport, basestring):
