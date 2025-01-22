@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import sys
+from collections.abc import Callable
 from optparse import SUPPRESS_HELP, OptionParser
 
 import workflows
 import workflows.frontend
 import workflows.services
 import workflows.transport
+from workflows.transport.common_transport import CommonTransport
 
 
 class ServiceStarter:
@@ -27,12 +29,14 @@ class ServiceStarter:
         """
 
     @staticmethod
-    def on_transport_factory_preparation(transport_factory):
+    def on_transport_factory_preparation(
+        transport_factory,
+    ) -> Callable[[], CommonTransport] | None:
         """Plugin hook to intercept/manipulate newly created Transport factories
         before first invocation."""
 
     @staticmethod
-    def on_transport_preparation(transport):
+    def on_transport_preparation(transport: CommonTransport) -> CommonTransport | None:
         """Plugin hook to intercept/manipulate newly created Transport objects
         before connecting."""
 
@@ -136,7 +140,9 @@ class ServiceStarter:
             parser.error(f"Please specify a service name. {known_services_help}")
 
         # Create Transport factory
-        transport_factory = workflows.transport.lookup(options.transport)
+        transport_factory: Callable[[], CommonTransport] = workflows.transport.lookup(
+            options.transport
+        )
 
         # Call on_transport_factory_preparation hook
         transport_factory = (
@@ -147,7 +153,7 @@ class ServiceStarter:
         # Set up on_transport_preparation hook to affect newly created transport objects
         true_transport_factory = transport_factory
 
-        def on_transport_preparation_hook():
+        def on_transport_preparation_hook() -> CommonTransport:
             transport_object = true_transport_factory()
             return self.on_transport_preparation(transport_object) or transport_object
 
