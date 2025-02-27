@@ -13,6 +13,7 @@ from unittest import mock
 
 import pika
 import pytest
+
 import workflows.transport.pika_transport
 from workflows.transport.common_transport import TemporarySubscription
 from workflows.transport.pika_transport import PikaTransport, _PikaThread
