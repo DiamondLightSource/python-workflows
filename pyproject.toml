@@ -67,6 +67,8 @@ required_plugins = "pytest-timeout"
 [tool.bumpversion]
 current_version = "3.1"
 parse = '(?P<major>\d+)\.(?P<minor>\d+)'
+search = '"{current_version}"'
+replace = '"{new_version}"'
 serialize = ["{major}.{minor}"]
 commit = true
 tag = true
