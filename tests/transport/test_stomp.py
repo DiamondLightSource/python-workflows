@@ -600,9 +600,9 @@ def test_subscribe_to_temporary_queue(mockstomp):
 
     def assert_not_seen_before(ts: TemporarySubscription):
         assert ts.subscription_id, "Temporary subscription is missing an ID"
-        assert (
-            ts.subscription_id not in known_subscriptions
-        ), "Duplicate subscription ID"
+        assert ts.subscription_id not in known_subscriptions, (
+            "Duplicate subscription ID"
+        )
         assert ts.queue_name, "Temporary queue does not have a name"
         assert ts.queue_name not in known_queues, "Duplicate temporary queue name"
         known_subscriptions.add(ts.subscription_id)

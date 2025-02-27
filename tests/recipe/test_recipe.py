@@ -306,13 +306,13 @@ def test_replacing_parameters_in_recipe_with_datastructures():
     A.apply_parameters(replacements)
 
     assert A.recipe[2]["list"] == replacements["some-list"]
-    assert (
-        A.recipe[2]["list"] is not replacements["some-list"]
-    ), "same list returned, not copied"
+    assert A.recipe[2]["list"] is not replacements["some-list"], (
+        "same list returned, not copied"
+    )
     assert A.recipe[2]["dictionary"] == replacements["nested"]
-    assert (
-        A.recipe[2]["dictionary"] is not replacements["nested"]
-    ), "same dictionary returned, not copied"
+    assert A.recipe[2]["dictionary"] is not replacements["nested"], (
+        "same dictionary returned, not copied"
+    )
     assert (
         A.recipe[2]["dictionary"]["some-dictionary"]
         is not replacements["nested"]["some-dictionary"]

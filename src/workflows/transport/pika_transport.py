@@ -999,9 +999,9 @@ class _PikaThread(threading.Thread):
         def _declare_subscribe_queue_in_thread():
             try:
                 if result.set_running_or_notify_cancel():
-                    assert (
-                        subscription_id not in self._subscriptions
-                    ), f"Subscription request {subscription_id} rejected due to existing subscription {self._subscriptions[subscription_id]}"
+                    assert subscription_id not in self._subscriptions, (
+                        f"Subscription request {subscription_id} rejected due to existing subscription {self._subscriptions[subscription_id]}"
+                    )
                     temporary_queue_name = (
                         self._get_shared_channel()
                         .queue_declare(
@@ -1543,9 +1543,9 @@ class _PikaThread(threading.Thread):
         """
         try:
             if result.set_running_or_notify_cancel():
-                assert (
-                    subscription_id not in self._subscriptions
-                ), f"Subscription request {subscription_id} rejected due to existing subscription {self._subscriptions[subscription_id]}"
+                assert subscription_id not in self._subscriptions, (
+                    f"Subscription request {subscription_id} rejected due to existing subscription {self._subscriptions[subscription_id]}"
+                )
                 self._add_subscription(subscription_id, subscription)
                 result.set_result(self._subscriptions[subscription_id].queue)
         except BaseException as e:

@@ -109,9 +109,9 @@ class Frontend:
             self._transport_factory = workflows.transport.lookup(transport)
         else:
             self._transport_factory = transport
-        assert hasattr(
-            self._transport_factory, "__call__"
-        ), "No valid transport factory given"
+        assert hasattr(self._transport_factory, "__call__"), (
+            "No valid transport factory given"
+        )
         self._transport = self._transport_factory()
         assert self._transport.connect(), "Could not connect to transport layer"
 
