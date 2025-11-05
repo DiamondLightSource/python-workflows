@@ -1,11 +1,11 @@
 apiVersion: backstage.io/v1alpha1
 kind: Component
 metadata:
-  name: workflows
-  title: Workflows
+  name: python-workflows
+  title: Zocalo Workflows
   description: >
     Workflows enables light-weight services to process tasks in a
-    message-oriented environment.
+    message-oriented environment. Used as the foundation of Zocalo.
   annotations:
     github.com/project-slug: DiamondLightSource/python-workflows
     diamond.ac.uk/viewdocs-url: https://zocalo.readthedocs.io/en/latest/workflows.html
