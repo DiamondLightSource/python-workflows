@@ -12,6 +12,13 @@ from typing import Any
 import workflows
 import workflows.logging
 
+from opentelemetry import trace
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+from workflows.transport.middleware.otel_tracing import OTELTracingMiddleware
+from opentelemetry.sdk.resources import Resource, SERVICE_NAME
+
 
 class Status(enum.Enum):
     """
@@ -185,6 +192,31 @@ class CommonService:
             self.transport.subscription_callback_set_intercept(
                 self._transport_interceptor
             )
+            
+            # Configure OTELTracing
+            resource = Resource.create({
+                SERVICE_NAME: self._service_name,
+            })
+
+            self.log.debug("Configuring OTELTracing")
+            provider = TracerProvider(resource=resource)
+            trace.set_tracer_provider(provider)
+
+            # Configure BatchProcessor and OTLPSpanExporter to point to OTELCollector
+            otlp_exporter = OTLPSpanExporter(
+                endpoint="https://otel.tracing.diamond.ac.uk:4318/v1/traces",
+                timeout=10
+            )
+            span_processor = BatchSpanProcessor(otlp_exporter)
+            provider.add_span_processor(span_processor)
+
+            # Add OTELTracingMiddleware to the transport layer
+            tracer = trace.get_tracer(__name__)
+            otel_middleware = OTELTracingMiddleware(tracer, service_name=self._service_name)
+            self._transport.add_middleware(otel_middleware)
+
+            self.log.debug("OTELTracingMiddleware added to transport layer of %s", self._service_name)
+
             metrics = self._environment.get("metrics")
             if metrics:
                 import prometheus_client
