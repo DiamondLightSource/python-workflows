@@ -543,6 +543,7 @@ class PikaTransport(CommonTransport):
         delay=None,
         expiration: int | None = None,
         transaction: int | None = None,
+        topic: str | None = None,
         **kwargs,
     ):
         """Send a message to a fanout exchange.
@@ -554,6 +555,7 @@ class PikaTransport(CommonTransport):
             delay: Delay transport of message by this many seconds
             expiration: Optional TTL expiration time, in seconds, relative to sending time
             transaction: Transaction ID if message should be part of a transaction
+            topic: The routing key, if posting to a topic exchange
             kwargs: Arbitrary arguments for other transports. Ignored.
         """
         assert delay is None, "Delay Not implemented"
@@ -572,7 +574,7 @@ class PikaTransport(CommonTransport):
 
         self._pika_thread.send(
             exchange=destination,
-            routing_key="",
+            routing_key=topic or "",
             body=message,
             properties=properties,
             mandatory=False,

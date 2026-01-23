@@ -265,9 +265,10 @@ class RecipeWrapper:
                 message = mangle_for_sending(message)
             self._retry_transport(
                 broadcast,
-                self.recipe[destination]["topic"],
+                self.recipe[destination]["exchange"],
                 message,
                 headers=header,
+                topic=self.recipe[destination].get("topic"),
                 **dest_kwargs,
             )
 
