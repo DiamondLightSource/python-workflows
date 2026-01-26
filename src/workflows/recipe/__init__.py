@@ -3,6 +3,7 @@ from __future__ import annotations
 import functools
 import logging
 from collections.abc import Callable
+from opentelemetry import trace
 from typing import Any
 
 from workflows.recipe.recipe import Recipe
@@ -69,6 +70,39 @@ def _wrap_subscription(
             message = mangle_for_receiving(message)
         if header.get("workflows-recipe") in {True, "True", "true", 1}:
             rw = RecipeWrapper(message=message, transport=transport_layer)
+            print(rw)
+            logger.log(1, rw)
+
+            # Extract and set DCID on the current span
+            span = trace.get_current_span()
+            dcid = None
+
+            # Try multiple locations where DCID might be stored
+            top_level_params = {}
+            if isinstance(message, dict):
+                # Direct parameters (top-level or in recipe)
+                top_level_params = message.get("parameters", {})
+            
+            # Payload parameters (most common location)
+            payload = message.get("payload", {})
+            payload_params = {}
+            if isinstance(payload, dict):
+                payload_params = payload.get("parameters", {})
+            
+            # Try all common locations
+            dcid = (
+                top_level_params.get("ispyb_dcid") or
+                top_level_params.get("dcid") or
+                payload_params.get("ispyb_dcid") or
+                payload_params.get("dcid") or
+                payload.get("ispyb_dcid") or  
+                payload.get("dcid")
+            )
+
+            if dcid:
+                span.set_attribute("dcid", dcid)
+                span.add_event("recipe.dcid_extracted", attributes={"dcid": dcid})
+        
             if log_extender and rw.environment and rw.environment.get("ID"):
                 with log_extender("recipe_ID", rw.environment["ID"]):
                     return callback(rw, header, message.get("payload"))

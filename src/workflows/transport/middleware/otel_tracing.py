@@ -2,7 +2,7 @@ from opentelemetry import trace
 from workflows.transport.middleware import BaseTransportMiddleware
 from collections.abc import Callable
 import functools
-from opentelemetry.propagate import inject
+from opentelemetry.propagate import inject, extract
 
 class OTELTracingMiddleware(BaseTransportMiddleware):
     def __init__(self, tracer: trace.Tracer, service_name: str):
@@ -14,29 +14,23 @@ class OTELTracingMiddleware(BaseTransportMiddleware):
         self.tracer = tracer
         self.service_name = service_name
 
-
-    def send(self, call_next: Callable, destination, message, **kwargs):
-        """
-        Middleware for tracing the `send` operation
-        
-        :param call_next: The next middleware or the original `send` method.
-        :param destination: The destination service to which the message is being sent. 
-        :param message: The message being sent.
-        :param kwargs: Additional arguments for the `send` method. 
-        """
-
-        # Start a new span for the `send` operation
-        with self.tracer.start_as_current_span("transport.send") as span:
-            # Attributes we're interested in
-            span.set_attribute("service_name", self.service_name)
-            span.set_attribute("destination", destination)
-            span.set_attribute("message", str(message))
+    def subscribe(self, call_next: Callable, channel, callback, **kwargs) -> int:
+        @functools.wraps(callback)
+        def wrapped_callback(header, message):
+            # Extract trace context from message headers
+            ctx = extract(header) if header else None
             
-            # Inject trace context into message headers
-            headers = kwargs.setdefault("headers", {})
-            inject(headers)
-            kwargs["headers"] = headers
-
-            # Call the next middleware or the original `send` method
-            return call_next(destination, message, **kwargs)
-
+            # Start a new span with the extracted context
+            with self.tracer.start_as_current_span(
+                "transport.subscribe",
+                context=ctx
+            ) as span:
+                span.set_attribute("service_name", self.service_name)
+                span.set_attribute("channel", channel)
+        
+                
+                # Call the original callback
+                return callback(header, message)
+        
+        # Call the next middleware with the wrapped callback
+        return call_next(channel, wrapped_callback, **kwargs)
