@@ -70,13 +70,19 @@ def _wrap_subscription(
             message = mangle_for_receiving(message)
         if header.get("workflows-recipe") in {True, "True", "true", 1}:
             rw = RecipeWrapper(message=message, transport=transport_layer)
-            print(rw)
-            logger.log(1, rw)
+            logger.debug("RecipeWrapper created: %s", rw)
 
-            # Extract and set DCID on the current span
+            # Extract and set DCID and recipe_id on the current span
             span = trace.get_current_span()
             dcid = None
+            recipe_id = None
 
+            # Extract recipe ID from environment
+            if isinstance(message, dict):
+                environment = message.get("environment", {})
+                if isinstance(environment, dict):
+                    recipe_id = environment.get("ID")
+            
             # Try multiple locations where DCID might be stored
             top_level_params = {}
             if isinstance(message, dict):
@@ -103,18 +109,28 @@ def _wrap_subscription(
                 span.set_attribute("dcid", dcid)
                 span.add_event("recipe.dcid_extracted", attributes={"dcid": dcid})
 
+            if recipe_id:
+                span.set_attribute("recipe_id", recipe_id)
+                span.add_event("recipe.id_extracted", attributes={"recipe_id": recipe_id})
+
             # Extract span_id and trace_id for logging
             span_context = span.get_span_context()
-            if span_context.is_valid:
+            if span_context and span_context.is_valid:
                 span_id = format(span_context.span_id, '016x')
                 trace_id = format(span_context.trace_id, '032x')
 
+                log_extra = {
+                    "span_id": span_id,
+                    "trace_id": trace_id,
+                }
+                if dcid:
+                    log_extra["dcid"] = dcid
+                if recipe_id:
+                    log_extra["recipe_id"] = recipe_id
+
                 logger.info(
                     "Processing recipe message",
-                    extra={
-                        "span_id": span_id,
-                        "trace_id": trace_id,
-                    }
+                    extra=log_extra
                 )
         
             if log_extender and rw.environment and rw.environment.get("ID"):
