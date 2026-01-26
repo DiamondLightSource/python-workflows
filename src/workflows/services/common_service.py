@@ -193,20 +193,24 @@ class CommonService:
                 self._transport_interceptor
             )
             
-            # Configure OTELTracing
-            resource = Resource.create({
-                SERVICE_NAME: self._service_name,
-            })
+            # Configure OTELTracing if configuration is available
+            otel_config = OTEL.config if hasattr(OTEL, 'config') and OTEL.config else None
+            
+            if otel_config:
+                # Configure OTELTracing
+                resource = Resource.create({
+                    SERVICE_NAME: self._service_name,
+                })
 
-            self.log.debug("Configuring OTELTracing")
-            provider = TracerProvider(resource=resource)
-            trace.set_tracer_provider(provider)
+                self.log.debug("Configuring OTELTracing")
+                provider = TracerProvider(resource=resource)
+                trace.set_tracer_provider(provider)
 
-            # Configure BatchProcessor and OTLPSpanExporter to point to OTELCollector
-            otlp_exporter = OTLPSpanExporter(
-                endpoint="https://otel.tracing.diamond.ac.uk:4318/v1/traces",
-                timeout=10
-            )
+                # Configure BatchProcessor and OTLPSpanExporter using config values
+                otlp_exporter = OTLPSpanExporter(
+                    endpoint=otel_config["endpoint"],
+                    timeout=otel_config.get("timeout", 10)
+                )
             span_processor = BatchSpanProcessor(otlp_exporter)
             provider.add_span_processor(span_processor)
 
