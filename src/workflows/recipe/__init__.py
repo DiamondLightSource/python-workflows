@@ -101,7 +101,7 @@ def _wrap_subscription(
 
                 if recipe_id:
                     log_extra["recipe_id"] = recipe_id
-        
+
             if log_extender and rw.environment and rw.environment.get("ID"):
                 with log_extender("recipe_ID", rw.environment["ID"]):
                     return callback(rw, header, message.get("payload"))

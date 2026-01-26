@@ -7,6 +7,7 @@ import workflows.transport
 from workflows.transport.pika_transport import PikaTransport
 from workflows.transport.stomp_transport import StompTransport
 
+
 class OTEL:
     """A Zocalo configuration plugin to pre-populate OTELTracing config defaults"""
 
@@ -23,10 +24,12 @@ class OTEL:
     def activate(configuration):
         # Build the full endpoint URL if not provided
         if "endpoint" not in configuration:
-            endpoint = f"https://{configuration['host']}:{configuration['port']}/v1/traces"
+            endpoint = (
+                f"https://{configuration['host']}:{configuration['port']}/v1/traces"
+            )
         else:
             endpoint = configuration["endpoint"]
-        
+
         OTEL.config["endpoint"] = endpoint
         OTEL.config["timeout"] = configuration.get("timeout", 10)
 
