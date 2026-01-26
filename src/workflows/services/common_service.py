@@ -9,15 +9,15 @@ import threading
 import time
 from typing import Any
 
-import workflows
-import workflows.logging
-
 from opentelemetry import trace
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+from opentelemetry.sdk.resources import SERVICE_NAME, Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
-from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+
+import workflows
+import workflows.logging
 from workflows.transport.middleware.otel_tracing import OTELTracingMiddleware
-from opentelemetry.sdk.resources import Resource, SERVICE_NAME
 
 
 class Status(enum.Enum):
@@ -216,7 +216,9 @@ class CommonService:
 
             # Add OTELTracingMiddleware to the transport layer
             tracer = trace.get_tracer(__name__)
-            otel_middleware = OTELTracingMiddleware(tracer, service_name=self._service_name)
+            otel_middleware = OTELTracingMiddleware(
+                tracer, service_name=self._service_name
+            )
             self._transport.add_middleware(otel_middleware)
 
 

@@ -3,8 +3,9 @@ from __future__ import annotations
 import functools
 import logging
 from collections.abc import Callable
-from opentelemetry import trace
 from typing import Any
+
+from opentelemetry import trace
 
 from workflows.recipe.recipe import Recipe
 from workflows.recipe.validate import validate_recipe
@@ -80,16 +81,18 @@ def _wrap_subscription(
                 environment = message.get("environment", {})
                 if isinstance(environment, dict):
                     recipe_id = environment.get("ID")
-            
+
             if recipe_id:
                 span.set_attribute("recipe_id", recipe_id)
-                span.add_event("recipe.id_extracted", attributes={"recipe_id": recipe_id})
+                span.add_event(
+                    "recipe.id_extracted", attributes={"recipe_id": recipe_id}
+                )
 
             # Extract span_id and trace_id for logging
             span_context = span.get_span_context()
             if span_context and span_context.is_valid:
-                span_id = format(span_context.span_id, '016x')
-                trace_id = format(span_context.trace_id, '032x')
+                span_id = format(span_context.span_id, "016x")
+                trace_id = format(span_context.trace_id, "032x")
 
                 log_extra = {
                     "span_id": span_id,
