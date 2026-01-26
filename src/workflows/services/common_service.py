@@ -219,7 +219,6 @@ class CommonService:
             otel_middleware = OTELTracingMiddleware(tracer, service_name=self._service_name)
             self._transport.add_middleware(otel_middleware)
 
-            self.log.debug("OTELTracingMiddleware added to transport layer of %s", self._service_name)
 
             metrics = self._environment.get("metrics")
             if metrics:

@@ -70,11 +70,9 @@ def _wrap_subscription(
             message = mangle_for_receiving(message)
         if header.get("workflows-recipe") in {True, "True", "true", 1}:
             rw = RecipeWrapper(message=message, transport=transport_layer)
-            logger.debug("RecipeWrapper created: %s", rw)
 
             # Extract recipe_id on the current span
             span = trace.get_current_span()
-            dcid = None
             recipe_id = None
 
             # Extract recipe ID from environment
@@ -97,16 +95,9 @@ def _wrap_subscription(
                     "span_id": span_id,
                     "trace_id": trace_id,
                 }
-                if dcid:
-                    log_extra["dcid"] = dcid
+
                 if recipe_id:
                     log_extra["recipe_id"] = recipe_id
-
-                logger.info(
-
-                    "Processing recipe message",
-                    extra=log_extra
-                )
         
             if log_extender and rw.environment and rw.environment.get("ID"):
                 with log_extender("recipe_ID", rw.environment["ID"]):
