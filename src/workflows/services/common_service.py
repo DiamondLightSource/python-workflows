@@ -18,6 +18,8 @@ from opentelemetry.sdk.trace.export import BatchSpanProcessor
 import workflows
 import workflows.logging
 from workflows.transport.middleware.otel_tracing import OTELTracingMiddleware
+from workflows.util.zocalo.configuration import OTEL
+
 
 
 class Status(enum.Enum):
