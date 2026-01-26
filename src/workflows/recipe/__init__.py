@@ -102,6 +102,20 @@ def _wrap_subscription(
             if dcid:
                 span.set_attribute("dcid", dcid)
                 span.add_event("recipe.dcid_extracted", attributes={"dcid": dcid})
+
+            # Extract span_id and trace_id for logging
+            span_context = span.get_span_context()
+            if span_context.is_valid:
+                span_id = format(span_context.span_id, '016x')
+                trace_id = format(span_context.trace_id, '032x')
+
+                logger.info(
+                    "Processing recipe message",
+                    extra={
+                        "span_id": span_id,
+                        "trace_id": trace_id,
+                    }
+                )
         
             if log_extender and rw.environment and rw.environment.get("ID"):
                 with log_extender("recipe_ID", rw.environment["ID"]):
