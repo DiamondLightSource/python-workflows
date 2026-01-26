@@ -6,11 +6,6 @@ from opentelemetry.propagate import inject, extract
 
 class OTELTracingMiddleware(BaseTransportMiddleware):
     def __init__(self, tracer: trace.Tracer, service_name: str):
-        """
-        Initialize the OpenTelemetry Tracing Middleware.
-
-        :param tracer: An OpenTelemetry tracer instance used to create spans.
-        """
         self.tracer = tracer
         self.service_name = service_name
 
