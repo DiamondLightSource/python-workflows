@@ -72,7 +72,7 @@ def _wrap_subscription(
             rw = RecipeWrapper(message=message, transport=transport_layer)
             logger.debug("RecipeWrapper created: %s", rw)
 
-            # Extract and set DCID and recipe_id on the current span
+            # Extract recipe_id on the current span
             span = trace.get_current_span()
             dcid = None
             recipe_id = None
@@ -83,32 +83,6 @@ def _wrap_subscription(
                 if isinstance(environment, dict):
                     recipe_id = environment.get("ID")
             
-            # Try multiple locations where DCID might be stored
-            top_level_params = {}
-            if isinstance(message, dict):
-                # Direct parameters (top-level or in recipe)
-                top_level_params = message.get("parameters", {})
-            
-            # Payload parameters (most common location)
-            payload = message.get("payload", {})
-            payload_params = {}
-            if isinstance(payload, dict):
-                payload_params = payload.get("parameters", {})
-            
-            # Try all common locations
-            dcid = (
-                top_level_params.get("ispyb_dcid") or
-                top_level_params.get("dcid") or
-                payload_params.get("ispyb_dcid") or
-                payload_params.get("dcid") or
-                payload.get("ispyb_dcid") or  
-                payload.get("dcid")
-            )
-
-            if dcid:
-                span.set_attribute("dcid", dcid)
-                span.add_event("recipe.dcid_extracted", attributes={"dcid": dcid})
-
             if recipe_id:
                 span.set_attribute("recipe_id", recipe_id)
                 span.add_event("recipe.id_extracted", attributes={"recipe_id": recipe_id})
@@ -129,6 +103,7 @@ def _wrap_subscription(
                     log_extra["recipe_id"] = recipe_id
 
                 logger.info(
+
                     "Processing recipe message",
                     extra=log_extra
                 )
