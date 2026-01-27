@@ -216,8 +216,8 @@ class CommonService:
                     endpoint=otel_config["endpoint"],
                     timeout=otel_config.get("timeout", 10),
                 )
-            span_processor = BatchSpanProcessor(otlp_exporter)
-            provider.add_span_processor(span_processor)
+                span_processor = BatchSpanProcessor(otlp_exporter)
+                provider.add_span_processor(span_processor)
 
             # Add OTELTracingMiddleware to the transport layer
             tracer = trace.get_tracer(__name__)
