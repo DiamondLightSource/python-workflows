@@ -195,15 +195,21 @@ class CommonService:
             try:
                 # Configure OTELTracing if configuration is available
                 otel_config = (
-                    self.config.opentelemetry if self.config and hasattr(self.config, "opentelemetry") else None
+                    self.config.opentelemetry
+                    if self.config and hasattr(self.config, "opentelemetry")
+                    else None
                 )
 
                 if otel_config:
                     if "endpoint" not in otel_config:
-                        self.log.warning("Missing required OTEL configuration field `endpoint`.")
-                    
+                        self.log.warning(
+                            "Missing required OTEL configuration field `endpoint`."
+                        )
+
                     if "timeout" not in otel_config:
-                        self.log.warning("Missing optional OTEL configuration field `timout`. Will default to 10 seconds. ")
+                        self.log.warning(
+                            "Missing optional OTEL configuration field `timout`. Will default to 10 seconds. "
+                        )
 
                     # Configure OTELTracing
                     resource = Resource.create(
@@ -232,7 +238,9 @@ class CommonService:
                     self._transport.add_middleware(otel_middleware)
             except Exception as e:
                 # Continue without tracing if configuration fails
-                self.log.warning("Failed to configure OpenTelemetry tracing: %s", str(e))
+                self.log.warning(
+                    "Failed to configure OpenTelemetry tracing: %s", str(e)
+                )
 
             metrics = self._environment.get("metrics")
             if metrics:
