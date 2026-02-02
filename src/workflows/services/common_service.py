@@ -18,7 +18,6 @@ from opentelemetry.sdk.trace.export import BatchSpanProcessor
 import workflows
 import workflows.logging
 from workflows.transport.middleware.otel_tracing import OTELTracingMiddleware
-from workflows.util.zocalo.configuration import OTEL
 
 
 class Status(enum.Enum):
@@ -193,38 +192,47 @@ class CommonService:
             self.transport.subscription_callback_set_intercept(
                 self._transport_interceptor
             )
-
-            # Configure OTELTracing if configuration is available
-            otel_config = (
-                OTEL.config if hasattr(OTEL, "config") and OTEL.config else None
-            )
-
-            if otel_config:
-                # Configure OTELTracing
-                resource = Resource.create(
-                    {
-                        SERVICE_NAME: self._service_name,
-                    }
+            try:
+                # Configure OTELTracing if configuration is available
+                otel_config = (
+                    self.config.opentelemetry if self.config and hasattr(self.config, "opentelemetry") else None
                 )
 
-                self.log.debug("Configuring OTELTracing")
-                provider = TracerProvider(resource=resource)
-                trace.set_tracer_provider(provider)
+                if otel_config:
+                    if "endpoint" not in otel_config:
+                        self.log.warning("Missing required OTEL configuration field `endpoint`.")
+                    
+                    if "timeout" not in otel_config:
+                        self.log.warning("Missing optional OTEL configuration field `timout`. Will default to 10 seconds. ")
 
-                # Configure BatchProcessor and OTLPSpanExporter using config values
-                otlp_exporter = OTLPSpanExporter(
-                    endpoint=otel_config["endpoint"],
-                    timeout=otel_config.get("timeout", 10),
-                )
-                span_processor = BatchSpanProcessor(otlp_exporter)
-                provider.add_span_processor(span_processor)
+                    # Configure OTELTracing
+                    resource = Resource.create(
+                        {
+                            SERVICE_NAME: self._service_name,
+                        }
+                    )
 
-            # Add OTELTracingMiddleware to the transport layer
-            tracer = trace.get_tracer(__name__)
-            otel_middleware = OTELTracingMiddleware(
-                tracer, service_name=self._service_name
-            )
-            self._transport.add_middleware(otel_middleware)
+                    self.log.debug("Configuring OTELTracing")
+                    provider = TracerProvider(resource=resource)
+                    trace.set_tracer_provider(provider)
+
+                    # Configure BatchProcessor and OTLPSpanExporter using config values
+                    otlp_exporter = OTLPSpanExporter(
+                        endpoint=otel_config["endpoint"],
+                        timeout=otel_config.get("timeout", 10),
+                    )
+                    span_processor = BatchSpanProcessor(otlp_exporter)
+                    provider.add_span_processor(span_processor)
+
+                    # Add OTELTracingMiddleware to the transport layer
+                    tracer = trace.get_tracer(__name__)
+                    otel_middleware = OTELTracingMiddleware(
+                        tracer, service_name=self._service_name
+                    )
+                    self._transport.add_middleware(otel_middleware)
+            except Exception as e:
+                # Continue without tracing if configuration fails
+                self.log.warning("Failed to configure OpenTelemetry tracing: %s", str(e))
 
             metrics = self._environment.get("metrics")
             if metrics:
