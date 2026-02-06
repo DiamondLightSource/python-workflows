@@ -72,40 +72,34 @@ def _wrap_subscription(
         if header.get("workflows-recipe") in {True, "True", "true", 1}:
             rw = RecipeWrapper(message=message, transport=transport_layer)
 
-            # Extract recipe_id on the current span
+            # Extract recipe ID from environment and add to current span
             span = trace.get_current_span()
-            recipe_id = None
-
-            # Extract recipe ID from environment
-            if isinstance(message, dict):
-                environment = message.get("environment", {})
-                if isinstance(environment, dict):
-                    recipe_id = environment.get("ID")
+            recipe_id = rw.environment.get("ID")
 
             if recipe_id:
                 span.set_attribute("recipe_id", recipe_id)
-                span.add_event(
-                    "recipe.id_extracted", attributes={"recipe_id": recipe_id}
-                )
 
             # Extract span_id and trace_id for logging
             span_context = span.get_span_context()
             if span_context and span_context.is_valid:
-                span_id = format(span_context.span_id, "016x")
-                trace_id = format(span_context.trace_id, "032x")
+                span_id = span_context.span_id
+                trace_id = span_context.trace_id
 
-                log_extra = {
+                otel_logs = {
                     "span_id": span_id,
                     "trace_id": trace_id,
                 }
-
+                
                 if recipe_id:
-                    log_extra["recipe_id"] = recipe_id
+                    otel_logs["recipe_id"] = recipe_id
+            else:
+                otel_logs = "No OTEL related logs available"
 
             if log_extender and rw.environment and rw.environment.get("ID"):
-                with log_extender("recipe_ID", rw.environment["ID"]):
+                with log_extender("recipe_ID", rw.environment["ID"]), log_extender("otel_logs", otel_logs):
                     return callback(rw, header, message.get("payload"))
             return callback(rw, header, message.get("payload"))
+        
         if allow_non_recipe_messages:
             return callback(None, header, message)
         #   self.log.warning('Discarding non-recipe message:\n' + \
