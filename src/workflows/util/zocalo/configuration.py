@@ -33,6 +33,8 @@ class OTEL:
         OTEL.config["endpoint"] = endpoint
         OTEL.config["timeout"] = configuration.get("timeout", 10)
 
+        return OTEL.config
+
 
 class Stomp:
     """A Zocalo configuration plugin to pre-populate StompTransport config defaults"""

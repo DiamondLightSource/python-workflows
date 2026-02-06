@@ -197,6 +197,13 @@ class CommonService:
             otel_config = (
                 self.config._opentelemetry if self.config and hasattr(self.config, "opentelemetry") else None
             )
+            # debugging
+            with open("/scratch/logs.txt", 'w+') as file:
+                if otel_config:
+                    import json
+                    json.dump(otel_config, file, indent=4)
+                else:
+                    file.write("otel config was not truthy")
             
             if otel_config and "timeout" not in otel_config:
                 self.log.warning("Missing optional OTEL configuration field `timeout`. Will default to 10 seconds. ")

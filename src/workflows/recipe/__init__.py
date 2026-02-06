@@ -1,5 +1,5 @@
 from __future__ import annotations
-
+from contextlib import ExitStack
 import functools
 import logging
 from collections.abc import Callable
@@ -70,6 +70,7 @@ def _wrap_subscription(
         if mangle_for_receiving:
             message = mangle_for_receiving(message)
         if header.get("workflows-recipe") in {True, "True", "true", 1}:
+            otel_logs = None
             rw = RecipeWrapper(message=message, transport=transport_layer)
 
             # Extract recipe ID from environment and add to current span
@@ -78,6 +79,8 @@ def _wrap_subscription(
 
             if recipe_id:
                 span.set_attribute("recipe_id", recipe_id)
+
+            
 
             # Extract span_id and trace_id for logging
             span_context = span.get_span_context()
@@ -92,13 +95,17 @@ def _wrap_subscription(
                 
                 if recipe_id:
                     otel_logs["recipe_id"] = recipe_id
-            else:
-                otel_logs = "No OTEL related logs available"
+        
+            with ExitStack() as stack:
+                # Configure the context depending on if service is emitting spans
+                if otel_logs and log_extender and rw.environment and rw.environment.get("ID"):
+                    stack.enter_context(log_extender('recipe_ID', rw.environment.get("ID")))
+                    stack.enter_context(log_extender('otel_logs', otel_logs))
+                elif log_extender and rw.environment and rw.environment.get("ID"):
+                    stack.enter_context(log_extender('recipe_ID', rw.environment.get("ID")))
 
-            if log_extender and rw.environment and rw.environment.get("ID"):
-                with log_extender("recipe_ID", rw.environment["ID"]), log_extender("otel_logs", otel_logs):
-                    return callback(rw, header, message.get("payload"))
-            return callback(rw, header, message.get("payload"))
+                return callback(rw, header, message.get("payload"))
+    
         
         if allow_non_recipe_messages:
             return callback(None, header, message)
