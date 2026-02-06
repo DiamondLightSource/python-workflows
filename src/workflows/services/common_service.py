@@ -200,32 +200,32 @@ class CommonService:
             
             if otel_config and "timeout" not in otel_config:
                 self.log.warning("Missing optional OTEL configuration field `timeout`. Will default to 10 seconds. ")
+                
+                # Configure OTELTracing
+                resource = Resource.create(
+                    {
+                        SERVICE_NAME: self._service_name,
+                    }
+                )
 
-            # Configure OTELTracing
-            resource = Resource.create(
-                {
-                    SERVICE_NAME: self._service_name,
-                }
-            )
+                self.log.debug("Configuring OTELTracing")
+                provider = TracerProvider(resource=resource)
+                trace.set_tracer_provider(provider)
 
-            self.log.debug("Configuring OTELTracing")
-            provider = TracerProvider(resource=resource)
-            trace.set_tracer_provider(provider)
+                # Configure BatchProcessor and OTLPSpanExporter using config values
+                otlp_exporter = OTLPSpanExporter(
+                    endpoint=otel_config["endpoint"],
+                    timeout=otel_config.get("timeout", 10),
+                )
+                span_processor = BatchSpanProcessor(otlp_exporter)
+                provider.add_span_processor(span_processor)
 
-            # Configure BatchProcessor and OTLPSpanExporter using config values
-            otlp_exporter = OTLPSpanExporter(
-                endpoint=otel_config["endpoint"],
-                timeout=otel_config.get("timeout", 10),
-            )
-            span_processor = BatchSpanProcessor(otlp_exporter)
-            provider.add_span_processor(span_processor)
-
-            # Add OTELTracingMiddleware to the transport layer
-            tracer = trace.get_tracer(__name__)
-            otel_middleware = OTELTracingMiddleware(
-                tracer, service_name=self._service_name
-            )
-            self._transport.add_middleware(otel_middleware)
+                # Add OTELTracingMiddleware to the transport layer
+                tracer = trace.get_tracer(__name__)
+                otel_middleware = OTELTracingMiddleware(
+                    tracer, service_name=self._service_name
+                )
+                self._transport.add_middleware(otel_middleware)
 
             metrics = self._environment.get("metrics")
             if metrics:
