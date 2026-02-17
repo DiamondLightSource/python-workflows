@@ -1,8 +1,9 @@
 from __future__ import annotations
-from contextlib import ExitStack
+
 import functools
 import logging
 from collections.abc import Callable
+from contextlib import ExitStack
 from typing import Any
 
 from opentelemetry import trace
@@ -80,8 +81,6 @@ def _wrap_subscription(
             if recipe_id:
                 span.set_attribute("recipe_id", recipe_id)
 
-            
-
             # Extract span_id and trace_id for logging
             span_context = span.get_span_context()
             if span_context and span_context.is_valid:
@@ -92,21 +91,29 @@ def _wrap_subscription(
                     "span_id": span_id,
                     "trace_id": trace_id,
                 }
-                
+
                 if recipe_id:
                     otel_logs["recipe_id"] = recipe_id
-        
+
             with ExitStack() as stack:
                 # Configure the context depending on if service is emitting spans
-                if otel_logs and log_extender and rw.environment and rw.environment.get("ID"):
-                    stack.enter_context(log_extender('recipe_ID', rw.environment.get("ID")))
-                    stack.enter_context(log_extender('otel_logs', otel_logs))
+                if (
+                    otel_logs
+                    and log_extender
+                    and rw.environment
+                    and rw.environment.get("ID")
+                ):
+                    stack.enter_context(
+                        log_extender("recipe_ID", rw.environment.get("ID"))
+                    )
+                    stack.enter_context(log_extender("otel_logs", otel_logs))
                 elif log_extender and rw.environment and rw.environment.get("ID"):
-                    stack.enter_context(log_extender('recipe_ID', rw.environment.get("ID")))
+                    stack.enter_context(
+                        log_extender("recipe_ID", rw.environment.get("ID"))
+                    )
 
                 return callback(rw, header, message.get("payload"))
-    
-        
+
         if allow_non_recipe_messages:
             return callback(None, header, message)
         #   self.log.warning('Discarding non-recipe message:\n' + \

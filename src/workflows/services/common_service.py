@@ -192,10 +192,12 @@ class CommonService:
             self.transport.subscription_callback_set_intercept(
                 self._transport_interceptor
             )
-            
+
             # Configure OTELTracing if configuration is available
             otel_config = (
-                self.config._opentelemetry if self.config and hasattr(self.config, "opentelemetry") else None
+                self.config._opentelemetry
+                if self.config and hasattr(self.config, "opentelemetry")
+                else None
             )
             if otel_config:
                 # Configure OTELTracing

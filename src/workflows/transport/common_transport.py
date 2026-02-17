@@ -10,6 +10,7 @@ from workflows.transport import middleware
 
 MessageCallback = Callable[[Mapping[str, Any], Any], None]
 
+
 class TemporarySubscription(NamedTuple):
     subscription_id: int
     queue_name: str
