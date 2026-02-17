@@ -74,7 +74,7 @@ def _wrap_subscription(
             otel_logs = None
             rw = RecipeWrapper(message=message, transport=transport_layer)
 
-            if hasattr(rw,"environment") and rw.environment.get("ID"):
+            if hasattr(rw, "environment") and rw.environment.get("ID"):
                 # Extract recipe ID from environment and add to current span
                 span = trace.get_current_span()
                 recipe_id = rw.environment.get("ID")
@@ -112,8 +112,8 @@ def _wrap_subscription(
                         stack.enter_context(
                             log_extender("recipe_ID", rw.environment.get("ID"))
                         )
-                    
-                    return callback(rw,header,message.get("payload"))
+
+                    return callback(rw, header, message.get("payload"))
 
             return callback(rw, header, message.get("payload"))
 
