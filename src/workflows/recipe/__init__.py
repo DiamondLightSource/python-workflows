@@ -73,46 +73,46 @@ def _wrap_subscription(
         if header.get("workflows-recipe") in {True, "True", "true", 1}:
             otel_logs = None
             rw = RecipeWrapper(message=message, transport=transport_layer)
-
-            # Extract recipe ID from environment and add to current span
-            span = trace.get_current_span()
-            recipe_id = rw.environment.get("ID")
-
-            if recipe_id:
-                span.set_attribute("recipe_id", recipe_id)
-
-            # Extract span_id and trace_id for logging
-            span_context = span.get_span_context()
-            if span_context and span_context.is_valid:
-                span_id = span_context.span_id
-                trace_id = span_context.trace_id
-
-                otel_logs = {
-                    "span_id": span_id,
-                    "trace_id": trace_id,
-                }
+            if rw.environment.get("ID"):
+                # Extract recipe ID from environment and add to current span
+                span = trace.get_current_span()
+                recipe_id = rw.environment.get("ID")
 
                 if recipe_id:
-                    otel_logs["recipe_id"] = recipe_id
+                    span.set_attribute("recipe_id", recipe_id)
 
-            with ExitStack() as stack:
-                # Configure the context depending on if service is emitting spans
-                if (
-                    otel_logs
-                    and log_extender
-                    and rw.environment
-                    and rw.environment.get("ID")
-                ):
-                    stack.enter_context(
-                        log_extender("recipe_ID", rw.environment.get("ID"))
-                    )
-                    stack.enter_context(log_extender("otel_logs", otel_logs))
-                elif log_extender and rw.environment and rw.environment.get("ID"):
-                    stack.enter_context(
-                        log_extender("recipe_ID", rw.environment.get("ID"))
-                    )
+                # Extract span_id and trace_id for logging
+                span_context = span.get_span_context()
+                if span_context and span_context.is_valid:
+                    span_id = span_context.span_id
+                    trace_id = span_context.trace_id
 
-                return callback(rw, header, message.get("payload"))
+                    otel_logs = {
+                        "span_id": span_id,
+                        "trace_id": trace_id,
+                    }
+
+                    if recipe_id:
+                        otel_logs["recipe_id"] = recipe_id
+
+                with ExitStack() as stack:
+                    # Configure the context depending on if service is emitting spans
+                    if (
+                        otel_logs
+                        and log_extender
+                        and rw.environment
+                        and rw.environment.get("ID")
+                    ):
+                        stack.enter_context(
+                            log_extender("recipe_ID", rw.environment.get("ID"))
+                        )
+                        stack.enter_context(log_extender("otel_logs", otel_logs))
+                    elif log_extender and rw.environment and rw.environment.get("ID"):
+                        stack.enter_context(
+                            log_extender("recipe_ID", rw.environment.get("ID"))
+                        )
+
+                    return callback(rw, header, message.get("payload"))
 
         if allow_non_recipe_messages:
             return callback(None, header, message)
