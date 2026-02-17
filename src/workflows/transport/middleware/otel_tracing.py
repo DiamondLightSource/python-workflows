@@ -16,7 +16,7 @@ class OTELTracingMiddleware:
         self.tracer = tracer
         self.service_name = service_name
 
-    def send(self, call_next: Callable, destination: str, message: Any, **kwargs):
+    def send(self, call_next: Callable, destination: str, message, **kwargs):
         # Get current span context (may be None if this is the root span)
         current_span = trace.get_current_span()
         parent_context = (
