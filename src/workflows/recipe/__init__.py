@@ -71,7 +71,7 @@ def _wrap_subscription(
         if mangle_for_receiving:
             message = mangle_for_receiving(message)
         if header.get("workflows-recipe") in {True, "True", "true", 1}:
-            otel_logs = None
+            
             rw = RecipeWrapper(message=message, transport=transport_layer)
 
             if hasattr(rw, "environment") and rw.environment.get("ID"):
@@ -84,6 +84,7 @@ def _wrap_subscription(
 
                 # Extract span_id and trace_id for logging
                 span_context = span.get_span_context()
+                otel_logs = None
                 if span_context and span_context.is_valid:
                     span_id = span_context.span_id
                     trace_id = span_context.trace_id
@@ -97,6 +98,7 @@ def _wrap_subscription(
                         otel_logs["recipe_id"] = recipe_id
 
                 with ExitStack() as stack:
+                    
                     # Configure the context depending on if service is emitting spans
                     if (
                         otel_logs
