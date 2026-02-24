@@ -233,10 +233,7 @@ class TimerMiddleware(BaseTransportMiddleware):
 
 
 def wrap(f: Callable):
-    # debugging
-    if f.__name__ == "send":
-        print("we are wrapping send now")
-
+    
     @functools.wraps(f)
     def wrapper(self, *args, **kwargs):
         return functools.reduce(
