@@ -14,7 +14,6 @@ class OTEL:
     class Schema(PluginSchema):
         host = fields.Str(required=True)
         port = fields.Int(required=True)
-        endpoint = fields.Str(required=False)
         timeout = fields.Int(required=False, load_default=10)
 
     # Store configuration for access by services
@@ -22,17 +21,10 @@ class OTEL:
 
     @staticmethod
     def activate(configuration):
-        # Build the full endpoint URL if not provided
-        if "endpoint" not in configuration:
-            endpoint = (
-                f"https://{configuration['host']}:{configuration['port']}/v1/traces"
-            )
-        else:
-            endpoint = configuration["endpoint"]
-
+        # Build the full endpoint URL
+        endpoint = f"https://{configuration['host']}:{configuration['port']}/v1/traces"
         OTEL.config["endpoint"] = endpoint
         OTEL.config["timeout"] = configuration.get("timeout", 10)
-
         return OTEL.config
 
 
