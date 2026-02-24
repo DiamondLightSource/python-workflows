@@ -9,12 +9,17 @@ from opentelemetry.context import Context
 from opentelemetry.propagate import extract, inject
 
 from workflows.transport.common_transport import MessageCallback, TemporarySubscription
-
-
 class OTELTracingMiddleware:
     def __init__(self, tracer: trace.Tracer, service_name: str):
         self.tracer = tracer
         self.service_name = service_name
+
+    def _set_span_attributes(self, span, **attributes):
+        """Helper method to set common span attributes"""
+        span.set_attribute("service_name", self.service_name)
+        for key, value in attributes.items():
+            if value is not None:
+                span.set_attribute(key, value)
 
     def send(self, call_next: Callable, destination: str, message, **kwargs):
         # Get current span context (may be None if this is the root span)
@@ -27,11 +32,7 @@ class OTELTracingMiddleware:
             "transport.send",
             context=parent_context,
         ) as span:
-            span.set_attribute("service_name", self.service_name)
-
-            span.set_attribute("message", json.dumps(message))
-            span.set_attribute("destination", destination)
-            print("parent_context is...", parent_context)
+            self._set_span_attributes(span, destination=destination)
 
             # Inject the current trace context into the message headers
             headers = kwargs.get("headers", {})
@@ -55,10 +56,7 @@ class OTELTracingMiddleware:
                 "transport.subscribe",
                 context=ctx,
             ) as span:
-                span.set_attribute("service_name", self.service_name)
-
-                span.set_attribute("message", json.dumps(message))
-                span.set_attribute("channel", channel)
+                self._set_span_attributes(span, channel=channel)
 
                 # Call the original callback - this will process the message
                 # and potentially call send() which will pick up this context
@@ -74,15 +72,12 @@ class OTELTracingMiddleware:
             # Extract trace context from message headers
             ctx = extract(header) if header else Context()
 
-            #         # Start a new span with the extracted context
+            # Start a new span with the extracted context
             with self.tracer.start_as_current_span(
                 "transport.subscribe_broadcast",
                 context=ctx,
             ) as span:
-                span.set_attribute("service_name", self.service_name)
-
-                span.set_attribute("message", json.dumps(message))
-                span.set_attribute("channel", channel)
+                self._set_span_attributes(span, channel=channel)
 
                 return callback(header, message)
 
@@ -105,11 +100,7 @@ class OTELTracingMiddleware:
                 "transport.subscribe_temporary",
                 context=ctx,
             ) as span:
-                span.set_attribute("service_name", self.service_name)
-
-                span.set_attribute("message", json.dumps(message))
-                if channel_hint:
-                    span.set_attribute("channel_hint", channel_hint)
+                self._set_span_attributes(span, channel_hint=channel_hint)
 
                 return callback(header, message)
 
@@ -132,8 +123,7 @@ class OTELTracingMiddleware:
             "transport.unsubscribe",
             context=current_context,
         ) as span:
-            span.set_attribute("service_name", self.service_name)
-            span.set_attribute("subscription_id", subscription)
+            self._set_span_attributes(span, subscription_id=subscription)
 
             call_next(
                 subscription, drop_callback_reference=drop_callback_reference, **kwargs
@@ -156,10 +146,7 @@ class OTELTracingMiddleware:
             "transport.ack",
             context=current_context,
         ) as span:
-            span.set_attribute("service_name", self.service_name)
-            span.set_attribute("message", json.dumps(message))
-            if subscription_id:
-                span.set_attribute("subscription_id", subscription_id)
+            self._set_span_attributes(span, subscription_id=subscription_id)
 
             call_next(message, subscription_id=subscription_id, **kwargs)
 
@@ -180,11 +167,7 @@ class OTELTracingMiddleware:
             "transport.nack",
             context=current_context,
         ) as span:
-            span.set_attribute("service_name", self.service_name)
-
-            span.set_attribute("message", json.dumps(message))
-            if subscription_id:
-                span.set_attribute("subscription_id", subscription_id)
+            self._set_span_attributes(span, subscription_id=subscription_id)
 
             call_next(message, subscription_id=subscription_id, **kwargs)
 
@@ -202,10 +185,7 @@ class OTELTracingMiddleware:
             "transaction.begin",
             context=current_context,
         ) as span:
-            span.set_attribute("service_name", self.service_name)
-
-            if subscription_id:
-                span.set_attribute("subscription_id", subscription_id)
+            self._set_span_attributes(span, subscription_id=subscription_id)
 
             return call_next(subscription_id=subscription_id, **kwargs)
 
@@ -223,10 +203,7 @@ class OTELTracingMiddleware:
             "transaction.abort",
             context=current_context,
         ) as span:
-            span.set_attribute("service_name", self.service_name)
-
-            if transaction_id:
-                span.set_attribute("transaction_id", transaction_id)
+            self._set_span_attributes(span, transaction_id=transaction_id)
 
             call_next(transaction_id=transaction_id, **kwargs)
 
@@ -244,8 +221,6 @@ class OTELTracingMiddleware:
             "transaction.commit",
             context=current_context,
         ) as span:
-            span.set_attribute("service_name", self.service_name)
-            if transaction_id:
-                span.set_attribute("transaction_id", transaction_id)
+            self._set_span_attributes(span, transaction_id=transaction_id)
 
             call_next(transaction_id=transaction_id, **kwargs)
