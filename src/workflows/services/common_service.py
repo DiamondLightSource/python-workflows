@@ -196,7 +196,7 @@ class CommonService:
             # Configure OTELTracing if configuration is available
             otel_config = (
                 self.config._opentelemetry
-                if self.config and hasattr(self.config, "opentelemetry")
+                if self.config and hasattr(self.config, "_opentelemetry")
                 else None
             )
             if otel_config:

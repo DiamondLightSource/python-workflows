@@ -74,47 +74,33 @@ def _wrap_subscription(
             
             rw = RecipeWrapper(message=message, transport=transport_layer)
 
-            if hasattr(rw, "environment") and rw.environment.get("ID"):
+            if log_extender and rw.environment["ID"]:
                 # Extract recipe ID from environment and add to current span
                 span = trace.get_current_span()
-                recipe_id = rw.environment.get("ID")
-
-                if recipe_id:
-                    span.set_attribute("recipe_id", recipe_id)
+                recipe_id = rw.environment["ID"]
+                span.set_attribute("recipe_id", recipe_id)
 
                 # Extract span_id and trace_id for logging
                 span_context = span.get_span_context()
                 otel_logs = None
-                if span_context and span_context.is_valid:
+                if span_context.is_valid:
                     span_id = span_context.span_id
                     trace_id = span_context.trace_id
 
                     otel_logs = {
                         "span_id": span_id,
                         "trace_id": trace_id,
+                        "recipe_id": recipe_id
                     }
-
-                    if recipe_id:
-                        otel_logs["recipe_id"] = recipe_id
 
                 with ExitStack() as stack:
                     
                     # Configure the context depending on if service is emitting spans
-                    if (
-                        otel_logs
-                        and log_extender
-                        and rw.environment
-                        and rw.environment.get("ID")
-                    ):
-                        stack.enter_context(
-                            log_extender("recipe_ID", rw.environment.get("ID"))
-                        )
+                    stack.enter_context(
+                        log_extender("recipe_ID", recipe_id)
+                    )
+                    if otel_logs:
                         stack.enter_context(log_extender("otel_logs", otel_logs))
-                    elif log_extender and rw.environment and rw.environment.get("ID"):
-                        stack.enter_context(
-                            log_extender("recipe_ID", rw.environment.get("ID"))
-                        )
-
                     return callback(rw, header, message.get("payload"))
 
             return callback(rw, header, message.get("payload"))
