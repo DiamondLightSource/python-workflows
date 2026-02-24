@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import functools
-import json
 from collections.abc import Callable
 
 from opentelemetry import trace
@@ -9,6 +8,8 @@ from opentelemetry.context import Context
 from opentelemetry.propagate import extract, inject
 
 from workflows.transport.common_transport import MessageCallback, TemporarySubscription
+
+
 class OTELTracingMiddleware:
     def __init__(self, tracer: trace.Tracer, service_name: str):
         self.tracer = tracer

@@ -233,7 +233,6 @@ class TimerMiddleware(BaseTransportMiddleware):
 
 
 def wrap(f: Callable):
-
     @functools.wraps(f)
     def wrapper(self, *args, **kwargs):
         return functools.reduce(

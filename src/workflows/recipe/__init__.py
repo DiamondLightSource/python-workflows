@@ -71,7 +71,6 @@ def _wrap_subscription(
         if mangle_for_receiving:
             message = mangle_for_receiving(message)
         if header.get("workflows-recipe") in {True, "True", "true", 1}:
-            
             rw = RecipeWrapper(message=message, transport=transport_layer)
 
             if log_extender and rw.environment["ID"]:
@@ -90,15 +89,12 @@ def _wrap_subscription(
                     otel_logs = {
                         "span_id": span_id,
                         "trace_id": trace_id,
-                        "recipe_id": recipe_id
+                        "recipe_id": recipe_id,
                     }
 
                 with ExitStack() as stack:
-                    
                     # Configure the context depending on if service is emitting spans
-                    stack.enter_context(
-                        log_extender("recipe_ID", recipe_id)
-                    )
+                    stack.enter_context(log_extender("recipe_ID", recipe_id))
                     if otel_logs:
                         stack.enter_context(log_extender("otel_logs", otel_logs))
                     return callback(rw, header, message.get("payload"))
