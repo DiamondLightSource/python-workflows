@@ -194,12 +194,8 @@ class CommonService:
             )
 
             # Configure OTELTracing if configuration is available
-            otel_config = (
-                self.config._opentelemetry
-                if self.config and hasattr(self.config, "_opentelemetry")
-                else None
-            )
-            if otel_config:
+            otel_config = getattr(self.config, "_opentelemetry", None)
+            if otel_config and self.transport.connect:
                 # Configure OTELTracing
                 resource = Resource.create(
                     {
