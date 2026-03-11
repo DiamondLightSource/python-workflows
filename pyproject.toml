@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "workflows"
-version = "3.2"
+version = "3.3"
 description = "Data processing in distributed environments"
 readme = "README.rst"
 authors = [
@@ -74,7 +74,7 @@ addopts = "-ra"
 required_plugins = "pytest-timeout"
 
 [tool.bumpversion]
-current_version = "3.2"
+current_version = "3.3"
 parse = '(?P<major>\d+)\.(?P<minor>\d+)'
 search = '"{current_version}"'
 replace = '"{new_version}"'
