@@ -72,7 +72,7 @@ def _wrap_subscription(
             message = mangle_for_receiving(message)
         if header.get("workflows-recipe") in {True, "True", "true", 1}:
             rw = RecipeWrapper(message=message, transport=transport_layer)
-            
+
             if log_extender and rw.environment.get("ID"):
                 # Extract recipe ID from environment and add to current span
                 span = trace.get_current_span()
@@ -86,8 +86,12 @@ def _wrap_subscription(
                     # Configure the context depending on if service is emitting valid spans
                     stack.enter_context(log_extender("recipe_ID", recipe_id))
                     if span_context.is_valid:
-                        stack.enter_context(log_extender("span_id", span_context.span_id))
-                        stack.enter_context(log_extender("trace_id", span_context.trace_id))
+                        stack.enter_context(
+                            log_extender("span_id", span_context.span_id)
+                        )
+                        stack.enter_context(
+                            log_extender("trace_id", span_context.trace_id)
+                        )
                     return callback(rw, header, message.get("payload"))
 
             return callback(rw, header, message.get("payload"))
