@@ -3,7 +3,10 @@ from __future__ import annotations
 import functools
 import logging
 from collections.abc import Callable
+from contextlib import ExitStack
 from typing import Any
+
+from opentelemetry import trace
 
 from workflows.recipe.recipe import Recipe
 from workflows.recipe.validate import validate_recipe
@@ -69,10 +72,30 @@ def _wrap_subscription(
             message = mangle_for_receiving(message)
         if header.get("workflows-recipe") in {True, "True", "true", 1}:
             rw = RecipeWrapper(message=message, transport=transport_layer)
-            if log_extender and rw.environment and rw.environment.get("ID"):
-                with log_extender("recipe_ID", rw.environment["ID"]):
+
+            if log_extender and rw.environment.get("ID"):
+                # Extract recipe ID from environment and add to current span
+                span = trace.get_current_span()
+                recipe_id = rw.environment["ID"]
+                span.set_attribute("recipe_id", recipe_id)
+
+                # Extract span_id and trace_id for logging
+                span_context = span.get_span_context()
+
+                with ExitStack() as stack:
+                    # Configure the context depending on if service is emitting valid spans
+                    stack.enter_context(log_extender("recipe_ID", recipe_id))
+                    if span_context.is_valid:
+                        stack.enter_context(
+                            log_extender("span_id", span_context.span_id)
+                        )
+                        stack.enter_context(
+                            log_extender("trace_id", span_context.trace_id)
+                        )
                     return callback(rw, header, message.get("payload"))
+
             return callback(rw, header, message.get("payload"))
+
         if allow_non_recipe_messages:
             return callback(None, header, message)
         #   self.log.warning('Discarding non-recipe message:\n' + \

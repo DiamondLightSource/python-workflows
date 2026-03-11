@@ -9,8 +9,15 @@ import threading
 import time
 from typing import Any
 
+from opentelemetry import trace
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+from opentelemetry.sdk.resources import SERVICE_NAME, Resource
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+
 import workflows
 import workflows.logging
+from workflows.transport.middleware.otel_tracing import OTELTracingMiddleware
 
 
 class Status(enum.Enum):
@@ -185,6 +192,36 @@ class CommonService:
             self.transport.subscription_callback_set_intercept(
                 self._transport_interceptor
             )
+
+            # Configure OTELTracing if configuration is available
+            otel_config = getattr(self.config, "_opentelemetry", None)
+            if otel_config:
+                # Configure OTELTracing
+                resource = Resource.create(
+                    {
+                        SERVICE_NAME: self._service_name,
+                    }
+                )
+
+                self.log.debug("Configuring OTELTracing")
+                provider = TracerProvider(resource=resource)
+                trace.set_tracer_provider(provider)
+
+                # Configure BatchProcessor and OTLPSpanExporter using config values
+                otlp_exporter = OTLPSpanExporter(
+                    endpoint=otel_config["endpoint"],
+                    timeout=otel_config.get("timeout", 10),
+                )
+                span_processor = BatchSpanProcessor(otlp_exporter)
+                provider.add_span_processor(span_processor)
+
+                # Add OTELTracingMiddleware to the transport layer
+                tracer = trace.get_tracer(__name__)
+                otel_middleware = OTELTracingMiddleware(
+                    tracer, service_name=self._service_name
+                )
+                self._transport.add_middleware(otel_middleware)
+
             metrics = self._environment.get("metrics")
             if metrics:
                 import prometheus_client

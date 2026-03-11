@@ -20,7 +20,15 @@ classifiers = [
 ]
 license = { text = "BSD-3-Clause" }
 requires-python = ">=3.10"
-dependencies = ["bidict", "pika", "setuptools", "stomp-py>=7"]
+dependencies = [
+    "bidict", 
+    "pika",
+    "setuptools",
+    "stomp-py>=7",
+    "opentelemetry-api",
+    "opentelemetry-sdk",
+    "opentelemetry-exporter-otlp-proto-http" 
+]
 
 [project.urls]
 Download = "https://github.com/DiamondLightSource/python-workflows/releases"
@@ -53,6 +61,7 @@ OfflineTransport = "workflows.transport.offline_transport:OfflineTransport"
 pika = "workflows.util.zocalo.configuration:Pika"
 stomp = "workflows.util.zocalo.configuration:Stomp"
 transport = "workflows.util.zocalo.configuration:DefaultTransport"
+opentelemetry = "workflows.util.zocalo.configuration:OTEL"
 
 [project.scripts]
 "workflows.validate_recipe" = "workflows.recipe.validate:main"

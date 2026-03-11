@@ -8,6 +8,26 @@ from workflows.transport.pika_transport import PikaTransport
 from workflows.transport.stomp_transport import StompTransport
 
 
+class OTEL:
+    """A Zocalo configuration plugin to pre-populate OTELTracing config defaults"""
+
+    class Schema(PluginSchema):
+        host = fields.Str(required=True)
+        port = fields.Int(required=True)
+        timeout = fields.Int(required=False, load_default=10)
+
+    # Store configuration for access by services
+    config = {}
+
+    @staticmethod
+    def activate(configuration):
+        # Build the full endpoint URL
+        endpoint = f"https://{configuration['host']}:{configuration['port']}/v1/traces"
+        OTEL.config["endpoint"] = endpoint
+        OTEL.config["timeout"] = configuration.get("timeout", 10)
+        return OTEL.config
+
+
 class Stomp:
     """A Zocalo configuration plugin to pre-populate StompTransport config defaults"""
 
