@@ -81,22 +81,13 @@ def _wrap_subscription(
 
                 # Extract span_id and trace_id for logging
                 span_context = span.get_span_context()
-                otel_logs = None
-                if span_context.is_valid:
-                    span_id = span_context.span_id
-                    trace_id = span_context.trace_id
-
-                    otel_logs = {
-                        "span_id": span_id,
-                        "trace_id": trace_id,
-                        "recipe_id": recipe_id,
-                    }
 
                 with ExitStack() as stack:
-                    # Configure the context depending on if service is emitting spans
+                    # Configure the context depending on if service is emitting valid spans
                     stack.enter_context(log_extender("recipe_ID", recipe_id))
-                    if otel_logs:
-                        stack.enter_context(log_extender("otel_logs", otel_logs))
+                    if span_context.is_valid:
+                        stack.enter_context(log_extender("span_id", span_context.span_id))
+                        stack.enter_context(log_extender("trace_id", span_context.trace_id))
                     return callback(rw, header, message.get("payload"))
 
             return callback(rw, header, message.get("payload"))
