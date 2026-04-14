@@ -172,7 +172,7 @@ class OTELTracingMiddleware:
             kwargs["headers"] = headers
 
             return call_next(destination, message, **kwargs)
-        
+
     def unsubscribe(
         self,
         call_next: Callable,
