@@ -16,6 +16,12 @@ from workflows.transport.common_transport import CommonTransport
 
 basestring = (str, bytes)
 
+# Pin the fork start method: service instances carry pipes and transport
+# state that aren't pickleable, so spawn/forkserver (the 3.14+ default on
+# Linux) can't serialize them. fork is deprecated upstream and will
+# eventually need a real refactor.
+multiprocessing.set_start_method("fork", force=True)
+
 
 class Frontend:
     """The frontend class encapsulates the actual service. It controls the
