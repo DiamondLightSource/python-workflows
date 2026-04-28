@@ -236,8 +236,10 @@ def wrap(f: Callable):
     @functools.wraps(f)
     def wrapper(self, *args, **kwargs):
         return functools.reduce(
-            lambda call_next, m: lambda *args, **kwargs: getattr(m, f.__name__)(
-                call_next, *args, **kwargs
+            lambda call_next, m: (
+                lambda *args, **kwargs: getattr(m, f.__name__)(
+                    call_next, *args, **kwargs
+                )
             ),
             reversed(self.middleware),
             lambda *args, **kwargs: f(self, *args, **kwargs),
