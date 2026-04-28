@@ -39,6 +39,16 @@ Bug-Tracker = "https://github.com/DiamondLightSource/python-workflows/issues"
 [project.optional-dependencies]
 prometheus = ["prometheus-client"]
 
+[dependency-groups]
+dev = [
+    "prometheus-client",
+    "pytest",
+    "pytest-cov",
+    "pytest-mock",
+    "pytest-timeout",
+    "websocket-client",
+]
+
 [project.entry-points."libtbx.dispatcher.script"]
 "workflows.validate_recipe" = "workflows.validate_recipe"
 

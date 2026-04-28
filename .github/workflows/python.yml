@@ -41,7 +41,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements_dev.txt dist/*.whl
+          pip install --group dev dist/*.whl
       - name: Test with pytest
         run: |
           pytest tests
