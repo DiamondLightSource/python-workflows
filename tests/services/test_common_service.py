@@ -373,8 +373,10 @@ def test_service_initialization_crashes_are_handled_correctly():
     # Traceback should have been sent to log
     log_msgs = list(
         filter(
-            lambda c: c[0][0] == {"band": "log", "payload": mock.ANY}
-            and c[0][0]["payload"].levelname == "CRITICAL",
+            lambda c: (
+                c[0][0] == {"band": "log", "payload": mock.ANY}
+                and c[0][0]["payload"].levelname == "CRITICAL"
+            ),
             fe_pipe.send.call_args_list,
         )
     )
