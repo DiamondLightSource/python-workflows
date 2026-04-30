@@ -3,12 +3,11 @@ from __future__ import annotations
 import curses
 import threading
 import time
-from typing import Any
+from typing import Callable
 
 import workflows.transport
 from workflows.services.common_service import CommonService
-
-basestring = (str, bytes)
+from workflows.transport.common_transport import CommonTransport
 
 
 class Monitor:  # pragma: no cover
@@ -19,7 +18,7 @@ class Monitor:  # pragma: no cover
     shutdown = False
     """Set to true to end the main loop and shut down the service monitor."""
 
-    cards: dict[Any, Any] = {}
+    cards: list
     """Register card shown for seen services"""
 
     border_chars = ()
@@ -27,15 +26,15 @@ class Monitor:  # pragma: no cover
     border_chars_text = ("|", "|", "=", "=", "/", "\\", "\\", "/")
     """Example alternative set of frame border characters."""
 
-    def __init__(self, transport=None):
+    def __init__(self, transport: Callable[[], CommonTransport] | str | None = None):
         """Set up monitor and connect to the network transport layer"""
-        if transport is None or isinstance(transport, basestring):
-            self._transport = workflows.transport.lookup(transport)()
-        else:
+        if callable(transport):
             self._transport = transport()
+        else:
+            self._transport = workflows.transport.lookup(transport)()
         assert self._transport.connect(), "Could not connect to transport layer"
         self._lock = threading.RLock()
-        self._node_status = {}
+        self._node_status: dict = {}
         self.message_box = None
         self._transport.subscribe_broadcast(
             "transient.status", self.update_status, retroactive=True

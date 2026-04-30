@@ -14,8 +14,6 @@ import workflows.util
 from workflows.services.common_service import CommonService
 from workflows.transport.common_transport import CommonTransport
 
-basestring = (str, bytes)
-
 # Pin the fork start method: service instances carry pipes and transport
 # state that aren't pickleable, so spawn/forkserver (the 3.14+ default on
 # Linux) can't serialize them. fork is deprecated upstream and will
@@ -111,7 +109,7 @@ class Frontend:
         )
 
         # Connect to the network transport layer
-        if transport is None or isinstance(transport, basestring):
+        if transport is None or isinstance(transport, str):
             self._transport_factory = workflows.transport.lookup(transport)
         else:
             self._transport_factory = transport
@@ -411,7 +409,7 @@ class Frontend:
                 self._terminate_service()
 
             # Find service class if necessary
-            if isinstance(self._service_factory, basestring):
+            if isinstance(self._service_factory, str):
                 self._service_factory = workflows.services.lookup(self._service_factory)
             if not self._service_factory:
                 return False

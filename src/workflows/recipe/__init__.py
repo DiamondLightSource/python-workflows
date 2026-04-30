@@ -25,12 +25,12 @@ logger = logging.getLogger("workflows.recipe")
 
 
 def _wrap_subscription(
-    transport_layer,
+    transport_layer: CommonTransport,
     subscription_call,
     channel,
     callback,
     *args,
-    mangle_for_receiving: Callable[[Any], Any] | None = None,
+    mangle_for_receiving: Callable[[dict[str, Any]], dict[str, Any]] | None = None,
     allow_non_recipe_messages: bool = False,
     log_extender=None,
     **kwargs,
@@ -59,7 +59,7 @@ def _wrap_subscription(
     """
 
     @functools.wraps(callback)
-    def unwrap_recipe(header, message):
+    def unwrap_recipe(header, message: dict[str, Any]):
         """This is a helper function unpacking incoming messages when they are
         in a recipe format. Other messages are passed through unmodified.
         :param header:  A dictionary of message headers. If the header contains

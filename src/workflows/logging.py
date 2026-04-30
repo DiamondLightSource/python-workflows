@@ -10,6 +10,8 @@ def get_exception_source():
     """Returns full file path, file name, line number, function name, and line contents
     causing the last exception."""
     _, _, tb = sys.exc_info()
+    if tb is None:
+        raise RuntimeError("No exception currently being handled")
     while tb.tb_next:
         tb = tb.tb_next
     f = tb.tb_frame
@@ -69,6 +71,8 @@ class CallbackHandler(logging.Handler):
 
     def handleError(self, record):
         t, v, _ = sys.exc_info()
+        if t is None:
+            raise RuntimeError("Trying to handle error when no exception active")
         try:
             sys.stderr.write(
                 f"--- Logging error --- {t.__name__}: {v}\n"

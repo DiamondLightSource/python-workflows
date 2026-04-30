@@ -27,5 +27,5 @@ def get_known_services():
             "cache",
             {e.name: e.load for e in entry_points(group="workflows.services")},
         )
-    register = get_known_services.cache.copy()
+    register = get_known_services.cache.copy()  # type: ignore
     return register

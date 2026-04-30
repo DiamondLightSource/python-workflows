@@ -7,8 +7,6 @@ from typing import Any
 
 import workflows
 
-basestring = (str, bytes)
-
 
 class Recipe:
     """Object containing a processing recipe that can be passed to services.
@@ -21,7 +19,7 @@ class Recipe:
 
     def __init__(self, recipe=None):
         """Constructor allows passing in a recipe dictionary."""
-        if isinstance(recipe, basestring):
+        if isinstance(recipe, str):
             self.recipe = self.deserialize(recipe)
         elif recipe:
             self.recipe = self._sanitize(recipe)
@@ -83,10 +81,6 @@ class Recipe:
             return result
         return not result
 
-    def __hash__(self):
-        """Recipe objects are mutable and therefore should not be hashable."""
-        return None
-
     def validate(self):
         """Check whether the encoded recipe is valid. It must describe a directed
         acyclical graph, all connections must be defined, etc."""
@@ -107,7 +101,7 @@ class Recipe:
 
         # Check that 'error' node points to regular nodes only
         if "error" in self.recipe and isinstance(
-            self.recipe["error"], (list, tuple, basestring)
+            self.recipe["error"], (list, tuple, str)
         ):
             if "start" in self.recipe["error"]:
                 raise workflows.Error(
@@ -240,22 +234,22 @@ class Recipe:
         ds_formatter = string.Formatter()
 
         def ds_format_field(value, spec):
-            ds_format_field.last = value
+            ds_format_field.last = value  # type: ignore
             return ""
 
-        ds_formatter.format_field = ds_format_field
+        ds_formatter.format_field = ds_format_field  # type: ignore
 
         params = SafeDict(parameters)
 
         def _recursive_apply(item):
             """Helper function to recursively apply replacements."""
-            if isinstance(item, basestring):
+            if isinstance(item, str):
                 if item.startswith("{$REPLACE") and item.endswith("}"):
                     try:
                         ds_formatter.vformat("{" + item[10:-1] + "}", (), parameters)
                     except KeyError:
                         return None
-                    return copy.deepcopy(ds_formatter.format_field.last)
+                    return copy.deepcopy(ds_formatter.format_field.last)  # type: ignore
                 else:
                     return formatter.vformat(item, (), params)
             if isinstance(item, dict):
@@ -285,7 +279,7 @@ class Recipe:
             return Recipe(self.recipe)
 
         # When a string is passed, merge with a constructed recipe object
-        if isinstance(other, basestring):
+        if isinstance(other, str):
             return self.merge(Recipe(other))
 
         # Merging empty recipes returns a copy of the original

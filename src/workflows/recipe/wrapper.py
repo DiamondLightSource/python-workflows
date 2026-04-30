@@ -3,9 +3,11 @@ from __future__ import annotations
 import logging
 import time
 from collections.abc import Callable
-from typing import Any
+from typing import Any, overload
 
 import workflows.recipe
+from workflows.recipe.recipe import Recipe
+from workflows.transport.common_transport import CommonTransport
 
 logger = logging.getLogger("workflows.recipe.wrapper")
 
@@ -15,12 +17,41 @@ class RecipeWrapper:
     life easier for recipe users.
     """
 
+    recipe_pointer: int | None
+
+    @overload
     def __init__(
-        self, message=None, transport=None, recipe=None, environment=None, **kwargs
+        self,
+        *,
+        transport: CommonTransport | None = None,
+        environment: dict[str, Any] | None = None,
+        message: dict[str, Any],
+    ) -> None: ...
+
+    @overload
+    def __init__(
+        self,
+        *,
+        transport: CommonTransport | None = None,
+        environment: dict[str, Any] | None = None,
+        recipe: Recipe | dict[str, Any],
+    ) -> None: ...
+
+    def __init__(
+        self,
+        *,
+        transport: CommonTransport | None = None,
+        environment: dict[str, Any] | None = None,
+        message: dict[str, Any] | None = None,
+        recipe: Recipe | dict[str, Any] | None = None,
+        **kwargs,
     ):
-        """Create a RecipeWrapper object from a wrapped message.
-        References to the transport layer are required to send directly to
-        connected downstream processes.
+        """
+        Create a RecipeWrapper object from a wrapped message.
+
+        transport:
+            References to the transport layer, required to make use of
+            methods that send directly to connected downstream processes.
         """
         if message:
             self.recipe = workflows.recipe.Recipe(message["recipe"])
@@ -47,7 +78,15 @@ class RecipeWrapper:
                 "A message or recipe is required to create a RecipeWrapper object."
             )
         self.default_channel = None
-        self.transport = transport
+        self._transport = transport
+
+    @property
+    def transport(self) -> CommonTransport:
+        if self._transport is None:
+            raise RuntimeError(
+                "This RecipeWrapper object does not contain a reference to a transport object."
+            )
+        return self._transport
 
     def send(self, *args, **kwargs):
         """Send messages to another service that is connected to the currently
@@ -55,13 +94,6 @@ class RecipeWrapper:
         default channel name, set via the set_default_channel method, or an
         unnamed output definition.
         """
-
-        if not self.transport:
-            raise ValueError(
-                "This RecipeWrapper object does not contain "
-                "a reference to a transport object."
-            )
-
         if not self.recipe_step:
             raise ValueError(
                 "This RecipeWrapper object does not contain "
@@ -87,12 +119,6 @@ class RecipeWrapper:
         running service via the recipe. Discard messages if the recipe does
         not have anything connected to the specified output channel.
         """
-        if not self.transport:
-            raise ValueError(
-                "This RecipeWrapper object does not contain "
-                "a reference to a transport object."
-            )
-
         if not self.recipe_step:
             raise ValueError(
                 "This RecipeWrapper object does not contain "
@@ -128,11 +154,6 @@ class RecipeWrapper:
         If the wrapped recipe has already been started then a ValueError will
         be raised.
         """
-        if not self.transport:
-            raise ValueError(
-                "This RecipeWrapper object does not contain "
-                "a reference to a transport object."
-            )
 
         if self.recipe_step:
             raise ValueError("This recipe has already been started.")
@@ -145,12 +166,6 @@ class RecipeWrapper:
         keep a state for longer processing tasks.
         :param delay: Delay transport of message by this many seconds
         """
-        if not self.transport:
-            raise ValueError(
-                "This RecipeWrapper object does not contain "
-                "a reference to a transport object."
-            )
-
         if not self.recipe_step:
             raise ValueError(
                 "This RecipeWrapper object does not contain "

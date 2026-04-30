@@ -224,7 +224,7 @@ class CommonService:
                 otel_middleware = OTELTracingMiddleware(
                     tracer, service_name=self._service_name
                 )
-                self._transport.add_middleware(otel_middleware)
+                self.transport.add_middleware(otel_middleware)
 
             metrics = self._environment.get("metrics")
             if metrics:
@@ -237,7 +237,7 @@ class CommonService:
                 self.log.debug("Instrumenting transport")
                 source = f"{self.__module__}:{self.__class__.__name__}"
                 instrument = PrometheusMiddleware(source=source)
-                self._transport.add_middleware(instrument)
+                self.transport.add_middleware(instrument)
                 port = metrics["port"]
                 self.log.debug(f"Starting metrics endpoint on port {port}")
                 prometheus_client.start_http_server(port=port)
