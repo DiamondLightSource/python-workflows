@@ -21,7 +21,7 @@ class SamplePipethrough(CommonService):
     def initializing(self):
         """Subscribe to a channel."""
         workflows.recipe.wrap_subscribe(
-            self._transport,
+            self.transport,
             "transient.destination",
             self.process,
         )

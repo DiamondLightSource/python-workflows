@@ -28,7 +28,7 @@ class OfflineTransport(CommonTransport):
     config: dict[Any, Any] = {}
 
     def __init__(
-        self, middleware: list[type[middleware.BaseTransportMiddleware]] | None = None
+        self, middleware: list[middleware.BaseTransportMiddleware] | None = None
     ):
         self._connected = False
         super().__init__(middleware=middleware)
@@ -78,10 +78,8 @@ class OfflineTransport(CommonTransport):
             f"subscription ID {sub_id}, callback function {callback}, further keywords: {kwargs}",
         )
 
-    def _unsubscribe(self, subscription, **kwargs):
-        self._output(
-            f"Ending subscription #{subscription}", f"further keywords: {kwargs}"
-        )
+    def _unsubscribe(self, sub_id: int, **kwargs):
+        self._output(f"Ending subscription #{sub_id}", f"further keywords: {kwargs}")
 
     def _send(
         self, destination, message, headers=None, delay=None, expiration=None, **kwargs

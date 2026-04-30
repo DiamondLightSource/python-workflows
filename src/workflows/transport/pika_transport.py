@@ -15,7 +15,9 @@ from concurrent.futures import Future
 from enum import Enum, auto
 from typing import Any
 
+import pika.channel
 import pika.exceptions
+import pika.spec
 from bidict import bidict
 from pika.adapters.blocking_connection import BlockingChannel
 
@@ -63,7 +65,7 @@ class PikaTransport(CommonTransport):
     config: dict[Any, Any] = {}
 
     def __init__(
-        self, middleware: list[type[middleware.BaseTransportMiddleware]] | None = None
+        self, middleware: list[middleware.BaseTransportMiddleware] | None = None
     ):
         self._channel = None
         self._conn = None
@@ -242,17 +244,15 @@ class PikaTransport(CommonTransport):
         )
 
     def _generate_connection_parameters(self) -> list[pika.ConnectionParameters]:
-        username = self.config.get("--rabbit-user", self.defaults.get("--rabbit-user"))
-        password = self.config.get("--rabbit-pass", self.defaults.get("--rabbit-pass"))
+        username = self.config.get("--rabbit-user", self.defaults["--rabbit-user"])
+        password = self.config.get("--rabbit-pass", self.defaults["--rabbit-pass"])
         credentials = pika.PlainCredentials(username, password)
 
-        host_string = self.config.get(
-            "--rabbit-host", self.defaults.get("--rabbit-host")
-        )
+        host_string = self.config.get("--rabbit-host", self.defaults["--rabbit-host"])
         port_string = str(
-            self.config.get("--rabbit-port", self.defaults.get("--rabbit-port"))
+            self.config.get("--rabbit-port", self.defaults["--rabbit-port"])
         )
-        vhost = self.config.get("--rabbit-vhost", self.defaults.get("--rabbit-vhost"))
+        vhost = self.config.get("--rabbit-vhost", self.defaults["--rabbit-vhost"])
         if "," in host_string:
             host = host_string.split(",")
         else:

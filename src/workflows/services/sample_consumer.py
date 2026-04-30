@@ -19,7 +19,7 @@ class SampleConsumer(CommonService):
 
     def initializing(self):
         """Subscribe to a channel."""
-        self._transport.subscribe("transient.destination", self.consume_message)
+        self.transport.subscribe("transient.destination", self.consume_message)
 
     def consume_message(self, header, message):
         """Consume a message"""

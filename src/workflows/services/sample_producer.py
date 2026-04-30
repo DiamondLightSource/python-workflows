@@ -30,7 +30,7 @@ class SampleProducer(CommonService):
         """Create and send a unique message for this service."""
         self.counter += 1
         self.log.info("Sending message #%d", self.counter)
-        self._transport.send(
+        self.transport.send(
             "transient.destination",
             "Message #%d\n++++++++Produced @%10.3f ms"
             % (self.counter, (time.time() % 1000) * 1000),
