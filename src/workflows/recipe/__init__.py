@@ -3,14 +3,15 @@ from __future__ import annotations
 import functools
 import logging
 from collections.abc import Callable
-from contextlib import ExitStack
-from typing import Any
+from contextlib import AbstractContextManager, ExitStack
+from typing import Any, Literal, overload
 
 from opentelemetry import trace
 
 from workflows.recipe.recipe import Recipe
 from workflows.recipe.validate import validate_recipe
 from workflows.recipe.wrapper import RecipeWrapper
+from workflows.transport.common_transport import CommonTransport
 
 __all__ = [
     "Recipe",
@@ -30,6 +31,8 @@ def _wrap_subscription(
     callback,
     *args,
     mangle_for_receiving: Callable[[Any], Any] | None = None,
+    allow_non_recipe_messages: bool = False,
+    log_extender=None,
     **kwargs,
 ):
     """Internal method to create an intercepting function for incoming messages
@@ -54,9 +57,6 @@ def _wrap_subscription(
                        function, which must be a context manager factory.
       :return:         Return value of call to subscription_call.
     """
-
-    allow_non_recipe_messages = kwargs.pop("allow_non_recipe_messages", False)
-    log_extender = kwargs.pop("log_extender", None)
 
     @functools.wraps(callback)
     def unwrap_recipe(header, message):
@@ -113,12 +113,40 @@ def _wrap_subscription(
     return subscription_call(channel, unwrap_recipe, *args, **kwargs)
 
 
+@overload
+def wrap_subscribe(
+    transport_layer: CommonTransport,
+    channel: str,
+    callback: Callable[[RecipeWrapper, dict, dict], None],
+    *args,
+    allow_non_recipe_messages: Literal[False] = False,
+    mangle_for_receiving: Callable[[Any], Any] | None = None,
+    log_extender: Callable[[str, Any], AbstractContextManager[Any]] | None = None,
+    **kwargs,
+) -> int: ...
+
+
+@overload
+def wrap_subscribe(
+    transport_layer: CommonTransport,
+    channel: str,
+    callback: Callable[[RecipeWrapper | None, dict, dict | bytes], None],
+    *args,
+    allow_non_recipe_messages: Literal[True],
+    mangle_for_receiving: Callable[[Any], Any] | None = None,
+    log_extender: Callable[[str, Any], AbstractContextManager[Any]] | None = None,
+    **kwargs,
+) -> int: ...
+
+
 def wrap_subscribe(
     transport_layer,
     channel,
     callback,
     *args,
-    mangle_for_receiving: Callable[[Any], Any] | None = None,
+    allow_non_recipe_messages=False,
+    mangle_for_receiving=None,
+    log_extender=None,
     **kwargs,
 ):
     """Listen to a queue on the transport layer, similar to the subscribe call in
@@ -141,6 +169,7 @@ def wrap_subscribe(
         callback,
         *args,
         mangle_for_receiving=mangle_for_receiving,
+        allow_non_recipe_messages=allow_non_recipe_messages,
         **kwargs,
     )
 
