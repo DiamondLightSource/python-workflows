@@ -456,14 +456,14 @@ class CommonService:
 
                 try:
                     task = self.__queue.get(True, self._idle_time or 2)
-                    run_idle_task = False
                 except queue.Empty:
-                    run_idle_task = True
+                    task = None
 
                 if self.transport and not self.transport.is_connected():
                     raise workflows.Disconnected("Connection lost")
 
-                if run_idle_task:
+                if task is None:
+                    # Run the idle task
                     if self._idle_time:
                         # run this outside the 'except' to avoid exception chaining
                         self.__update_service_status(self.SERVICE_STATUS_TIMER)
