@@ -324,7 +324,7 @@ class PikaTransport(CommonTransport):
     def _call_message_callback(
         self,
         subscription_id: int,
-        _channel: pika.channel.Channel,
+        _channel: BlockingChannel,
         method: pika.spec.Basic.Deliver,
         properties: pika.spec.BasicProperties,
         body: bytes,
@@ -395,7 +395,9 @@ class PikaTransport(CommonTransport):
         try:
             return self._pika_thread.subscribe_queue(
                 queue=channel,
-                callback=functools.partial(self._call_message_callback, sub_id),
+                callback=lambda ch, m, p, b: self._call_message_callback(
+                    sub_id, ch, m, p, b
+                ),
                 auto_ack=not acknowledgement,
                 subscription_id=sub_id,
                 reconnectable=reconnectable,
@@ -1067,7 +1069,7 @@ class _PikaThread(threading.Thread):
         exchange: str,
         routing_key: str,
         body: str | bytes,
-        properties: pika.spec.BasicProperties = None,
+        properties: pika.spec.BasicProperties | None = None,
         mandatory: bool = True,
         transaction_id: int | None = None,
     ) -> Future[None]:
@@ -1318,7 +1320,9 @@ class _PikaThread(threading.Thread):
     # PikaThread Internal methods
 
     def _debug_close_connection(self):
-        self._connection.add_callback_threadsafe(lambda: self._connection.close())
+        connection = self._connection
+        assert connection is not None
+        connection.add_callback_threadsafe(lambda: connection.close())
 
     def _get_shared_channel(self) -> BlockingChannel:
         """Get the shared (no prefetch) channel. Create if necessary."""
@@ -1389,7 +1393,7 @@ class _PikaThread(threading.Thread):
     def _run(self):
         if self._please_stop.is_set():
             # stop() was called before start()... so quit
-            self._state == _PikaThreadStatus.STOPPED
+            self._state == _PikaThreadStatus.STOPPED  # type: ignore
             return
         assert self._state == _PikaThreadStatus.NEW
         assert self._reconnection_allowed, "Should be true until first synchronize"
