@@ -301,6 +301,9 @@ class CommonService:
         This function is run by a separate daemon thread, which is started by
         the __start_command_queue_listener function.
         """
+        assert self.__pipe_commands is not None, (
+            "Listener started without command queue connection"
+        )
         self.log.debug("Queue listener thread started")
         counter = itertools.count()  # insertion sequence to keep messages in order
         while not self.__shutdown:
@@ -336,7 +339,7 @@ class CommonService:
         thread_function = self.__command_queue_listener
 
         class QueueListenerThread(threading.Thread):
-            def run(qltself):
+            def run(self):
                 thread_function()
 
         assert not hasattr(self, "__queue_listener_thread")
