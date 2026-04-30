@@ -330,7 +330,7 @@ class PikaTransport(CommonTransport):
         body: bytes,
     ):
         """Rewrite and redirect a pika callback to the subscription function"""
-        merged_headers = dict(properties.headers)
+        merged_headers = dict(properties.headers or {})
         merged_headers.update(
             {
                 "consumer_tag": str(method.consumer_tag),
