@@ -17,6 +17,7 @@ from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
 import workflows
 import workflows.logging
+from workflows.transport.common_transport import CommonTransport
 from workflows.transport.middleware.otel_tracing import OTELTracingMiddleware
 
 
@@ -171,11 +172,14 @@ class CommonService:
         return self._environment.get("config")
 
     @property
-    def transport(self):
+    def transport(self) -> CommonTransport:
+        # Handle the fact that we apparently allow missing transport layers
+        if self._transport is None:
+            raise RuntimeError("Transport layer has not yet been defined")
         return self._transport
 
     @transport.setter
-    def transport(self, value):
+    def transport(self, value: CommonTransport) -> None:
         if self._transport:
             raise AttributeError("Transport already defined")
         self._transport = value
