@@ -8,9 +8,10 @@ from opentelemetry.context import Context
 from opentelemetry.propagate import extract, inject
 
 from workflows.transport.common_transport import MessageCallback, TemporarySubscription
+from workflows.transport.middleware import BaseTransportMiddleware
 
 
-class OTELTracingMiddleware:
+class OTELTracingMiddleware(BaseTransportMiddleware):
     def __init__(self, tracer: trace.Tracer, service_name: str):
         self.tracer = tracer
         self.service_name = service_name

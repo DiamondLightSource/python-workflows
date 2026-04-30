@@ -33,14 +33,14 @@ class CommonTransport:
     #
 
     def __init__(
-        self, middleware: list[type[middleware.BaseTransportMiddleware]] | None = None
+        self, middleware: list[middleware.BaseTransportMiddleware] | None = None
     ):
         if middleware is None:
             self.middleware = []
         else:
             self.middleware = middleware
 
-    def add_middleware(self, middleware: type[middleware.BaseTransportMiddleware]):
+    def add_middleware(self, middleware: middleware.BaseTransportMiddleware):
         self.middleware.insert(0, middleware)
 
     @classmethod
