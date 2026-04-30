@@ -5,7 +5,7 @@ import inspect
 import logging
 import time
 from collections.abc import Callable
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Concatenate
 
 if TYPE_CHECKING:
     from workflows.transport.common_transport import (
@@ -232,17 +232,17 @@ class TimerMiddleware(BaseTransportMiddleware):
         return call_next(channel, wrapped_callback, **kwargs)
 
 
-def wrap(f: Callable):
+def wrap[S, **P, R](
+    f: Callable[Concatenate[S, P], R],
+) -> Callable[Concatenate[S, P], R]:
     @functools.wraps(f)
-    def wrapper(self, *args, **kwargs):
+    def wrapper(self: S, *args: P.args, **kwargs: P.kwargs) -> R:
         return functools.reduce(
             lambda call_next, m: (
-                lambda *args, **kwargs: getattr(m, f.__name__)(
-                    call_next, *args, **kwargs
-                )
+                lambda *a, **kw: getattr(m, f.__name__)(call_next, *a, **kw)
             ),
-            reversed(self.middleware),
-            lambda *args, **kwargs: f(self, *args, **kwargs),
+            reversed(self.middleware),  # type: ignore[attr-defined]
+            lambda *a, **kw: f(self, *a, **kw),
         )(*args, **kwargs)
 
     return wrapper
