@@ -186,6 +186,7 @@ class RecipeWrapper:
         passed down the chain of services. This makes debugging very difficult.
         """
         self.recipe.apply_parameters(parameters)
+        assert self.recipe_pointer is not None
         self.recipe_step = self.recipe[self.recipe_pointer]
 
     def _generate_full_recipe_message(self, destination, message, add_path_step):
