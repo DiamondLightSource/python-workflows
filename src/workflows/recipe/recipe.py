@@ -1,11 +1,16 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 import copy
 import json
 import string
-from typing import Any
+from typing import Any, Literal, cast
 
 import workflows
+
+type RecipeKey = Literal["start", "error"] | int
+type RawRecipe = dict[RecipeKey, Any]
+type InputRecipe = Mapping[RecipeKey | str, Any]
 
 
 class Recipe:
@@ -13,27 +18,28 @@ class Recipe:
     A recipe describes how all involved services are connected together, how
     data should be passed and how errors should be handled."""
 
-    recipe: dict[Any, Any] = {}
+    recipe: RawRecipe
     """The processing recipe is encoded in this dictionary."""
-    # TODO: Describe format
 
-    def __init__(self, recipe=None):
+    def __init__(self, recipe: InputRecipe | str | None = None):
         """Constructor allows passing in a recipe dictionary."""
         if isinstance(recipe, str):
             self.recipe = self.deserialize(recipe)
         elif recipe:
             self.recipe = self._sanitize(recipe)
+        else:
+            self.recipe = {}
 
-    def deserialize(self, string):
+    def deserialize(self, data: str) -> RawRecipe:
         """Convert a recipe that has been stored as serialized json string to a
         data structure."""
-        return self._sanitize(json.loads(string))
+        return self._sanitize(json.loads(data))
 
     @staticmethod
-    def _sanitize(recipe):
+    def _sanitize(recipe: InputRecipe) -> RawRecipe:
         """Clean up a recipe that may have been stored as serialized json string.
         Convert any numerical pointers that are stored as strings to integers."""
-        recipe = recipe.copy()
+        recipe = dict(recipe)
         for k in list(recipe):
             if k not in ("start", "error") and int(k) and k != int(k):
                 recipe[int(k)] = recipe[k]
@@ -46,44 +52,43 @@ class Recipe:
             # dicts should be normalized, too
         if "start" in recipe:
             recipe["start"] = [tuple(x) for x in recipe["start"]]
-        return recipe
+        return cast(RawRecipe, recipe)
 
-    def serialize(self):
+    def serialize(self) -> str:
         """Write out the current recipe as serialized json string."""
         return json.dumps(self.recipe)
 
-    def pretty(self):
+    def pretty(self) -> str:
         """Write out the current recipe as serialized json string with pretty formatting."""
         return json.dumps(self.recipe, indent=2)
 
-    def __getitem__(self, item):
+    def __getitem__(self, item: RecipeKey) -> Any:
         """Allow direct dictionary access to recipe elements."""
         return self.recipe.__getitem__(item)
 
-    def __contains__(self, item):
+    def __contains__(self, item: object) -> bool:
         """Testing for presence of recipe elements."""
         return item in self.recipe
 
-    def __eq__(self, other):
+    def __eq__(self, other: object) -> bool:
         """Overload equality operator (!=) to allow comparing recipe objects
         with one another and with their string representations."""
         if isinstance(other, Recipe):
             return self.recipe == other.recipe
         if isinstance(other, dict):
             return self.recipe == self._sanitize(other)
-        return self.recipe == self.deserialize(other)
+        if isinstance(other, str):
+            return self.recipe == self.deserialize(other)
+        return NotImplemented
 
-    def __ne__(self, other):
-        """Overload inequality operator (!=) to allow comparing recipe objects
-        with one another and with their string representations."""
-        result = self.__eq__(other)
-        if result is NotImplemented:
-            return result
-        return not result
+    def validate(self) -> None:
+        """Check whether the encoded recipe is valid.
 
-    def validate(self):
-        """Check whether the encoded recipe is valid. It must describe a directed
-        acyclical graph, all connections must be defined, etc."""
+        It must describe a directed acyclical graph, all connections
+        must be defined, etc.
+
+        Raises if the recipe is not valid.
+        """
         if not self.recipe:
             raise workflows.Error("Invalid recipe: No recipe defined")
 
@@ -180,7 +185,7 @@ class Recipe:
                     'Invalid recipe: Recipe contains unreferenced node "%s"' % str(node)
                 )
 
-    def apply_parameters(self, parameters):
+    def apply_parameters(self, parameters: dict[str, Any]) -> None:
         """Recursively apply dictionary entries in 'parameters' to {item}s in recipe
         structure, leaving undefined {item}s as they are. A special case is a
         {$REPLACE:item}, which replaces the string with a copy of the referenced
@@ -265,7 +270,7 @@ class Recipe:
 
         self.recipe = _recursive_apply(self.recipe)
 
-    def merge(self, other):
+    def merge(self, other: Recipe | str) -> Recipe:
         """Merge two recipes together, returning a single recipe containing all
         nodes.
         Note: This does NOT yet return a minimal recipe.
@@ -298,7 +303,7 @@ class Recipe:
         new_recipe = self.recipe
 
         # Find the maximum index of the current recipe
-        max_index = max(1, *filter(lambda x: isinstance(x, int), self.recipe.keys()))
+        max_index = max(1, *(k for k in self.recipe if isinstance(k, int)))
         next_index = max_index + 1
 
         # Set up a translation table for indices and copy all entries
@@ -344,19 +349,5 @@ class Recipe:
                     new_recipe["error"].extend(translate(other.recipe["error"]))
                 else:
                     new_recipe["error"].append(translate(other.recipe["error"]))
-
-        #   # Minimize DAG
-        #   queuehash, topichash = {}, {}
-        #   for k, v in new_recipe.items():
-        #     if isinstance(v, dict):
-        #       if 'queue' in v:
-        #         queuehash[v['queue']] = queuehash.get(v['queue'], [])
-        #         queuehash[v['queue']].append(k)
-        #       if 'topic' in v:
-        #         topichash[v['topic']] = topichash.get(v['topic'], [])
-        #         topichash[v['topic']].append(k)
-        #
-        #   print queuehash
-        #   print topichash
 
         return Recipe(new_recipe)
