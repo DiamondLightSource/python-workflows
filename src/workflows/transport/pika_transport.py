@@ -1441,7 +1441,7 @@ class _PikaThread(threading.Thread):
                 connection_counter += 1
 
                 # Clear the channels because this might be a reconnect
-                self._pika_channels = {}
+                self._pika_channels = bidict()
                 self._pika_shared_channel = None
                 self._transaction_on_channel = bidict()
                 self._channel_has_active_tx = {}
@@ -1465,7 +1465,7 @@ class _PikaThread(threading.Thread):
 
                 # Run until we are asked to stop, or fail
                 while not self._please_stop.is_set():
-                    self._connection.process_data_events(None)
+                    self._connection.process_data_events(None)  # type: ignore
             except pika.exceptions.ConnectionClosed:
                 self._exc_info = sys.exc_info()
                 if self._please_stop.is_set():
@@ -1492,6 +1492,7 @@ class _PikaThread(threading.Thread):
                 self._exc_info = sys.exc_info()
                 break
             # Make sure our connection is closed before reconnecting
+            assert self._connection is not None
             if not self._connection.is_closed:
                 logger.info("Connection not closed. Closing.")
                 self._connection.close()

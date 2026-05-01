@@ -1,7 +1,13 @@
+"""
+Zocalo configuration for workflows objects
+
+Only imported if Zocalo is present in the environment.
+"""
+
 from __future__ import annotations
 
-from marshmallow import fields
-from zocalo.configuration import PluginSchema
+from marshmallow import fields  # type: ignore
+from zocalo.configuration import PluginSchema  # type: ignore
 
 import workflows.transport
 from workflows.transport.pika_transport import PikaTransport

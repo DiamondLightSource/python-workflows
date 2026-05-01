@@ -8,6 +8,7 @@ import uuid
 from typing import Any
 
 import stomp
+import stomp.exception
 
 import workflows.util
 from workflows.transport import middleware
@@ -227,7 +228,7 @@ class StompTransport(CommonTransport):
                         ),
                         int(
                             self.config.get(
-                                "--stomp-port", self.defaults.get("--stomp-port")
+                                "--stomp-port", self.defaults["--stomp-port"]
                             )
                         ),
                     )
@@ -265,7 +266,7 @@ class StompTransport(CommonTransport):
                     "Could not initiate connection to stomp host"
                 )
             self._namespace = self.config.get(
-                "--stomp-prfx", self.defaults.get("--stomp-prfx")
+                "--stomp-prfx", self.defaults["--stomp-prfx"]
             )
             if self._namespace and not self._namespace.endswith("."):
                 self._namespace = self._namespace + "."
@@ -370,11 +371,11 @@ class StompTransport(CommonTransport):
 
         return channel
 
-    def _unsubscribe(self, subscription, **kwargs):
+    def _unsubscribe(self, sub_id: int, **kwargs) -> None:
         """Stop listening to a queue or a broadcast
         :param subscription: Subscription ID to cancel
         """
-        self._conn.unsubscribe(id=subscription)
+        self._conn.unsubscribe(id=sub_id)
         # Callback reference is kept as further messages may already have been received
 
     def _send(
