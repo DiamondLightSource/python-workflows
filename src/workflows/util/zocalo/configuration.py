@@ -6,6 +6,8 @@ Only imported if Zocalo is present in the environment.
 
 from __future__ import annotations
 
+from typing import Any
+
 from marshmallow import fields  # type: ignore
 from zocalo.configuration import PluginSchema  # type: ignore
 
@@ -23,7 +25,7 @@ class OTEL:
         timeout = fields.Int(required=False, load_default=10)
 
     # Store configuration for access by services
-    config = {}
+    config: dict[str, Any] = {}
 
     @staticmethod
     def activate(configuration):
