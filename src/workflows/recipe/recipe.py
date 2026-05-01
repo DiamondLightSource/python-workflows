@@ -1,16 +1,14 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
 import copy
 import json
 import string
-from typing import Any, Literal, cast
+from typing import Any, Literal
 
 import workflows
 
 type RecipeKey = Literal["start", "error"] | int
 type RawRecipe = dict[RecipeKey, Any]
-type InputRecipe = Mapping[RecipeKey | str, Any]
 
 
 class Recipe:
@@ -21,7 +19,7 @@ class Recipe:
     recipe: RawRecipe
     """The processing recipe is encoded in this dictionary."""
 
-    def __init__(self, recipe: InputRecipe | str | None = None):
+    def __init__[KT: RecipeKey | str](self, recipe: dict[KT, Any] | str | None = None):
         """Constructor allows passing in a recipe dictionary."""
         if isinstance(recipe, str):
             self.recipe = self.deserialize(recipe)
@@ -36,23 +34,29 @@ class Recipe:
         return self._sanitize(json.loads(data))
 
     @staticmethod
-    def _sanitize(recipe: InputRecipe) -> RawRecipe:
+    def _sanitize[KT: RecipeKey | str](recipe: dict[KT, Any]) -> RawRecipe:
         """Clean up a recipe that may have been stored as serialized json string.
         Convert any numerical pointers that are stored as strings to integers."""
-        recipe = dict(recipe)
-        for k in list(recipe):
-            if k not in ("start", "error") and int(k) and k != int(k):
-                recipe[int(k)] = recipe[k]
-                del recipe[k]
-        for k in list(recipe):
-            if "output" in recipe[k] and not isinstance(
-                recipe[k]["output"], (list, dict)
+        sanitized: RawRecipe = {}
+        for k, v in recipe.items():
+            if k == "start" or k == "error":
+                sanitized[k] = v
+            elif isinstance(k, int):
+                sanitized[k] = v
+            elif isinstance(k, str):
+                sanitized[int(k)] = v
+
+        for node in sanitized.values():
+            if (
+                isinstance(node, dict)
+                and "output" in node
+                and not isinstance(node["output"], (list, dict))
             ):
-                recipe[k]["output"] = [recipe[k]["output"]]
-            # dicts should be normalized, too
-        if "start" in recipe:
-            recipe["start"] = [tuple(x) for x in recipe["start"]]
-        return cast(RawRecipe, recipe)
+                node["output"] = [node["output"]]
+
+        if "start" in sanitized:
+            sanitized["start"] = [tuple(x) for x in sanitized["start"]]
+        return sanitized
 
     def serialize(self) -> str:
         """Write out the current recipe as serialized json string."""
