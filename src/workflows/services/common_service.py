@@ -186,7 +186,7 @@ class CommonService:
 
     def start_transport(self):
         """If a transport object has been defined then connect it now."""
-        if self.transport:
+        if self._transport:
             if self.transport.connect():
                 self.log.debug("Service successfully connected to transport layer")
             else:
@@ -246,7 +246,7 @@ class CommonService:
 
     def stop_transport(self):
         """If a transport object has been defined then tear it down."""
-        if self.transport:
+        if self._transport:
             self.log.debug("Stopping transport object")
             self.transport.disconnect()
 
@@ -459,7 +459,7 @@ class CommonService:
                 except queue.Empty:
                     task = None
 
-                if self.transport and not self.transport.is_connected():
+                if self._transport and not self.transport.is_connected():
                     raise workflows.Disconnected("Connection lost")
 
                 if task is None:
