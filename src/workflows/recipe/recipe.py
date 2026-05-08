@@ -25,7 +25,7 @@ class Recipe:
             self.recipe = self.deserialize(recipe)
         elif recipe:
             self.recipe = self._sanitize(recipe)
-        else:
+        elif not hasattr(self, "recipe"):
             self.recipe = {}
 
     def deserialize(self, data: str) -> RawRecipe:
