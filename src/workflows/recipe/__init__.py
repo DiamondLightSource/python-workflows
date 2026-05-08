@@ -170,6 +170,7 @@ def wrap_subscribe(
         *args,
         mangle_for_receiving=mangle_for_receiving,
         allow_non_recipe_messages=allow_non_recipe_messages,
+        log_extender=log_extender,
         **kwargs,
     )
 
