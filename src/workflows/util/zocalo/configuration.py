@@ -48,6 +48,7 @@ class Stomp:
             ("prefix", "--stomp-prfx"),
         ]:
             StompTransport.defaults[target] = configuration[cfgoption]
+        return dict(StompTransport.defaults)
 
 
 class Pika:
@@ -70,6 +71,7 @@ class Pika:
             ("vhost", "--rabbit-vhost"),
         ]:
             PikaTransport.defaults[target] = configuration[cfgoption]
+        return dict(PikaTransport.defaults)
 
 
 class DefaultTransport:
