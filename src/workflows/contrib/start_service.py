@@ -60,9 +60,11 @@ class ServiceStarter:
         **kwargs,
     ):
         """Example command line interface to start services.
-        :param cmdline_args: List of command line arguments to pass to parser
-        :param program_name: Name of the command line tool to display in help
-        :param version: Version number to print when run with '--version'
+
+        Args:
+            cmdline_args: List of command line arguments to pass to parser
+            program_name: Name of the command line tool to display in help
+            version: Version number to print when run with '--version'
         """
 
         # Enumerate all known services

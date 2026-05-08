@@ -42,22 +42,24 @@ class Frontend:
         """Create a frontend instance. Connect to the transport layer, start any
         requested service, begin broadcasting status information and listen
         for control commands.
-        :param restart_service:
-            If the service process dies unexpectedly the frontend should start
-            a new instance.
-        :param service:
-            A class or name of the class to be instantiated in a subprocess as
-            service.
-        :param transport:
-            Either the name of a transport class, a transport class, or a
-            transport class object.
-        :param transport_command_channel:
-            An optional channel of a transport subscription to be listened to for
-            commands.
-        :param verbose_service:
-            If set, run services with increased logging level (DEBUG).
-        :param environment:
-            An optional dictionary that is passed to started services.
+
+        Args:
+            restart_service:
+                If the service process dies unexpectedly the frontend should start
+                a new instance.
+            service:
+                A class or name of the class to be instantiated in a subprocess as
+                service.
+            transport:
+                Either the name of a transport class, a transport class, or a
+                transport class object.
+            transport_command_channel:
+                An optional channel of a transport subscription to be listened to
+                for commands.
+            verbose_service:
+                If set, run services with increased logging level (DEBUG).
+            environment:
+                An optional dictionary that is passed to started services.
         """
         self.__lock = threading.RLock()
         self.__hostid = workflows.util.generate_unique_host_id()
@@ -146,9 +148,12 @@ class Frontend:
         broadcast if it is held for over 0.5 seconds.
         When the status does not change it is still broadcast every
         _status_interval seconds.
-        :param status_code: Either an integer describing the service status
-                            (see workflows.services.common_service), or None
-                            if the status is unchanged.
+
+        Args:
+            status_code:
+                Either an integer describing the service status (see
+                workflows.services.common_service), or None if the status is
+                unchanged.
         """
         if status_code is not None:
             self._service_status = status_code
@@ -397,9 +402,13 @@ class Frontend:
 
     def switch_service(self, new_service=None):
         """Start a new service in a subprocess.
-        :param new_service: Either a service name or a service class. If not set,
-                            start up a new instance of the previous class
-        :return: True on success, False on failure.
+
+        Args:
+            new_service: Either a service name or a service class. If not set,
+                start up a new instance of the previous class.
+
+        Returns:
+            True on success, False on failure.
         """
         if new_service:
             self._service_factory = new_service

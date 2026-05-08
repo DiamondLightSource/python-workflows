@@ -483,8 +483,10 @@ class PikaTransport(CommonTransport):
             raise workflows.Disconnected(e)
 
     def _unsubscribe(self, sub_id: int, **kwargs):
-        """Stop listening to a queue
-        :param sub_id: Consumer Tag to cancel
+        """Stop listening to a queue.
+
+        Args:
+            sub_id: Consumer Tag to cancel
         """
         self._pika_thread.unsubscribe(sub_id)
         # self._channel.basic_cancel(consumer_tag=consumer_tag, callback=None)
@@ -585,20 +587,26 @@ class PikaTransport(CommonTransport):
         self, transaction_id: int, *, subscription_id: int | None = None, **kwargs
     ) -> None:
         """Start a new transaction.
-        :param transaction_id: ID for this transaction in the transport layer.
-        :param subscription_id: Tie the transaction to a specific channel containing this subscription.
+
+        Args:
+            transaction_id: ID for this transaction in the transport layer.
+            subscription_id: Tie the transaction to a specific channel containing this subscription.
         """
         self._pika_thread.tx_select(transaction_id, subscription_id).result()
 
     def _transaction_abort(self, transaction_id: int, **kwargs) -> None:
         """Abort a transaction and roll back all operations.
-        :param transaction_id: ID of transaction to be aborted.
+
+        Args:
+            transaction_id: ID of transaction to be aborted.
         """
         self._pika_thread.tx_rollback(transaction_id).result()
 
     def _transaction_commit(self, transaction_id: int, **kwargs) -> None:
         """Commit a transaction.
-        :param transaction_id: ID of transaction to be committed.
+
+        Args:
+            transaction_id: ID of transaction to be committed.
         """
         self._pika_thread.tx_commit(transaction_id).result()
 
@@ -616,8 +624,7 @@ class PikaTransport(CommonTransport):
             subscription_id:
                 Internal id for the subscription this message came from
             multiple: Should multiple messages be acknowledged?
-
-        :param **kwargs: Further parameters for the transport layer.
+            **kwargs: Further parameters for the transport layer.
         """
         self._pika_thread.ack(
             message_id,
@@ -1186,8 +1193,10 @@ class _PikaThread(threading.Thread):
         self, transaction_id: int, subscription_id: int | None
     ) -> Future[None]:
         """Set a channel to transaction mode. Thread-safe.
-        :param transaction_id: ID for this transaction in the transport layer.
-        :param subscription_id: Tie the transaction to a specific channel containing this subscription.
+
+        Args:
+            transaction_id: ID for this transaction in the transport layer.
+            subscription_id: Tie the transaction to a specific channel containing this subscription.
         """
 
         if not self._connection:
@@ -1230,7 +1239,9 @@ class _PikaThread(threading.Thread):
 
     def tx_rollback(self, transaction_id: int) -> Future[None]:
         """Abort a transaction and roll back all operations. Thread-safe.
-        :param transaction_id: ID of transaction to be aborted.
+
+        Args:
+            transaction_id: ID of transaction to be aborted.
         """
         if not self._connection:
             raise RuntimeError("Cannot transact on unstarted connection")
@@ -1258,8 +1269,10 @@ class _PikaThread(threading.Thread):
         return future
 
     def tx_commit(self, transaction_id: int) -> Future[None]:
-        """Commit a transaction.
-        :param transaction_id: ID of transaction to be committed. Thread-safe..
+        """Commit a transaction. Thread-safe.
+
+        Args:
+            transaction_id: ID of transaction to be committed.
         """
         if not self._connection:
             raise RuntimeError("Cannot transact on unstarted connection")
