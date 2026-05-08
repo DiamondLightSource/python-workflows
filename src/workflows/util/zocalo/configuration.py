@@ -6,7 +6,7 @@ Only imported if Zocalo is present in the environment.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import ClassVar, TypedDict
 
 from marshmallow import fields  # type: ignore
 from zocalo.configuration import PluginSchema  # type: ignore
@@ -19,13 +19,17 @@ from workflows.transport.stomp_transport import StompTransport
 class OTEL:
     """A Zocalo configuration plugin to pre-populate OTELTracing config defaults"""
 
+    class _OTELConfig(TypedDict, total=False):
+        endpoint: str
+        timeout: int
+
+    # Store configuration for access by services
+    config: ClassVar[_OTELConfig] = {}
+
     class Schema(PluginSchema):
         host = fields.Str(required=True)
         port = fields.Int(required=True)
         timeout = fields.Int(required=False, load_default=10)
-
-    # Store configuration for access by services
-    config: dict[str, Any] = {}
 
     @staticmethod
     def activate(configuration):
@@ -33,7 +37,7 @@ class OTEL:
         endpoint = f"https://{configuration['host']}:{configuration['port']}/v1/traces"
         OTEL.config["endpoint"] = endpoint
         OTEL.config["timeout"] = configuration.get("timeout", 10)
-        return OTEL.config
+        return dict(OTEL.config)
 
 
 class Stomp:
@@ -56,6 +60,7 @@ class Stomp:
             ("prefix", "--stomp-prfx"),
         ]:
             StompTransport.defaults[target] = configuration[cfgoption]
+        return dict(StompTransport.defaults)
 
 
 class Pika:
@@ -78,6 +83,7 @@ class Pika:
             ("vhost", "--rabbit-vhost"),
         ]:
             PikaTransport.defaults[target] = configuration[cfgoption]
+        return dict(PikaTransport.defaults)
 
 
 class DefaultTransport:
