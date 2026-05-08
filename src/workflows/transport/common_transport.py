@@ -291,7 +291,7 @@ class CommonTransport:
     @middleware.wrap
     def send(
         self, destination: str, message: Any, *, headers: dict | None = None, **kwargs
-    ):
+    ) -> None:
         """Send a message to a queue.
 
         Args:
@@ -304,6 +304,8 @@ class CommonTransport:
                 expiration: Optional expiration time, relative to sending time.
                 transaction: Transaction ID if message should be part of a
                 transaction.
+
+        Raises: On failure.
         """
 
         message = self._mangle_for_sending(message)
