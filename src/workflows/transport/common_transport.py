@@ -289,22 +289,25 @@ class CommonTransport:
         self.__callback_interceptor = interceptor
 
     @middleware.wrap
-    def send(self, destination, message, **kwargs):
+    def send(
+        self, destination: str, message: Any, *, headers: dict | None = None, **kwargs
+    ):
         """Send a message to a queue.
 
         Args:
             destination: Queue name to send to.
-            message: Either a string or a serializable object to be sent.
+            message: The message. Usually string-like or json-serializable but
+                exact specification depends on the concrete transport.
+            headers: Optional dictionary of header entries to set.
             **kwargs: Further parameters for the transport layer. For example:
                 delay: Delay transport of message by this many seconds.
-                headers: Optional dictionary of header entries.
                 expiration: Optional expiration time, relative to sending time.
                 transaction: Transaction ID if message should be part of a
                 transaction.
         """
 
         message = self._mangle_for_sending(message)
-        self._send(destination, message, **kwargs)
+        self._send(destination, message, headers=headers, **kwargs)
 
     @middleware.wrap
     def raw_send(self, destination, message, **kwargs):
