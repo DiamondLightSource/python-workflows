@@ -6,6 +6,7 @@ import json
 import logging
 import pprint
 import uuid
+from collections.abc import Mapping
 from typing import Any
 
 import workflows.util
@@ -33,25 +34,31 @@ class OfflineTransport(CommonTransport):
         self._connected = False
         super().__init__(middleware=middleware)
 
-    def connect(self):
+    def connect(self) -> bool:
         self._connected = True
         return True
 
-    def is_connected(self):
+    def is_connected(self) -> bool:
         return self._connected
 
-    def disconnect(self):
+    def disconnect(self) -> None:
         self._connected = False
 
-    def _output(self, message, details=None):
+    def _output(self, message: str, details: Any = None) -> None:
         _offlog.info(f"Offline Transport: {message}")
         if details:
             _offlog.debug(details)
 
-    def broadcast_status(self, status):
+    def broadcast_status(self, status: Mapping) -> None:
         self._output("Writing status message", pprint.pformat(status))
 
-    def _subscribe(self, sub_id, channel, callback, **kwargs):
+    def _subscribe(
+        self,
+        sub_id: int,
+        channel: str,
+        callback: MessageCallback,
+        **kwargs: Any,
+    ) -> None:
         self._output(
             f"Subscribing to messages on {channel}",
             f"subscription ID {sub_id}, callback function {callback}, further keywords: {kwargs}",
@@ -62,7 +69,7 @@ class OfflineTransport(CommonTransport):
         sub_id: int,
         channel_hint: str | None,
         callback: MessageCallback,
-        **kwargs,
+        **kwargs: Any,
     ) -> str:
         channel = channel_hint or workflows.util.generate_unique_host_id()
         channel = channel + "." + str(uuid.uuid4())
@@ -72,44 +79,62 @@ class OfflineTransport(CommonTransport):
         self._subscribe(sub_id, channel, callback, **kwargs)
         return channel
 
-    def _subscribe_broadcast(self, sub_id, channel, callback, **kwargs):
+    def _subscribe_broadcast(
+        self,
+        sub_id: int,
+        channel: str,
+        callback: MessageCallback,
+        **kwargs: Any,
+    ) -> None:
         self._output(
             f"Subscribing to broadcasts on {channel}",
             f"subscription ID {sub_id}, callback function {callback}, further keywords: {kwargs}",
         )
 
-    def _unsubscribe(self, sub_id: int, **kwargs):
+    def _unsubscribe(self, sub_id: int, **kwargs: Any) -> None:
         self._output(f"Ending subscription #{sub_id}", f"further keywords: {kwargs}")
 
     def _send(
-        self, destination, message, headers=None, delay=None, expiration=None, **kwargs
-    ):
+        self,
+        destination: str,
+        message: Any,
+        headers: dict | None = None,
+        delay: float | None = None,
+        expiration: int | None = None,
+        **kwargs: Any,
+    ) -> None:
         self._output(f"Sending {len(message)} bytes to {destination}", message)
 
     def _broadcast(
-        self, destination, message, headers=None, delay=None, expiration=None, **kwargs
-    ):
+        self,
+        destination: str,
+        message: Any,
+        headers: dict | None = None,
+        delay: float | None = None,
+        expiration: int | None = None,
+        **kwargs: Any,
+    ) -> None:
         self._output(f"Broadcasting {len(message)} bytes to {destination}", message)
 
-    def _transaction_begin(self, transaction_id, **kwargs):
+    def _transaction_begin(self, transaction_id: int, **kwargs: Any) -> None:
         self._output(f"Starting transaction {transaction_id}")
 
-    def _transaction_abort(self, transaction_id, **kwargs):
+    def _transaction_abort(self, transaction_id: int, **kwargs: Any) -> None:
         self._output(f"Rolling back transaction {transaction_id}")
 
-    def _transaction_commit(self, transaction_id, **kwargs):
+    def _transaction_commit(self, transaction_id: int, **kwargs: Any) -> None:
         self._output(f"Committing transaction {transaction_id}")
 
-    def _ack(self, message_id, subscription_id, **kwargs):
+    def _ack(self, message_id: Any, subscription_id: int, **kwargs: Any) -> None:
         self._output(
             f"Acknowledging message {message_id} in subscription {subscription_id}"
         )
 
-    def _nack(self, message_id, subscription_id, **kwargs):
+    def _nack(self, message_id: Any, subscription_id: int, **kwargs: Any) -> None:
         self._output(
             f"Rejecting message {message_id} in subscription {subscription_id}"
         )
 
     @staticmethod
-    def _mangle_for_sending(message):
+    def _mangle_for_sending(message: Any) -> Any:
         return json.dumps(message, default=json_serializer)
