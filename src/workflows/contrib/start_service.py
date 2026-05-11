@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import optparse
 import sys
 from collections.abc import Callable
 from optparse import SUPPRESS_HELP, OptionParser
+from typing import Any
 
 import workflows
 import workflows.frontend
@@ -17,20 +19,22 @@ class ServiceStarter:
     used in a number of scenarios."""
 
     @staticmethod
-    def on_parser_preparation(parser):
+    def on_parser_preparation(parser: OptionParser) -> OptionParser | None:
         """Plugin hook to manipulate the OptionParser object before command line
         parsing. If a value is returned here it will replace the OptionParser
         object."""
 
     @staticmethod
-    def on_parsing(options, args):
+    def on_parsing(
+        options: optparse.Values, args: list[str]
+    ) -> tuple[optparse.Values, list[str]] | None:
         """Plugin hook to manipulate the command line parsing results.
         A tuple of values can be returned, which will replace (options, args).
         """
 
     @staticmethod
     def on_transport_factory_preparation(
-        transport_factory,
+        transport_factory: Callable[[], CommonTransport],
     ) -> Callable[[], CommonTransport] | None:
         """Plugin hook to intercept/manipulate newly created Transport factories
         before first invocation."""
@@ -41,24 +45,26 @@ class ServiceStarter:
         before connecting."""
 
     @staticmethod
-    def before_frontend_construction(kwargs):
+    def before_frontend_construction(kwargs: dict[str, Any]) -> dict[str, Any] | None:
         """Plugin hook to manipulate the Frontend object constructor arguments. If
         a value is returned here it will replace the keyword arguments
         dictionary passed to the constructor."""
 
     @staticmethod
-    def on_frontend_preparation(frontend):
+    def on_frontend_preparation(
+        frontend: workflows.frontend.Frontend,
+    ) -> workflows.frontend.Frontend | None:
         """Plugin hook to manipulate the Frontend object before starting it. If a
         value is returned here it will replace the Frontend object."""
 
     def run(
         self,
-        cmdline_args=None,
-        program_name="start_service",
-        version=None,
+        cmdline_args: list[str] | None = None,
+        program_name: str = "start_service",
+        version: str | None = None,
         add_metrics_option: bool = False,
-        **kwargs,
-    ):
+        **kwargs: Any,
+    ) -> None:
         """Example command line interface to start services.
 
         Args:
@@ -165,10 +171,12 @@ class ServiceStarter:
         if options.service not in known_services:
             # First check whether the provided service name is a case-insensitive match.
             service_lower = options.service.lower()
-            match = {s.lower(): s for s in known_services}.get(service_lower, None)
-            match = (
-                [match]
-                if match
+            exact_match = {s.lower(): s for s in known_services}.get(
+                service_lower, None
+            )
+            match: list[str] = (
+                [exact_match]
+                if exact_match
                 # Next, check whether the provided service name is a partial
                 # case-sensitive match.
                 else [s for s in known_services if s.startswith(options.service)]
