@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import json
 import time
+from typing import Any
 
 import workflows.recipe
+from workflows.recipe.wrapper import RecipeWrapper
 from workflows.services.common_service import CommonService
 
 
@@ -18,7 +20,7 @@ class SamplePipethrough(CommonService):
     # Logger name
     _logger_name = "workflows.service.sample_pipethrough"
 
-    def initializing(self):
+    def initializing(self) -> None:
         """Subscribe to a channel."""
         workflows.recipe.wrap_subscribe(
             self.transport,
@@ -26,7 +28,7 @@ class SamplePipethrough(CommonService):
             self.process,
         )
 
-    def process(self, rw, header, message):
+    def process(self, rw: RecipeWrapper, header: dict, message: Any) -> None:
         """Consume message and send to output pipe."""
         t = (time.time() % 1000) * 1000
 

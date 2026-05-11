@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from importlib.metadata import entry_points
+from typing import Any
 
 
-def lookup(service: str):
+def lookup(service: str) -> Any:
     """Find a service class based on a name.
 
     Args:
@@ -19,7 +21,7 @@ def lookup(service: str):
         return None
 
 
-def get_known_services():
+def get_known_services() -> dict[str, Callable[[], Any]]:
     """Return a dictionary of all known services.
 
     Returns:

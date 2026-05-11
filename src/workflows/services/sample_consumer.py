@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import time
+from collections.abc import Mapping
+from typing import Any
 
 from workflows.services.common_service import CommonService
 
@@ -17,11 +19,11 @@ class SampleConsumer(CommonService):
     # Logger name
     _logger_name = "workflows.service.sample_consumer"
 
-    def initializing(self):
+    def initializing(self) -> None:
         """Subscribe to a channel."""
         self.transport.subscribe("transient.destination", self.consume_message)
 
-    def consume_message(self, header, message):
+    def consume_message(self, header: Mapping[str, Any], message: Any) -> None:
         """Consume a message"""
         t = (time.time() % 1000) * 1000
 

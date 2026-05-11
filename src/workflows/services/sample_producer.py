@@ -18,7 +18,7 @@ class SampleProducer(CommonService):
 
     counter = 0
 
-    def initializing(self):
+    def initializing(self) -> None:
         """Service initialization. This function is run before any commands are
         received from the frontend. This is the place to request channel
         subscriptions with the messaging layer, and register callbacks.
@@ -26,7 +26,7 @@ class SampleProducer(CommonService):
         self.log.info("Starting message producer")
         self._register_idle(3, self.create_message)
 
-    def create_message(self):
+    def create_message(self) -> None:
         """Create and send a unique message for this service."""
         self.counter += 1
         self.log.info("Sending message #%d", self.counter)
