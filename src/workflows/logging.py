@@ -4,9 +4,10 @@ import linecache
 import logging
 import os.path
 import sys
+from typing import Callable
 
 
-def get_exception_source():
+def get_exception_source() -> tuple[str, str, int, str, str | None]:
     """Returns full file path, file name, line number, function name, and line contents
     causing the last exception."""
     _, _, tb = sys.exc_info()
@@ -21,7 +22,7 @@ def get_exception_source():
     filename = os.path.basename(filefullpath)
     name = co.co_name
     linecache.checkcache(filefullpath)
-    line = linecache.getline(filefullpath, lineno, f.f_globals)
+    line: str | None = linecache.getline(filefullpath, lineno, f.f_globals)
     if line:
         line = line.strip()
     else:
@@ -32,12 +33,12 @@ def get_exception_source():
 class CallbackHandler(logging.Handler):
     """This handler sends logrecords to a callback function."""
 
-    def __init__(self, callback):
+    def __init__(self, callback: Callable[[logging.LogRecord], None]):
         """Set up a handler instance, record the callback function."""
         super().__init__()
         self._callback = callback
 
-    def prepare(self, record):
+    def prepare(self, record: logging.LogRecord) -> logging.LogRecord:
         # Function taken from Python 3.6 QueueHandler
         """
         Prepares a record for queuing. The object returned by this method is
@@ -61,7 +62,7 @@ class CallbackHandler(logging.Handler):
         record.exc_info = None
         return record
 
-    def emit(self, record):
+    def emit(self, record: logging.LogRecord) -> None:
         """Send a LogRecord to the callback function, after preparing it
         for serialization."""
         try:
@@ -69,7 +70,7 @@ class CallbackHandler(logging.Handler):
         except Exception:
             self.handleError(record)
 
-    def handleError(self, record):
+    def handleError(self, record: logging.LogRecord) -> None:
         t, v, _ = sys.exc_info()
         if t is None:
             raise RuntimeError("Trying to handle error when no exception active")
