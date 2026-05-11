@@ -54,7 +54,7 @@ def validate_recipe(json_filename: str | os.PathLike[str]) -> None:
         raise e
 
 
-def main():
+def main() -> None:
     """Run the program from entry point"""
     parser = argparse.ArgumentParser()
     parser.add_argument(

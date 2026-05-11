@@ -301,7 +301,7 @@ class RecipeWrapper:
         header: dict[str, Any] | None = None,
         *,
         mangle_for_sending: Callable[[Any], Any] | None = None,
-        **kwargs,
+        **kwargs: Any,
     ) -> None:
         """
         Trigger the start of a recipe.
@@ -375,7 +375,7 @@ class RecipeWrapper:
                 usually "encode to JSON".
             **kwargs: Keywords passed on to the transport.
         """
-        if not self.recipe_step:
+        if not self.recipe_step or self.recipe_pointer is None:
             raise ValueError(
                 "This RecipeWrapper object does not contain "
                 "a recipe with a selected step."
@@ -418,7 +418,9 @@ class RecipeWrapper:
         assert self.recipe_pointer is not None
         self.recipe_step = self.recipe[self.recipe_pointer]
 
-    def _generate_full_recipe_message(self, destination, message, add_path_step):
+    def _generate_full_recipe_message(
+        self, destination: int, message: Any, add_path_step: bool
+    ) -> dict[str, Any]:
         """Factory function to generate independent message objects for
         downstream recipients with different destinations."""
         if add_path_step and self.recipe_pointer:
@@ -436,17 +438,17 @@ class RecipeWrapper:
 
     def _send_to_destinations(
         self,
-        destinations,
-        message,
-        header=None,
+        destinations: int | list[int],
+        message: Any,
+        header: dict[str, Any] | None = None,
         mangle_for_sending: Callable[[Any], Any] | None = None,
-        **kwargs,
-    ):
+        **kwargs: Any,
+    ) -> None:
         """Send messages to a list of numbered destinations. This is an internal
         helper method used by the public 'send' methods.
         """
         if not isinstance(destinations, list):
-            destinations = (destinations,)
+            destinations = [destinations]
         for destination in destinations:
             self._send_to_destination(
                 destination,
@@ -458,13 +460,13 @@ class RecipeWrapper:
 
     def _send_to_destination(
         self,
-        destination,
-        header,
-        payload,
-        transport_kwargs,
-        add_path_step=True,
+        destination: int,
+        header: dict[str, Any] | None,
+        payload: Any,
+        transport_kwargs: dict[str, Any],
+        add_path_step: bool = True,
         mangle_for_sending: Callable[[Any], Any] | None = None,
-    ):
+    ) -> None:
         """Helper function to send a message to a specific recipe destination."""
         if header:
             header = header.copy()
@@ -516,7 +518,9 @@ class RecipeWrapper:
                 **dest_kwargs,
             )
 
-    def _retry_transport(self, function, *args, **kwargs):
+    def _retry_transport(
+        self, function: Callable[..., Any], *args: Any, **kwargs: Any
+    ) -> Any:
         """Attempt to send a message, and in case the connection has been lost,
         attempt to reconnect. Reconnecting only works on the assumption that
         the previous connection did not include any subscriptions, which should

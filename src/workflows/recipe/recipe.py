@@ -132,7 +132,7 @@ class Recipe:
         # Detect cycles
         touched_nodes = {"start", "error"}
 
-        def flatten_links(struct):
+        def flatten_links(struct: Any) -> list[int]:
             """Take an output/error link object, list or dictionary and return flat list of linked nodes."""
             if struct is None:
                 return []
@@ -153,7 +153,7 @@ class Recipe:
                 "Invalid recipe: Invalid link in recipe (%s)" % str(struct)
             )
 
-        def find_cycles(path):
+        def find_cycles(path: list[Any]) -> None:
             """Depth-First-Search helper function to identify cycles."""
             if path[-1] not in self.recipe:
                 raise workflows.Error(
@@ -215,23 +215,23 @@ class Recipe:
         """
 
         class SafeString:
-            def __init__(self, s):
+            def __init__(self, s: str):
                 self.string = s
 
-            def __repr__(self):
+            def __repr__(self) -> str:
                 return "{" + self.string + "}"
 
-            def __str__(self):
+            def __str__(self) -> str:
                 return "{" + self.string + "}"
 
-            def __getitem__(self, item):
+            def __getitem__(self, item: str) -> SafeString:
                 return SafeString(self.string + "[" + item + "]")
 
         class SafeDict(dict):
             """A dictionary that returns undefined keys as {keyname}.
             This can be used to selectively replace variables in datastructures."""
 
-            def __missing__(self, key):
+            def __missing__(self, key: str) -> SafeString:
                 return SafeString(key)
 
         # By default the python formatter class is used to resolve {item} references
@@ -242,7 +242,7 @@ class Recipe:
         # string.
         ds_formatter = string.Formatter()
 
-        def ds_format_field(value, spec):
+        def ds_format_field(value: Any, spec: str) -> str:
             ds_format_field.last = value  # type: ignore
             return ""
 
@@ -250,7 +250,7 @@ class Recipe:
 
         params = SafeDict(parameters)
 
-        def _recursive_apply(item):
+        def _recursive_apply(item: Any) -> Any:
             """Helper function to recursively apply replacements."""
             if isinstance(item, str):
                 if item.startswith("{$REPLACE") and item.endswith("}"):
@@ -323,7 +323,7 @@ class Recipe:
                 new_recipe[translation[key]] = value
 
         # Rewrite all copied entries to point to new keys
-        def translate(x):
+        def translate(x: Any) -> Any:
             if isinstance(x, list):
                 return list(map(translate, x))
             elif isinstance(x, tuple):
