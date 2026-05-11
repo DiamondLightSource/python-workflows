@@ -5,16 +5,19 @@ import dataclasses
 import functools
 import json
 import logging
+import optparse
 import os
 import random
 import sys
 import threading
 import time
 import uuid
+from argparse import ArgumentParser, Namespace
 from collections.abc import Callable, Iterable
 from concurrent.futures import Future
 from enum import Enum, auto
-from typing import TYPE_CHECKING, Any, Mapping
+from optparse import OptionParser
+from typing import Any, Mapping
 
 import pika.channel
 import pika.exceptions
@@ -29,11 +32,6 @@ from workflows.transport.common_transport import (
     MessageCallback,
     json_serializer,
 )
-
-if TYPE_CHECKING:
-    import optparse
-    from argparse import ArgumentParser, Namespace
-    from optparse import OptionParser
 
 logger = logging.getLogger("workflows.transport.pika_transport")
 
