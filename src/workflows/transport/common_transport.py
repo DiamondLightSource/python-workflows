@@ -79,7 +79,15 @@ class CommonTransport:
         """
 
     @middleware.wrap
-    def subscribe(self, channel: str, callback: MessageCallback, **kwargs: Any) -> int:
+    def subscribe(
+        self,
+        channel: str,
+        callback: MessageCallback,
+        *,
+        disable_mangling: bool = False,
+        acknowledgement: bool = False,
+        **kwargs: Any,
+    ) -> int:
         """Listen to a queue, notify via callback function.
 
         Args:
@@ -87,11 +95,11 @@ class CommonTransport:
             callback: Function to be called when messages are received.
                 The callback will pass two arguments, the header as a
                 dictionary structure, and the message.
-            **kwargs: Further parameters for the transport layer. For example:
-                disable_mangling: Receive messages as unprocessed strings.
-                exclusive: Attempt to become exclusive subscriber to the queue.
-                acknowledgement: If true receipt of each message needs to be
+            disable_mangling: Receive messages as unprocessed strings.
+            acknowledgement: If true receipt of each message needs to be
                 acknowledged.
+            **kwargs: Further parameters for the transport layer. For example:
+                exclusive: Attempt to become exclusive subscriber to the queue.
 
         Returns:
             A unique subscription ID.
@@ -102,18 +110,22 @@ class CommonTransport:
         def mangled_callback(header: Mapping[str, Any], message: Any, /) -> Any:
             return callback(header, self._mangle_for_receiving(message))
 
-        if "disable_mangling" in kwargs:
-            if kwargs["disable_mangling"]:
-                mangled_callback = callback  # noqa:F811
-            del kwargs["disable_mangling"]
+        if disable_mangling:
+            mangled_callback = callback  # noqa:F811
         self.__subscriptions[self.__subscription_id] = {
             "channel": channel,
             "callback": mangled_callback,
-            "ack": kwargs.get("acknowledgement"),
+            "ack": acknowledgement,
             "unsubscribed": False,
         }
         self.log.debug("Subscribing to %s with ID %d", channel, self.__subscription_id)
-        self._subscribe(self.__subscription_id, channel, mangled_callback, **kwargs)
+        self._subscribe(
+            self.__subscription_id,
+            channel,
+            mangled_callback,
+            acknowledgement=acknowledgement,
+            **kwargs,
+        )
         return self.__subscription_id
 
     @middleware.wrap
@@ -121,6 +133,9 @@ class CommonTransport:
         self,
         channel_hint: str | None,
         callback: MessageCallback,
+        *,
+        disable_mangling: bool = False,
+        acknowledgement: bool = False,
         **kwargs: Any,
     ) -> TemporarySubscription:
         """Listen to a new queue specifically created for this connection.
@@ -134,10 +149,10 @@ class CommonTransport:
             callback: Function to be called when messages are received.
                 The callback will pass two arguments, the header as a
                 dictionary structure, and the message.
-            **kwargs: Further parameters for the transport layer. For example:
-                disable_mangling: Receive messages as unprocessed strings.
-                acknowledgement: If true receipt of each message needs to be
+            disable_mangling: Receive messages as unprocessed strings.
+            acknowledgement: If true receipt of each message needs to be
                 acknowledged.
+            **kwargs: Further parameters for the transport layer.
 
         Returns:
             A named tuple containing a unique subscription ID and the actual
@@ -151,14 +166,12 @@ class CommonTransport:
 
         mangled_callback: MessageCallback = _
 
-        if "disable_mangling" in kwargs:
-            if kwargs["disable_mangling"]:
-                mangled_callback = callback  # noqa:F811
-            del kwargs["disable_mangling"]
+        if disable_mangling:
+            mangled_callback = callback  # noqa:F811
         self.__subscriptions[self.__subscription_id] = {
             # "channel": channel,
             "callback": mangled_callback,
-            "ack": kwargs.get("acknowledgement"),
+            "ack": acknowledgement,
             "unsubscribed": False,
         }
         self.log.debug(
@@ -167,7 +180,11 @@ class CommonTransport:
             self.__subscription_id,
         )
         queue_name = self._subscribe_temporary(
-            self.__subscription_id, channel_hint, mangled_callback, **kwargs
+            self.__subscription_id,
+            channel_hint,
+            mangled_callback,
+            acknowledgement=acknowledgement,
+            **kwargs,
         )
 
         return TemporarySubscription(
@@ -225,7 +242,12 @@ class CommonTransport:
 
     @middleware.wrap
     def subscribe_broadcast(
-        self, channel: str, callback: MessageCallback, **kwargs: Any
+        self,
+        channel: str,
+        callback: MessageCallback,
+        *,
+        disable_mangling: bool = False,
+        **kwargs: Any,
     ) -> int:
         """Listen to a broadcast topic, notify via callback function.
 
@@ -234,8 +256,8 @@ class CommonTransport:
             callback: Function to be called when messages are received.
                 The callback will pass two arguments, the header as a
                 dictionary structure, and the message.
+            disable_mangling: Receive messages as unprocessed strings.
             **kwargs: Further parameters for the transport layer. For example:
-                disable_mangling: Receive messages as unprocessed strings.
                 retroactive: Ask broker to send old messages if possible.
 
         Returns:
@@ -247,10 +269,8 @@ class CommonTransport:
         def mangled_callback(header: Mapping[str, Any], message: Any, /) -> Any:
             return callback(header, self._mangle_for_receiving(message))
 
-        if "disable_mangling" in kwargs:
-            if kwargs["disable_mangling"]:
-                mangled_callback = callback  # noqa:F811
-            del kwargs["disable_mangling"]
+        if disable_mangling:
+            mangled_callback = callback  # noqa:F811
         self.__subscriptions[self.__subscription_id] = {
             "channel": channel,
             "callback": mangled_callback,
