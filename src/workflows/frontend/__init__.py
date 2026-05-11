@@ -4,7 +4,8 @@ import logging
 import multiprocessing
 import threading
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
+from typing import Any
 
 import workflows
 import workflows.frontend.utilization
@@ -13,8 +14,6 @@ import workflows.transport
 import workflows.util
 from workflows.services.common_service import CommonService
 from workflows.transport.common_transport import CommonTransport
-
-basestring = (str, bytes)
 
 # Pin the fork start method: service instances carry pipes and transport
 # state that aren't pickleable, so spawn/forkserver (the 3.14+ default on
@@ -35,11 +34,11 @@ class Frontend:
     def __init__(
         self,
         transport: Callable[[], CommonTransport] | str | None = None,
-        service=None,
-        transport_command_channel=None,
-        restart_service=False,
-        verbose_service=False,
-        environment=None,
+        service: type[CommonService] | str | None = None,
+        transport_command_channel: str | None = None,
+        restart_service: bool = False,
+        verbose_service: bool = False,
+        environment: dict[str, Any] | None = None,
     ):
         """Create a frontend instance. Connect to the transport layer, start any
         requested service, begin broadcasting status information and listen
@@ -65,14 +64,14 @@ class Frontend:
         """
         self.__lock = threading.RLock()
         self.__hostid = workflows.util.generate_unique_host_id()
-        self._service = None  # pointer to the service instance
-        self._service_class_name = None
-        self._service_factory = None  # pointer to the service class
-        self._service_name = None
-        self._service_starttime = None
-        self._service_rapidstarts = None
-        self._pipe_commands = None  # frontend -> service
-        self._pipe_service = None  # frontend <- service
+        self._service: multiprocessing.Process | None = None
+        self._service_class_name: str | None = None
+        self._service_factory: type[CommonService] | str | None = None
+        self._service_name: str | None = None
+        self._service_starttime: float | None = None
+        self._service_rapidstarts: int | None = None
+        self._pipe_commands: Any = None  # frontend -> service
+        self._pipe_service: Any = None  # frontend <- service
         self._service_status = CommonService.SERVICE_STATUS_NONE
         self._service_status_announced = CommonService.SERVICE_STATUS_NONE
 
@@ -81,8 +80,8 @@ class Frontend:
 
         # Status broadcast related variables
         self._status_interval = 6
-        self._status_last_broadcast = 0
-        self._status_idle_since = None
+        self._status_last_broadcast: float = 0
+        self._status_idle_since: float | None = None
         self._utilization = workflows.frontend.utilization.UtilizationStatistics(
             summation_period=self._status_interval
         )
@@ -103,7 +102,7 @@ class Frontend:
                 self.status = {"workflows_" + k: v for k, v in self.status_fn().items()}
                 return self.status.__iter__()
 
-            def __getitem__(self, key):
+            def __getitem__(self, key: str) -> Any:
                 """Return a value from the status dictionary."""
                 return self.status.__getitem__(key)
 
@@ -113,7 +112,7 @@ class Frontend:
         )
 
         # Connect to the network transport layer
-        if transport is None or isinstance(transport, basestring):
+        if transport is None or isinstance(transport, str):
             self._transport_factory = workflows.transport.lookup(transport)
         else:
             self._transport_factory = transport
@@ -143,7 +142,7 @@ class Frontend:
         if environment and "liveness" in environment:
             self._start_liveness_endpoint(environment["liveness"]["port"])
 
-    def update_status(self, status_code=None):
+    def update_status(self, status_code: int | None = None) -> None:
         """Update the service status kept inside the frontend (_service_status).
         The status is broadcast over the network immediately. If the status
         changes to IDLE then this message is delayed. The IDLE status is only
@@ -184,7 +183,7 @@ class Frontend:
             self._transport.broadcast_status(self.get_status())
             self._status_last_broadcast = time.time()
 
-    def run(self):
+    def run(self) -> None:
         """The main loop of the frontend.
         This is where the frontend process will spend most of its time."""
         self.log.debug("Entered main loop")
@@ -209,7 +208,7 @@ class Frontend:
             self._transport.disconnect()
             self.log.debug("Terminating.")
 
-    def _iterate_main_loop(self):
+    def _iterate_main_loop(self) -> None:
         """Collection of steps that are run over and over again in the main loop
         of the frontend. Here incoming messages from the service are processed
         and forwarded to their corresponding callback methods."""
@@ -231,7 +230,7 @@ class Frontend:
                     self.log.warning("Invalid message received %s", str(message))
             except EOFError:
                 # Service has gone away
-                error_message = False
+                error_message: str | bool = False
                 if self._service_status == CommonService.SERVICE_STATUS_END:
                     self.log.info("Service terminated")
                 elif self._service_status == CommonService.SERVICE_STATUS_ERROR:
@@ -271,7 +270,7 @@ class Frontend:
                 self.update_status(status_code=CommonService.SERVICE_STATUS_NEW)
                 self.switch_service()
 
-    def send_command(self, command):
+    def send_command(self, command: Any) -> None:
         """Send command to service via the command queue."""
         if self._pipe_commands:
             self._pipe_commands.send(command)
@@ -287,7 +286,9 @@ class Frontend:
                     "No command queue pipe found for command\n%s", str(command)
                 )
 
-    def process_transport_command(self, header, message):
+    def process_transport_command(
+        self, header: Mapping[str, Any], message: Any
+    ) -> None:
         """Parse a command coming in through the transport command subscription"""
         if not isinstance(message, dict):
             return
@@ -313,7 +314,7 @@ class Frontend:
         else:
             self.log.warning("Received invalid transport command message")
 
-    def parse_band_log(self, message):
+    def parse_band_log(self, message: dict[str, Any]) -> None:
         """Process incoming logging messages from the service."""
         try:
             record = message["payload"]
@@ -336,14 +337,14 @@ class Frontend:
             setattr(record, "workflows_" + k, v)
         logging.getLogger(record_name).handle(record)
 
-    def parse_band_request_termination(self, message):
+    def parse_band_request_termination(self, message: dict[str, Any]) -> None:
         """Service declares it should be terminated."""
         self.log.debug("Service requests termination")
         self._terminate_service()
         if not self.restart_service:
             self.shutdown = True
 
-    def parse_band_set_name(self, message):
+    def parse_band_set_name(self, message: dict[str, Any]) -> None:
         """Process incoming message indicating service name change."""
         if message.get("name"):
             self._service_name = message["name"]
@@ -352,21 +353,21 @@ class Frontend:
                 "Received broken record on set_name band\nMessage: %s", str(message)
             )
 
-    def parse_band_status_update(self, message):
+    def parse_band_status_update(self, message: dict[str, Any]) -> None:
         """Process incoming status updates from the service."""
         self.log.debug("Status update: " + str(message))
         self.update_status(status_code=message["statuscode"])
 
-    def parse_band_liveness_check(self, message):
+    def parse_band_liveness_check(self, message: dict[str, Any]) -> None:
         """Respond by sending message to backend to let it know we are alive."""
         self.log.debug("Service liveness check: alive!")
         self.__alive = True
 
-    def get_host_id(self):
+    def get_host_id(self) -> str:
         """Get a cached copy of the host id."""
         return self.__hostid
 
-    def get_status(self):
+    def get_status(self) -> dict[str, Any]:
         """Returns a dictionary containing all relevant status information to be
         broadcast across the network."""
         return {
@@ -381,7 +382,7 @@ class Frontend:
             "workflows": workflows.version(),
         }
 
-    def exponential_backoff(self):
+    def exponential_backoff(self) -> None:
         """A function that keeps waiting longer and longer the more rapidly it is called.
         It can be used to increasingly slow down service starts when they keep failing.
         """
@@ -402,7 +403,9 @@ class Frontend:
         self.log.debug("Slowing down service starts (%.1f seconds)", minimum_wait)
         time.sleep(minimum_wait)
 
-    def switch_service(self, new_service=None):
+    def switch_service(
+        self, new_service: type[CommonService] | str | None = None
+    ) -> bool:
         """Start a new service in a subprocess.
 
         Args:
@@ -420,7 +423,7 @@ class Frontend:
                 self._terminate_service()
 
             # Find service class if necessary
-            if isinstance(self._service_factory, basestring):
+            if isinstance(self._service_factory, str):
                 self._service_factory = workflows.services.lookup(self._service_factory)
             if not self._service_factory:
                 return False
@@ -459,7 +462,7 @@ class Frontend:
         self.log.info("Started service: %s", self._service_name)
         return True
 
-    def _terminate_service(self):
+    def _terminate_service(self) -> None:
         """Force termination of running service.
         Disconnect queues, end queue feeder threads.
         Wait for service process to clear, drop all references."""
@@ -480,10 +483,13 @@ class Frontend:
                 self._service.join()  # must wait for process to be actually destroyed
             self._service = None
 
-    def _start_liveness_endpoint(self, port: int):
+    def _start_liveness_endpoint(self, port: int) -> None:
         from wsgiref.simple_server import make_server
+        from wsgiref.types import StartResponse, WSGIEnvironment
 
-        def alive(environ, start_response):
+        def alive(
+            environ: WSGIEnvironment, start_response: StartResponse
+        ) -> list[bytes]:
             self.__alive = False
             self.send_command({"band": "command", "payload": "liveness_check"})
 

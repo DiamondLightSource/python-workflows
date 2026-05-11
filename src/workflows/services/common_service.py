@@ -4,9 +4,11 @@ import contextlib
 import enum
 import itertools
 import logging
+import multiprocessing.connection
 import queue
 import threading
 import time
+from collections.abc import Callable, Generator, Mapping
 from typing import Any
 
 from opentelemetry import trace
@@ -17,7 +19,7 @@ from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
 import workflows
 import workflows.logging
-from workflows.transport.common_transport import CommonTransport
+from workflows.transport.common_transport import CommonTransport, MessageCallback
 from workflows.transport.middleware.otel_tracing import OTELTracingMiddleware
 
 
@@ -57,7 +59,7 @@ class Status(enum.Enum):
     NONE = (-1, "no service loaded")  # Node has no service instance loaded
     TEARDOWN = (-2, "shutdown")  # Node is shutting down
 
-    def __init__(self, intval, description):
+    def __init__(self, intval: int, description: str):
         """
         Each status is defined as a tuple of a unique integer value and a
         descriptive string. These are available via enum properties
@@ -98,18 +100,19 @@ class CommonService:
 
     # Logger name ---------------------------------------------------------------
 
-    _logger_name = "workflows.service"  # The logger can be accessed via self.log
+    #: The logger can be accessed via self.log
+    _logger_name = "workflows.service"
 
     # Overrideable functions ----------------------------------------------------
 
-    def initializing(self):
+    def initializing(self) -> None:
         """Service initialization. This function is run before any commands are
         received from the frontend. This is the place to request channel
         subscriptions with the messaging layer, and register callbacks.
         This function can be overridden by specific service implementations."""
         pass
 
-    def in_shutdown(self):
+    def in_shutdown(self) -> None:
         """Service shutdown. This function is run before the service is terminated.
         No more commands are received, but communications can still be sent.
         This function can be overridden by specific service implementations."""
@@ -136,39 +139,47 @@ class CommonService:
 
     # Any keyword arguments set on service invocation
 
-    start_kwargs: dict[Any, Any] = {}
+    start_kwargs: dict[str, Any]
+    _transport_interceptor_counter: itertools.count[int]
 
     # Not so overrideable functions ---------------------------------------------
 
-    def __init__(self, *args, **kwargs):
-        """Service constructor. Parameters include optional references to two
-        pipes: frontend= for messages from the service to the frontend,
-        and commands= for messages from the frontend to the service.
-        A dictionary can optionally be passed with environment=, which is then
-        available to the service during runtime."""
-        self.__pipe_frontend = None
-        self.__pipe_commands = None
-        self._environment = kwargs.get("environment", {})
-        self._transport = None
-        self.__callback_register = {}
-        self.__log_extensions = []
-        self.__service_status = None
-        self.__shutdown = False
-        self.__update_service_status(self.SERVICE_STATUS_NEW)
-        self.__queue = queue.PriorityQueue()
-        self._idle_callback = None
-        self._idle_time = None
+    def __init__(self, *, environment: dict[str, Any] | None = None):
+        """
+        Service constructor.
+
+        Args:
+            environment:
+                Optional dictionary made available to the service at runtime
+                via ``self._environment``. Typically used by the frontend to
+                pass configuration (e.g. ``config``, ``metrics``, ``liveness``)
+                into the spawned service process.
+        """
+        self.__pipe_frontend: multiprocessing.connection.Connection | None = None
+        self.__pipe_commands: multiprocessing.connection.Connection | None = None
+        self._environment = environment if environment is not None else {}
+        self._transport: CommonTransport | None = None
+        self.__callback_register: dict[str, Callable[[Any], None]] = {}
+        self.__log_extensions: list[tuple[str, Any]] = []
+        self.__service_status: int = self.SERVICE_STATUS_NEW
+        self.__shutdown: bool = False
+        self.__queue: queue.PriorityQueue[tuple[Priority, int, Any]] = (
+            queue.PriorityQueue()
+        )
+        self._idle_callback: Callable[[], None] | None = None
+        self._idle_time: float | None = None
+        self.start_kwargs = {}
 
         # Logger will be overwritten in start() function
         self.log = logging.getLogger(self._logger_name)
 
-    def __send_to_frontend(self, data_structure):
+    def __send_to_frontend(self, data_structure: Any) -> None:
         """Put a message in the pipe for the frontend."""
         if self.__pipe_frontend:
             self.__pipe_frontend.send(data_structure)
 
     @property
-    def config(self):
+    def config(self) -> Any:
         return self._environment.get("config")
 
     @property
@@ -184,9 +195,9 @@ class CommonService:
             raise AttributeError("Transport already defined")
         self._transport = value
 
-    def start_transport(self):
-        """If a transport object has been defined then connect it now."""
-        if self.transport:
+    def start_transport(self) -> None:
+        """If a transport object has been defined, then connect it."""
+        if self._transport:
             if self.transport.connect():
                 self.log.debug("Service successfully connected to transport layer")
             else:
@@ -224,7 +235,7 @@ class CommonService:
                 otel_middleware = OTELTracingMiddleware(
                     tracer, service_name=self._service_name
                 )
-                self._transport.add_middleware(otel_middleware)
+                self.transport.add_middleware(otel_middleware)
 
             metrics = self._environment.get("metrics")
             if metrics:
@@ -237,24 +248,24 @@ class CommonService:
                 self.log.debug("Instrumenting transport")
                 source = f"{self.__module__}:{self.__class__.__name__}"
                 instrument = PrometheusMiddleware(source=source)
-                self._transport.add_middleware(instrument)
+                self.transport.add_middleware(instrument)
                 port = metrics["port"]
                 self.log.debug(f"Starting metrics endpoint on port {port}")
                 prometheus_client.start_http_server(port=port)
         else:
             self.log.debug("No transport layer defined for service. Skipping.")
 
-    def stop_transport(self):
+    def stop_transport(self) -> None:
         """If a transport object has been defined then tear it down."""
-        if self.transport:
+        if self._transport:
             self.log.debug("Stopping transport object")
             self.transport.disconnect()
 
-    def _transport_interceptor(self, callback):
+    def _transport_interceptor(self, callback: MessageCallback) -> MessageCallback:
         """Takes a callback function and returns a function that takes headers and
         messages and places them on the main service queue."""
 
-        def add_item_to_queue(header, message):
+        def add_item_to_queue(header: Mapping[str, Any], message: Any) -> None:
             queue_item = (
                 Priority.TRANSPORT,
                 next(
@@ -268,22 +279,52 @@ class CommonService:
 
         return add_item_to_queue
 
-    def connect(self, frontend=None, commands=None):
-        """Inject pipes connecting the service to the frontend. Two arguments are
-        supported: frontend= for messages from the service to the frontend,
-        and commands= for messages from the frontend to the service.
-        The injection should happen before the service is started, otherwise the
-        underlying file descriptor references may not be handled correctly."""
-        if frontend:
+    def connect(
+        self,
+        frontend: multiprocessing.connection.Connection | None = None,
+        commands: multiprocessing.connection.Connection | None = None,
+    ) -> None:
+        """Inject the pipes connecting this service to the frontend.
+
+        Injection should happen before :meth:`start` is called, otherwise
+        the underlying file descriptor references may not be handled
+        correctly across the process boundary.
+
+        Args:
+            frontend: Write end of the pipe used to send messages from the
+                service to the frontend (status updates, log records, etc.).
+                Setting this also triggers an immediate status broadcast.
+            commands: Read end of the pipe used to receive command messages
+                from the frontend. If left as ``None`` the service has no
+                way to receive commands and will shut itself down shortly
+                after :meth:`start`.
+        """
+        if frontend is not None:
             self.__pipe_frontend = frontend
             self.__send_service_status_to_frontend()
-        if commands:
+        if commands is not None:
             self.__pipe_commands = commands
 
     @contextlib.contextmanager
-    def extend_log(self, field, value):
-        """A context wherein a specified extra field in log messages is populated
-        with a fixed value. This affects all log messages within the context."""
+    def extend_log(self, field: str, value: Any) -> Generator[None, None, None]:
+        """Annotate log records emitted within the context with an extra field.
+
+        The ``(field, value)`` pair is attached to every log record produced
+        while the context is active, and removed on exit. If an exception
+        propagates out of the block, the field is also stashed on the
+        exception as ``workflows_log_<field>`` so downstream handlers
+        (notably :meth:`process_uncaught_exception`) can surface it.
+
+        Args:
+            field: Name of the extra field to attach to log records. Must be
+                a valid Python identifier suffix, as it is also used to
+                build the attribute name on any escaping exception.
+            value: Value to associate with ``field``. Anything that the
+                log handler can serialize is acceptable.
+
+        Yields:
+            Control to the wrapped block. No value is yielded.
+        """
         self.__log_extensions.append((field, value))
         try:
             yield
@@ -293,7 +334,7 @@ class CommonService:
         finally:
             self.__log_extensions.remove((field, value))
 
-    def __command_queue_listener(self):
+    def __command_queue_listener(self) -> None:
         """Function to continuously retrieve data from the frontend. Commands are
         sent to the central priority queue. If the pipe from the frontend is
         closed the service shutdown is initiated. Check every second if service
@@ -301,6 +342,9 @@ class CommonService:
         This function is run by a separate daemon thread, which is started by
         the __start_command_queue_listener function.
         """
+        assert self.__pipe_commands is not None, (
+            "Listener started without command queue connection"
+        )
         self.log.debug("Queue listener thread started")
         counter = itertools.count()  # insertion sequence to keep messages in order
         while not self.__shutdown:
@@ -329,14 +373,14 @@ class CommonService:
                 time.sleep(0.05)
         self.log.debug("Queue listener thread terminating")
 
-    def __start_command_queue_listener(self):
+    def __start_command_queue_listener(self) -> None:
         """Start the function __command_queue_listener in a separate thread. This
         function continuously listens to the pipe connected to the frontend.
         """
         thread_function = self.__command_queue_listener
 
         class QueueListenerThread(threading.Thread):
-            def run(qltself):
+            def run(self) -> None:
                 thread_function()
 
         assert not hasattr(self, "__queue_listener_thread")
@@ -346,52 +390,52 @@ class CommonService:
         self.__queue_listener_thread.name = "Command Queue Listener"
         self.__queue_listener_thread.start()
 
-    def _log_send(self, logrecord):
+    def _log_send(self, logrecord: logging.LogRecord) -> None:
         """Forward log records to the frontend."""
         for field, value in self.__log_extensions:
             setattr(logrecord, field, value)
         self.__send_to_frontend({"band": "log", "payload": logrecord})
 
-    def _register(self, message_band, callback):
+    def _register(self, message_band: str, callback: Callable[[Any], None]) -> None:
         """Register a callback function for a specific message band."""
         self.__callback_register[message_band] = callback
 
-    def _register_idle(self, idle_time, callback):
+    def _register_idle(self, idle_time: float, callback: Callable[[], None]) -> None:
         """Register a callback function that is run when idling for a given
         time span (in seconds)."""
         self._idle_callback = callback
         self._idle_time = idle_time
 
-    def __update_service_status(self, statuscode):
+    def __update_service_status(self, statuscode: int) -> None:
         """Set the internal status of the service object, and notify frontend."""
         if self.__service_status != statuscode:
             self.__service_status = statuscode
             self.__send_service_status_to_frontend()
 
-    def __send_service_status_to_frontend(self):
+    def __send_service_status_to_frontend(self) -> None:
         """Actually send the internal status of the service object to the frontend."""
         self.__send_to_frontend(
             {"band": "status_update", "statuscode": self.__service_status}
         )
 
-    def get_name(self):
+    def get_name(self) -> str:
         """Get the name for this service."""
         return self._service_name
 
-    def _set_name(self, name):
+    def _set_name(self, name: str) -> None:
         """Set a new name for this service, and notify the frontend accordingly."""
         self._service_name = name
         self.__send_to_frontend({"band": "set_name", "name": self._service_name})
 
-    def _request_termination(self):
+    def _request_termination(self) -> None:
         """Terminate the service from the frontend side"""
         self.__send_to_frontend({"band": "request_termination"})
 
-    def _shutdown(self):
+    def _shutdown(self) -> None:
         """Terminate the service from the service side."""
         self.__shutdown = True
 
-    def initialize_logging(self):
+    def initialize_logging(self) -> None:
         """Reset the logging for the service process. All logged messages are
         forwarded to the frontend. If any filtering is desired, then this must
         take place on the service side."""
@@ -423,14 +467,28 @@ class CommonService:
         console.setLevel(logging.CRITICAL)
         root_logger.addHandler(console)
 
-    def start(self, **kwargs):
-        """Start listening to command queue, process commands in main loop,
-        set status, etc...
-        This function is most likely called by the frontend in a separate
-        process."""
+    def start(self, *, verbose_log: bool = False, **kwargs: Any) -> None:
+        """Run the service main loop until shutdown.
 
+        This is the entry point invoked by the frontend in the spawned service
+        process. It sets up logging and transport, calls :meth:`initializing`,
+        then enters the main loop, dispatching command-band and transport-band
+        messages off the internal priority queue and emitting status updates as
+        the service state changes. On shutdown - ``clean``, or via an unhandled
+        exception - :meth:`in_shutdown`, is invoked and the transport is torn
+        down.
+
+        Args:
+            verbose_log:
+                If set, initialises the service logger level to ``DEBUG``.
+            **kwargs:
+                Other arbitrary keyword arguments, forwarded by the frontend.
+                Stored on :attr:`start_kwargs` for use by subclasses.
+        """
         # Keep a copy of keyword arguments for use in subclasses
         self.start_kwargs.update(kwargs)
+        if verbose_log:
+            self.start_kwargs["verbose_log"] = verbose_log
         try:
             self.initialize_logging()
 
@@ -453,14 +511,14 @@ class CommonService:
 
                 try:
                     task = self.__queue.get(True, self._idle_time or 2)
-                    run_idle_task = False
                 except queue.Empty:
-                    run_idle_task = True
+                    task = None
 
-                if self.transport and not self.transport.is_connected():
+                if self._transport and not self.transport.is_connected():
                     raise workflows.Disconnected("Connection lost")
 
-                if run_idle_task:
+                if task is None:
+                    # Run the idle task
                     if self._idle_time:
                         # run this outside the 'except' to avoid exception chaining
                         self.__update_service_status(self.SERVICE_STATUS_TIMER)
@@ -509,7 +567,7 @@ class CommonService:
             self.process_uncaught_exception(e)
             self.__update_service_status(self.SERVICE_STATUS_ERROR)
 
-    def process_uncaught_exception(self, e):
+    def process_uncaught_exception(self, e: BaseException) -> None:
         """This is called to handle otherwise uncaught exceptions from the service.
         The service will terminate either way, but here we can do things such as
         gathering useful environment information and logging for posterity."""
@@ -536,7 +594,7 @@ class CommonService:
             "Unhandled service exception: %s", e, exc_info=True, extra=added_information
         )
 
-    def __process_command(self, command):
+    def __process_command(self, command: str) -> None:
         """Process an incoming command message from the frontend."""
         if command == Commands.SHUTDOWN:
             self.__shutdown = True

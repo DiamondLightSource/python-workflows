@@ -10,6 +10,7 @@ repos:
   - id: check-merge-conflict
   - id: check-ast
     fail_fast: True
+    language_version: python3.12
   - id: check-json
   - id: check-added-large-files
     args: ['--maxkb=200']
@@ -35,4 +36,5 @@ repos:
   hooks:
   - id: mypy
     files: 'src/.*\.py$'
-    additional_dependencies: ['types-setuptools==57.0.2']
+    additional_dependencies: ['types-setuptools>=57.0.2']
+    language_version: python3.12

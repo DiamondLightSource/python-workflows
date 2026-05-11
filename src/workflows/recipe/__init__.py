@@ -3,14 +3,15 @@ from __future__ import annotations
 import functools
 import logging
 from collections.abc import Callable
-from contextlib import ExitStack
-from typing import Any
+from contextlib import AbstractContextManager, ExitStack
+from typing import Any, Literal, overload
 
 from opentelemetry import trace
 
 from workflows.recipe.recipe import Recipe
 from workflows.recipe.validate import validate_recipe
 from workflows.recipe.wrapper import RecipeWrapper
+from workflows.transport.common_transport import CommonTransport
 
 __all__ = [
     "Recipe",
@@ -24,14 +25,16 @@ logger = logging.getLogger("workflows.recipe")
 
 
 def _wrap_subscription(
-    transport_layer,
-    subscription_call,
-    channel,
-    callback,
-    *args,
-    mangle_for_receiving: Callable[[Any], Any] | None = None,
-    **kwargs,
-):
+    transport_layer: CommonTransport,
+    subscription_call: Callable[..., int],
+    channel: str,
+    callback: Callable[..., Any],
+    *args: Any,
+    mangle_for_receiving: Callable[[dict[str, Any]], dict[str, Any]] | None = None,
+    allow_non_recipe_messages: bool = False,
+    log_extender: Callable[[str, Any], AbstractContextManager[Any]] | None = None,
+    **kwargs: Any,
+) -> int:
     """Internal method to create an intercepting function for incoming messages
     to interpret recipes. This function is then used to subscribe to a channel
     on the transport layer.
@@ -57,11 +60,8 @@ def _wrap_subscription(
         Return value of call to subscription_call.
     """
 
-    allow_non_recipe_messages = kwargs.pop("allow_non_recipe_messages", False)
-    log_extender = kwargs.pop("log_extender", None)
-
     @functools.wraps(callback)
-    def unwrap_recipe(header, message):
+    def unwrap_recipe(header: dict[str, Any], message: dict[str, Any]) -> Any:
         """Unpack incoming messages when they are in a recipe format.
 
         Other messages are passed through unmodified.
@@ -113,20 +113,49 @@ def _wrap_subscription(
             "Unable to process incoming message."
         )
         transport_layer.nack(header)
+        return None
 
     if mangle_for_receiving:
         kwargs = {**kwargs, "disable_mangling": True}
     return subscription_call(channel, unwrap_recipe, *args, **kwargs)
 
 
+@overload
 def wrap_subscribe(
-    transport_layer,
-    channel,
-    callback,
-    *args,
+    transport_layer: CommonTransport,
+    channel: str,
+    callback: Callable[[RecipeWrapper, dict, dict], None],
+    *args: Any,
+    allow_non_recipe_messages: Literal[False] = False,
     mangle_for_receiving: Callable[[Any], Any] | None = None,
-    **kwargs,
-):
+    log_extender: Callable[[str, Any], AbstractContextManager[Any]] | None = None,
+    **kwargs: Any,
+) -> int: ...
+
+
+@overload
+def wrap_subscribe(
+    transport_layer: CommonTransport,
+    channel: str,
+    callback: Callable[[RecipeWrapper | None, dict, dict | bytes], None],
+    *args: Any,
+    allow_non_recipe_messages: Literal[True],
+    mangle_for_receiving: Callable[[Any], Any] | None = None,
+    log_extender: Callable[[str, Any], AbstractContextManager[Any]] | None = None,
+    **kwargs: Any,
+) -> int: ...
+
+
+def wrap_subscribe(
+    transport_layer: CommonTransport,
+    channel: str,
+    callback: Callable[..., Any],
+    *args: Any,
+    allow_non_recipe_messages: bool = False,
+    mangle_for_receiving: Callable[[Any], Any] | None = None,
+    log_extender: Callable[[str, Any], AbstractContextManager[Any]] | None = None,
+    **kwargs: Any,
+) -> int:
     """Listen to a queue on the transport layer, similar to the subscribe call in
     transport/common_transport.py. Intercept all incoming messages and parse
     for recipe information.
@@ -151,18 +180,20 @@ def wrap_subscribe(
         callback,
         *args,
         mangle_for_receiving=mangle_for_receiving,
+        allow_non_recipe_messages=allow_non_recipe_messages,
+        log_extender=log_extender,
         **kwargs,
     )
 
 
 def wrap_subscribe_broadcast(
-    transport_layer,
-    channel,
-    callback,
-    *args,
+    transport_layer: CommonTransport,
+    channel: str,
+    callback: Callable[..., Any],
+    *args: Any,
     mangle_for_receiving: Callable[[Any], Any] | None = None,
-    **kwargs,
-):
+    **kwargs: Any,
+) -> int:
     """Listen to a topic on the transport layer, similar to the
     subscribe_broadcast call in transport/common_transport.py. Intercept all
     incoming messages and parse for recipe information.

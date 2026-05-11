@@ -1,9 +1,15 @@
+"""
+Zocalo configuration for workflows objects
+
+Only imported if Zocalo is present in the environment.
+"""
+
 from __future__ import annotations
 
-from typing import ClassVar, TypedDict
+from typing import Any, ClassVar, TypedDict
 
-from marshmallow import fields
-from zocalo.configuration import PluginSchema
+from marshmallow import fields  # type: ignore
+from zocalo.configuration import PluginSchema  # type: ignore
 
 import workflows.transport
 from workflows.transport.pika_transport import PikaTransport
@@ -26,7 +32,7 @@ class OTEL:
         timeout = fields.Int(required=False, load_default=10)
 
     @staticmethod
-    def activate(configuration):
+    def activate(configuration: dict[str, Any]) -> Any:
         # Build the full endpoint URL
         endpoint = f"https://{configuration['host']}:{configuration['port']}/v1/traces"
         OTEL.config["endpoint"] = endpoint
@@ -45,7 +51,7 @@ class Stomp:
         prefix = fields.Str(required=True)
 
     @staticmethod
-    def activate(configuration):
+    def activate(configuration: dict[str, Any]) -> Any:
         for cfgoption, target in [
             ("host", "--stomp-host"),
             ("port", "--stomp-port"),
@@ -68,7 +74,7 @@ class Pika:
         vhost = fields.Str(required=True)
 
     @staticmethod
-    def activate(configuration):
+    def activate(configuration: dict[str, Any]) -> Any:
         for cfgoption, target in [
             ("host", "--rabbit-host"),
             ("port", "--rabbit-port"),
@@ -87,5 +93,5 @@ class DefaultTransport:
         default = fields.Str(required=True)
 
     @staticmethod
-    def activate(configuration):
+    def activate(configuration: dict[str, Any]) -> None:
         workflows.transport.default_transport = configuration["default"]
