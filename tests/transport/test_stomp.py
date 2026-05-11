@@ -32,11 +32,10 @@ def test_lookup_and_initialize_stomp_transport_layer():
 
 def test_add_command_line_help_optparse():
     """Check that command line parameters are registered in the parser."""
-    parser = mock.MagicMock()
+    parser = mock.MagicMock(spec=optparse.OptionParser)
 
     StompTransport().add_command_line_options(parser)
 
-    parser.add_argument.assert_not_called()
     parser.add_option.assert_called()
     assert parser.add_option.call_count > 4
     for call in parser.add_option.call_args_list:
@@ -45,13 +44,11 @@ def test_add_command_line_help_optparse():
 
 def test_add_command_line_help_argparse():
     """Check that command line parameters are registered in the parser."""
-    parser = mock.MagicMock()
-    parser.add_argument = mock.Mock()
+    parser = mock.MagicMock(spec=argparse.ArgumentParser)
 
     StompTransport().add_command_line_options(parser)
 
     parser.add_argument.assert_called()
-    parser.add_option.assert_not_called()
     assert parser.add_argument.call_count > 4
     for call in parser.add_argument.call_args_list:
         assert inspect.isclass(call[1]["action"])
