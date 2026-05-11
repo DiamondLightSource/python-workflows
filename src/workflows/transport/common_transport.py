@@ -410,7 +410,7 @@ class CommonTransport:
 
         self._broadcast(destination, message, **kwargs)
 
-    def broadcast_status(self, status: dict) -> None:
+    def broadcast_status(self, status: Mapping) -> None:
         """Broadcast transient status information to all listeners."""
         raise NotImplementedError
 

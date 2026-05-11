@@ -5,6 +5,7 @@ import dataclasses
 import functools
 import json
 import logging
+import os
 import random
 import sys
 import threading
@@ -13,7 +14,7 @@ import uuid
 from collections.abc import Callable, Iterable
 from concurrent.futures import Future
 from enum import Enum, auto
-from typing import Any
+from typing import TYPE_CHECKING, Any, Mapping
 
 import pika.channel
 import pika.exceptions
@@ -28,6 +29,11 @@ from workflows.transport.common_transport import (
     MessageCallback,
     json_serializer,
 )
+
+if TYPE_CHECKING:
+    import optparse
+    from argparse import ArgumentParser, Namespace
+    from optparse import OptionParser
 
 logger = logging.getLogger("workflows.transport.pika_transport")
 
@@ -82,7 +88,7 @@ class PikaTransport(CommonTransport):
         return self._vhost
 
     @classmethod
-    def load_configuration_file(cls, filename):
+    def load_configuration_file(cls, filename: str | os.PathLike[str]) -> None:
         cfgparser = configparser.ConfigParser(allow_no_value=True)
         if not cfgparser.read(filename):
             raise workflows.Error(
@@ -101,15 +107,15 @@ class PikaTransport(CommonTransport):
                 pass
 
     @classmethod
-    def add_command_line_options(cls, parser):
+    def add_command_line_options(cls, parser: ArgumentParser | OptionParser) -> None:
         """Function to inject command line parameters"""
-        if "add_argument" in dir(parser):
+        if isinstance(parser, ArgumentParser):
             return cls.add_command_line_options_argparse(parser)
         else:
             return cls.add_command_line_options_optparse(parser)
 
     @classmethod
-    def add_command_line_options_argparse(cls, argparser):
+    def add_command_line_options_argparse(cls, argparser: ArgumentParser) -> None:
         """Function to inject command line parameters into
         a Python ArgumentParser."""
         import argparse
@@ -117,7 +123,13 @@ class PikaTransport(CommonTransport):
         class SetParameter(argparse.Action):
             """callback object for ArgumentParser"""
 
-            def __call__(self, parser, namespace, value, option_string=None):
+            def __call__(
+                self,
+                parser: ArgumentParser,
+                namespace: Namespace,
+                value: Any,
+                option_string: str | None = None,
+            ) -> None:
                 cls.config[option_string] = value
                 if option_string == "--rabbit-conf":
                     cls.load_configuration_file(value)
@@ -172,11 +184,13 @@ class PikaTransport(CommonTransport):
         )
 
     @classmethod
-    def add_command_line_options_optparse(cls, optparser):
+    def add_command_line_options_optparse(cls, optparser: OptionParser) -> None:
         """function to inject command line parameters into
         a Python OptionParser."""
 
-        def set_parameter(option, opt, value, parser):
+        def set_parameter(
+            option: optparse.Option, opt: str, value: Any, parser: optparse.OptionParser
+        ) -> None:
             """callback function for OptionParser"""
             cls.config[opt] = value
             if opt == "--rabbit-conf":
@@ -305,11 +319,11 @@ class PikaTransport(CommonTransport):
         #       Surely .connection_alive is (slightly) better?
         return hasattr(self, "_pika_thread") and self._pika_thread.connection_alive
 
-    def disconnect(self):
+    def disconnect(self) -> None:
         """Gracefully close connection to pika server"""
         self._pika_thread.join(stop=True)
 
-    def broadcast_status(self, status):
+    def broadcast_status(self, status: Mapping) -> None:
         """Broadcast transient status information to all listeners"""
 
         # Basic status checks - this is based on behaviour of status_monitor
@@ -328,7 +342,7 @@ class PikaTransport(CommonTransport):
         method: pika.spec.Basic.Deliver,
         properties: pika.spec.BasicProperties,
         body: bytes,
-    ):
+    ) -> None:
         """Rewrite and redirect a pika callback to the subscription function"""
         merged_headers = dict(properties.headers or {})
         merged_headers.update(
@@ -357,8 +371,8 @@ class PikaTransport(CommonTransport):
         acknowledgement: bool = False,
         prefetch_count: int = 1,
         reconnectable: bool = False,
-        **_kwargs,
-    ):
+        **_kwargs: Any,
+    ) -> None:
         """
         Listen to a queue, notify via callback function.
 
@@ -416,8 +430,8 @@ class PikaTransport(CommonTransport):
         callback: MessageCallback,
         *,
         reconnectable: bool = False,
-        **_kwargs,
-    ):
+        **_kwargs: Any,
+    ) -> None:
         """
         Listen to a FANOUT exchange, notify via callback function.
 
@@ -447,7 +461,7 @@ class PikaTransport(CommonTransport):
         callback: MessageCallback,
         *,
         acknowledgement: bool = False,
-        **kwargs,
+        **kwargs: Any,
     ) -> str:
         """
         Create and then listen to a temporary queue, notify via callback function.
@@ -482,7 +496,7 @@ class PikaTransport(CommonTransport):
         ) as e:
             raise workflows.Disconnected(e)
 
-    def _unsubscribe(self, sub_id: int, **kwargs):
+    def _unsubscribe(self, sub_id: int, **kwargs: Any) -> None:
         """Stop listening to a queue.
 
         Args:
@@ -494,15 +508,15 @@ class PikaTransport(CommonTransport):
 
     def _send(
         self,
-        destination,
-        message,
-        headers=None,
-        delay=None,
-        expiration=None,
+        destination: str,
+        message: Any,
+        headers: dict[str, Any] | None = None,
+        delay: float | None = None,
+        expiration: float | None = None,
         transaction: int | None = None,
         exchange: str | None = None,
-        **kwargs,
-    ):
+        **kwargs: Any,
+    ) -> None:
         """
         Send a message to a queue.
 
@@ -541,14 +555,14 @@ class PikaTransport(CommonTransport):
 
     def _broadcast(
         self,
-        destination,
-        message,
-        headers=None,
-        delay=None,
+        destination: str,
+        message: Any,
+        headers: dict[str, Any] | None = None,
+        delay: float | None = None,
         expiration: int | None = None,
         transaction: int | None = None,
-        **kwargs,
-    ):
+        **kwargs: Any,
+    ) -> None:
         """Send a message to a fanout exchange.
 
         Args:
@@ -584,7 +598,7 @@ class PikaTransport(CommonTransport):
         ).result()
 
     def _transaction_begin(
-        self, transaction_id: int, *, subscription_id: int | None = None, **kwargs
+        self, transaction_id: int, *, subscription_id: int | None = None, **kwargs: Any
     ) -> None:
         """Start a new transaction.
 
@@ -594,7 +608,7 @@ class PikaTransport(CommonTransport):
         """
         self._pika_thread.tx_select(transaction_id, subscription_id).result()
 
-    def _transaction_abort(self, transaction_id: int, **kwargs) -> None:
+    def _transaction_abort(self, transaction_id: int, **kwargs: Any) -> None:
         """Abort a transaction and roll back all operations.
 
         Args:
@@ -602,7 +616,7 @@ class PikaTransport(CommonTransport):
         """
         self._pika_thread.tx_rollback(transaction_id).result()
 
-    def _transaction_commit(self, transaction_id: int, **kwargs) -> None:
+    def _transaction_commit(self, transaction_id: int, **kwargs: Any) -> None:
         """Commit a transaction.
 
         Args:
@@ -611,8 +625,13 @@ class PikaTransport(CommonTransport):
         self._pika_thread.tx_commit(transaction_id).result()
 
     def _ack(
-        self, message_id, subscription_id: int, *, multiple: bool = False, **_kwargs
-    ):
+        self,
+        message_id: int,
+        subscription_id: int,
+        *,
+        multiple: bool = False,
+        **_kwargs: Any,
+    ) -> None:
         """
         Acknowledge receipt of a message.
 
@@ -635,13 +654,13 @@ class PikaTransport(CommonTransport):
 
     def _nack(
         self,
-        message_id,
+        message_id: int,
         subscription_id: int,
         *,
         multiple: bool = False,
         requeue: bool = True,
-        **_kwargs,
-    ):
+        **_kwargs: Any,
+    ) -> None:
         """
         Reject receipt of a message.
 
@@ -664,7 +683,7 @@ class PikaTransport(CommonTransport):
         )
 
     @staticmethod
-    def _mangle_for_sending(message):
+    def _mangle_for_sending(message: Any) -> str:
         """Function that any message will pass through before it being forwarded to
         the actual _send* functions.
         Pika only deals with serialized strings, so serialize message as json.
@@ -672,7 +691,7 @@ class PikaTransport(CommonTransport):
         return json.dumps(message, default=json_serializer)
 
     @staticmethod
-    def _mangle_for_receiving(message):
+    def _mangle_for_receiving(message: str | bytes | bytearray) -> Any:
         """Function that any message will pass through before it being forwarded to
         the receiving subscribed callback functions.
         This transport class only deals with serialized strings, so decode
@@ -693,11 +712,11 @@ class _PikaThreadStatus(Enum):
     STOPPED = auto()
 
     @property
-    def is_new(self):
+    def is_new(self) -> bool:
         return self is self.NEW
 
     @property
-    def is_end_of_life(self):
+    def is_end_of_life(self) -> bool:
         return self in {self.STOPPING, self.STOPPED}
 
 
@@ -766,7 +785,7 @@ class _PikaThread(threading.Thread):
     def __init__(
         self,
         connection_parameters: Iterable[pika.ConnectionParameters],
-        reconnection_attempts=5,
+        reconnection_attempts: int = 5,
     ):
         super().__init__(name="workflows pika_transport", daemon=True, target=self._run)
         self._state: _PikaThreadStatus = _PikaThreadStatus.NEW
@@ -812,7 +831,7 @@ class _PikaThread(threading.Thread):
         """Read the current connection state"""
         return self._state
 
-    def stop(self):
+    def stop(self) -> None:
         """
         Request termination, including disconnection and cleanup if necessary.
 
@@ -839,7 +858,13 @@ class _PikaThread(threading.Thread):
         except pika.exceptions.ConnectionWrongStateError:
             pass
 
-    def join(self, timeout: float | None = None, *, re_raise: bool = False, stop=False):
+    def join(
+        self,
+        timeout: float | None = None,
+        *,
+        re_raise: bool = False,
+        stop: bool = False,
+    ) -> None:
         """Wait until the thread terminates.
 
         Args:
@@ -861,7 +886,7 @@ class _PikaThread(threading.Thread):
         if re_raise:
             self.raise_if_exception()
 
-    def wait_for_connection(self, timeout=None):
+    def wait_for_connection(self, timeout: float | None = None) -> None:
         """
         Safely wait until the thread has connected and is communicating with the server.
 
@@ -874,7 +899,7 @@ class _PikaThread(threading.Thread):
         self._connected.wait(timeout)
         self.raise_if_exception()
 
-    def raise_if_exception(self):
+    def raise_if_exception(self) -> None:
         """If the thread has failed with an exception, raise it in the callers thread."""
         exception = self._exc_info
         if exception:
@@ -1005,7 +1030,7 @@ class _PikaThread(threading.Thread):
 
         result: Future[str] = Future()
 
-        def _declare_subscribe_queue_in_thread():
+        def _declare_subscribe_queue_in_thread() -> None:
             try:
                 if result.set_running_or_notify_cancel():
                     assert subscription_id not in self._subscriptions, (
@@ -1047,7 +1072,7 @@ class _PikaThread(threading.Thread):
 
         result: Future[None] = Future()
 
-        def _unsubscribe():
+        def _unsubscribe() -> None:
             try:
                 if result.set_running_or_notify_cancel():
                     logger.debug("Unsubscribing from subscription %d", subscription_id)
@@ -1087,7 +1112,7 @@ class _PikaThread(threading.Thread):
 
         future: Future[None] = Future()
 
-        def _send():
+        def _send() -> None:
             if future.set_running_or_notify_cancel():
                 try:
                     if transaction_id:
@@ -1115,9 +1140,9 @@ class _PikaThread(threading.Thread):
         delivery_tag: int,
         subscription_id: int,
         *,
-        multiple=False,
+        multiple: bool = False,
         transaction_id: int | None,
-    ):
+    ) -> None:
         if subscription_id not in self._subscriptions:
             raise KeyError(f"Could not find subscription {subscription_id} to ACK")
 
@@ -1134,7 +1159,7 @@ class _PikaThread(threading.Thread):
             )
         if transaction_id is None and not self._channel_has_active_tx.get(channel):
 
-            def _ack_callback():
+            def _ack_callback() -> None:
                 channel.basic_ack(delivery_tag, multiple=multiple)
                 if self._channel_is_transactional.get(channel):
                     channel.tx_commit()
@@ -1153,10 +1178,10 @@ class _PikaThread(threading.Thread):
         delivery_tag: int,
         subscription_id: int,
         *,
-        multiple=False,
-        requeue=True,
+        multiple: bool = False,
+        requeue: bool = True,
         transaction_id: int | None,
-    ):
+    ) -> None:
         if subscription_id not in self._subscriptions:
             raise KeyError(f"Could not find subscription {subscription_id} to NACK")
 
@@ -1173,7 +1198,7 @@ class _PikaThread(threading.Thread):
             )
         if transaction_id is None and not self._channel_has_active_tx.get(channel):
 
-            def _nack_callback():
+            def _nack_callback() -> None:
                 channel.basic_nack(delivery_tag, multiple=multiple, requeue=requeue)
                 if self._channel_is_transactional.get(channel):
                     channel.tx_commit()
@@ -1204,7 +1229,7 @@ class _PikaThread(threading.Thread):
 
         future: Future[None] = Future()
 
-        def _tx_select():
+        def _tx_select() -> None:
             if future.set_running_or_notify_cancel():
                 try:
                     if subscription_id:
@@ -1248,7 +1273,7 @@ class _PikaThread(threading.Thread):
 
         future: Future[None] = Future()
 
-        def _tx_rollback():
+        def _tx_rollback() -> None:
             if future.set_running_or_notify_cancel():
                 try:
                     channel = self._transaction_on_channel.inverse.pop(
@@ -1279,7 +1304,7 @@ class _PikaThread(threading.Thread):
 
         future: Future[None] = Future()
 
-        def _tx_commit():
+        def _tx_commit() -> None:
             if future.set_running_or_notify_cancel():
                 try:
                     channel = self._transaction_on_channel.inverse.pop(
@@ -1332,7 +1357,7 @@ class _PikaThread(threading.Thread):
     ####################################################################
     # PikaThread Internal methods
 
-    def _debug_close_connection(self):
+    def _debug_close_connection(self) -> None:
         connection = self._connection
         assert connection is not None
         connection.add_callback_threadsafe(lambda: connection.close())
@@ -1347,7 +1372,7 @@ class _PikaThread(threading.Thread):
             ##### self._pika_shared_channel.confirm_delivery()
         return self._pika_shared_channel
 
-    def _recreate_subscriptions(self):
+    def _recreate_subscriptions(self) -> None:
         """Resubscribe all existing subscriptions"""
         old_subscriptions = self._subscriptions
         self._subscriptions = {}
@@ -1366,7 +1391,9 @@ class _PikaThread(threading.Thread):
             f"Subscriptions recreated. Reconnections allowed? - {'Yes' if self._reconnection_allowed else 'No.'}"
         )
 
-    def _add_subscription(self, subscription_id: int, subscription: _PikaSubscription):
+    def _add_subscription(
+        self, subscription_id: int, subscription: _PikaSubscription
+    ) -> None:
         assert self._connection is not None
         assert subscription_id not in self._subscriptions
 
@@ -1403,7 +1430,7 @@ class _PikaThread(threading.Thread):
         self._subscriptions[subscription_id] = subscription
         logger.debug("Consuming (%d) on %s", subscription_id, subscription.queue)
 
-    def _run(self):
+    def _run(self) -> None:
         if self._please_stop.is_set():
             # stop() was called before start()... so quit
             self._state == _PikaThreadStatus.STOPPED  # type: ignore
@@ -1553,7 +1580,7 @@ class _PikaThread(threading.Thread):
         subscription_id: int,
         subscription: _PikaSubscription,
         result: Future,
-    ):
+    ) -> None:
         """
         Add a subscription to the pika connection.
 

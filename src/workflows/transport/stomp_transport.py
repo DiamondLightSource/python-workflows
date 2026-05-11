@@ -35,7 +35,7 @@ class StompTransport(CommonTransport):
     config: dict[Any, Any] = {}
 
     def __init__(
-        self, middleware: list[type[middleware.BaseTransportMiddleware]] | None = None
+        self, middleware: list[middleware.BaseTransportMiddleware] | None = None
     ):
         self._connected = False
         self._namespace = ""
@@ -45,7 +45,7 @@ class StompTransport(CommonTransport):
         #   self._stomp_listener = stomp.PrintingListener()
         self._stomp_listener.on_message = self._on_message
         self._stomp_listener.on_before_message = lambda frame: frame
-        super().__init__()
+        super().__init__(middleware)
 
     def get_namespace(self):
         """Return the stomp namespace. This is a prefix used for all topic and
