@@ -20,13 +20,14 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import os
 import sys
 
 import workflows
 import workflows.recipe
 
 
-def validate_recipe(json_filename):
+def validate_recipe(json_filename: str | os.PathLike[str]) -> None:
     """Reads a json file, tries to turn it into a recipe and then validates it.
     Exits on exception with non-zero error"""
 
