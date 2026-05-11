@@ -2,10 +2,13 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from importlib.metadata import entry_points
-from typing import Any
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from workflows.services.common_service import CommonService
 
 
-def lookup(service: str) -> Any:
+def lookup(service: str) -> type[CommonService] | None:
     """Find a service class based on a name.
 
     Args:
@@ -21,7 +24,7 @@ def lookup(service: str) -> Any:
         return None
 
 
-def get_known_services() -> dict[str, Callable[[], Any]]:
+def get_known_services() -> dict[str, Callable[[], type[CommonService]]]:
     """Return a dictionary of all known services.
 
     Returns:
