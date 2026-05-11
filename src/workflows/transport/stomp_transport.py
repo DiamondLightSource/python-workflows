@@ -1,13 +1,18 @@
 from __future__ import annotations
 
+import argparse
 import configparser
 import json
+import optparse
 import threading
 import time
 import uuid
+from collections.abc import Mapping
 from typing import Any
 
 import stomp
+import stomp.exception
+import stomp.utils
 
 import workflows.util
 from workflows.transport import middleware
@@ -34,7 +39,7 @@ class StompTransport(CommonTransport):
     config: dict[Any, Any] = {}
 
     def __init__(
-        self, middleware: list[type[middleware.BaseTransportMiddleware]] | None = None
+        self, middleware: list[middleware.BaseTransportMiddleware] | None = None
     ):
         self._connected = False
         self._namespace = ""
@@ -44,9 +49,9 @@ class StompTransport(CommonTransport):
         #   self._stomp_listener = stomp.PrintingListener()
         self._stomp_listener.on_message = self._on_message
         self._stomp_listener.on_before_message = lambda frame: frame
-        super().__init__()
+        super().__init__(middleware)
 
-    def get_namespace(self):
+    def get_namespace(self) -> str:
         """Return the stomp namespace. This is a prefix used for all topic and
         queue names."""
         if self._namespace.endswith("."):
@@ -54,7 +59,7 @@ class StompTransport(CommonTransport):
         return self._namespace
 
     @classmethod
-    def load_configuration_file(cls, filename):
+    def load_configuration_file(cls, filename: str) -> None:
         cfgparser = configparser.ConfigParser(allow_no_value=True)
         if not cfgparser.read(filename):
             raise workflows.Error(
@@ -73,23 +78,32 @@ class StompTransport(CommonTransport):
                 pass
 
     @classmethod
-    def add_command_line_options(cls, parser):
+    def add_command_line_options(
+        cls, parser: argparse.ArgumentParser | optparse.OptionParser
+    ) -> None:
         """function to inject command line parameters"""
-        if "add_argument" in dir(parser):
+        if isinstance(parser, argparse.ArgumentParser):
             return cls.add_command_line_options_argparse(parser)
         else:
             return cls.add_command_line_options_optparse(parser)
 
     @classmethod
-    def add_command_line_options_argparse(cls, argparser):
+    def add_command_line_options_argparse(
+        cls, argparser: argparse.ArgumentParser
+    ) -> None:
         """function to inject command line parameters into
         a Python ArgumentParser."""
-        import argparse
 
         class SetParameter(argparse.Action):
             """callback object for ArgumentParser"""
 
-            def __call__(self, parser, namespace, value, option_string=None):
+            def __call__(
+                self,
+                parser: argparse.ArgumentParser,
+                namespace: argparse.Namespace,
+                value: Any,
+                option_string: str | None = None,
+            ) -> None:
                 cls.config[option_string] = value
                 if option_string == "--stomp-conf":
                     cls.load_configuration_file(value)
@@ -144,11 +158,18 @@ class StompTransport(CommonTransport):
         )
 
     @classmethod
-    def add_command_line_options_optparse(cls, optparser):
+    def add_command_line_options_optparse(
+        cls, optparser: optparse.OptionParser
+    ) -> None:
         """function to inject command line parameters into
         a Python OptionParser."""
 
-        def set_parameter(option, opt, value, parser):
+        def set_parameter(
+            option: optparse.Option,
+            opt: str,
+            value: Any,
+            parser: optparse.OptionParser,
+        ) -> None:
             """callback function for OptionParser"""
             cls.config[opt] = value
             if opt == "--stomp-conf":
@@ -215,7 +236,7 @@ class StompTransport(CommonTransport):
             callback=set_parameter,
         )
 
-    def connect(self):
+    def connect(self) -> bool:
         with self._lock:
             if self._connected:
                 return True
@@ -227,7 +248,7 @@ class StompTransport(CommonTransport):
                         ),
                         int(
                             self.config.get(
-                                "--stomp-port", self.defaults.get("--stomp-port")
+                                "--stomp-port", self.defaults["--stomp-port"]
                             )
                         ),
                     )
@@ -265,25 +286,25 @@ class StompTransport(CommonTransport):
                     "Could not initiate connection to stomp host"
                 )
             self._namespace = self.config.get(
-                "--stomp-prfx", self.defaults.get("--stomp-prfx")
+                "--stomp-prfx", self.defaults["--stomp-prfx"]
             )
             if self._namespace and not self._namespace.endswith("."):
                 self._namespace = self._namespace + "."
             self._connected = True
         return True
 
-    def is_connected(self):
+    def is_connected(self) -> bool:
         """Return connection status"""
         self._connected = self._connected and self._conn.is_connected()
         return self._connected
 
-    def disconnect(self):
+    def disconnect(self) -> None:
         """Gracefully close connection to stomp server."""
         if self._connected:
             self._connected = False
             self._conn.disconnect()
 
-    def broadcast_status(self, status):
+    def broadcast_status(self, status: Mapping) -> None:
         """Broadcast transient status information to all listeners"""
         self._broadcast(
             "transient.status",
@@ -291,7 +312,13 @@ class StompTransport(CommonTransport):
             headers={"expires": str(int((15 + time.time()) * 1000))},
         )
 
-    def _subscribe(self, sub_id, channel, callback, **kwargs):
+    def _subscribe(
+        self,
+        sub_id: int,
+        channel: str,
+        callback: MessageCallback,
+        **kwargs: Any,
+    ) -> None:
         """Listen to a queue, notify via callback function.
 
         Args:
@@ -329,7 +356,13 @@ class StompTransport(CommonTransport):
 
         self._conn.subscribe(destination, sub_id, headers=headers, ack=ack)
 
-    def _subscribe_broadcast(self, sub_id, channel, callback, **kwargs):
+    def _subscribe_broadcast(
+        self,
+        sub_id: int,
+        channel: str,
+        callback: MessageCallback,
+        **kwargs: Any,
+    ) -> None:
         """Listen to a broadcast topic, notify via callback function.
 
         Args:
@@ -355,7 +388,7 @@ class StompTransport(CommonTransport):
         sub_id: int,
         channel_hint: str | None,
         callback: MessageCallback,
-        **kwargs,
+        **kwargs: Any,
     ) -> str:
         """Create and then listen to a temporary queue, notify via callback function.
 
@@ -378,18 +411,24 @@ class StompTransport(CommonTransport):
 
         return channel
 
-    def _unsubscribe(self, subscription, **kwargs):
+    def _unsubscribe(self, sub_id: int, **kwargs: Any) -> None:
         """Stop listening to a queue or a broadcast.
 
         Args:
-            subscription: Subscription ID to cancel
+            sub_id: Subscription ID to cancel
         """
-        self._conn.unsubscribe(id=subscription)
+        self._conn.unsubscribe(id=sub_id)
         # Callback reference is kept as further messages may already have been received
 
     def _send(
-        self, destination, message, headers=None, delay=None, expiration=None, **kwargs
-    ):
+        self,
+        destination: str,
+        message: Any,
+        headers: dict | None = None,
+        delay: float | None = None,
+        expiration: int | None = None,
+        **kwargs: Any,
+    ) -> None:
         """Send a message to a queue.
 
         Args:
@@ -426,8 +465,14 @@ class StompTransport(CommonTransport):
             raise workflows.Disconnected("No connection to stomp host")
 
     def _broadcast(
-        self, destination, message, headers=None, delay=None, expiration=None, **kwargs
-    ):
+        self,
+        destination: str,
+        message: Any,
+        headers: dict | None = None,
+        delay: float | None = None,
+        expiration: int | None = None,
+        **kwargs: Any,
+    ) -> None:
         """Broadcast a message.
 
         Args:
@@ -457,7 +502,7 @@ class StompTransport(CommonTransport):
             self._connected = False
             raise workflows.Disconnected("No connection to stomp host")
 
-    def _transaction_begin(self, transaction_id, **kwargs):
+    def _transaction_begin(self, transaction_id: int, **kwargs: Any) -> None:
         """Start a new transaction.
 
         Args:
@@ -465,7 +510,7 @@ class StompTransport(CommonTransport):
         """
         self._conn.begin(transaction=transaction_id)
 
-    def _transaction_abort(self, transaction_id, **kwargs):
+    def _transaction_abort(self, transaction_id: int, **kwargs: Any) -> None:
         """Abort a transaction and roll back all operations.
 
         Args:
@@ -473,7 +518,7 @@ class StompTransport(CommonTransport):
         """
         self._conn.abort(transaction_id)
 
-    def _transaction_commit(self, transaction_id, **kwargs):
+    def _transaction_commit(self, transaction_id: int, **kwargs: Any) -> None:
         """Commit a transaction.
 
         Args:
@@ -481,7 +526,7 @@ class StompTransport(CommonTransport):
         """
         self._conn.commit(transaction_id)
 
-    def _ack(self, message_id, subscription_id, **kwargs):
+    def _ack(self, message_id: Any, subscription_id: int, **kwargs: Any) -> None:
         """Acknowledge receipt of a message. This only makes sense when the
         'acknowledgement' flag was set for the relevant subscription.
 
@@ -495,7 +540,7 @@ class StompTransport(CommonTransport):
         """
         self._conn.ack(message_id, subscription_id, **kwargs)
 
-    def _nack(self, message_id, subscription_id, **kwargs):
+    def _nack(self, message_id: Any, subscription_id: int, **kwargs: Any) -> None:
         """Reject receipt of a message. This only makes sense when the
         'acknowledgement' flag was set for the relevant subscription.
 
@@ -509,7 +554,7 @@ class StompTransport(CommonTransport):
         self._conn.nack(message_id, subscription_id, **kwargs)
 
     @staticmethod
-    def _mangle_for_sending(message):
+    def _mangle_for_sending(message: Any) -> str:
         """Function that any message will pass through before it being forwarded to
         the actual _send* functions.
         Stomp only deals with serialized strings, so serialize message as json.
@@ -517,7 +562,7 @@ class StompTransport(CommonTransport):
         return json.dumps(message, default=json_serializer)
 
     @staticmethod
-    def _mangle_for_receiving(message):
+    def _mangle_for_receiving(message: Any) -> Any:
         """Function that any message will pass through before it being forwarded to
         the receiving subscribed callback functions.
         This transport class only deals with serialized strings, so decode
@@ -531,12 +576,9 @@ class StompTransport(CommonTransport):
 
     ## Stomp listener methods #####################################################
 
-    def _on_message(self, frame):
+    def _on_message(self, frame: stomp.utils.Frame) -> None:
         headers = frame.headers
         body = frame.body
         subscription_id = int(headers["subscription"])
         target_function = self.subscription_callback(subscription_id)
-        if target_function:
-            target_function(headers, body)
-        else:
-            raise workflows.Error(f"Unhandled message {headers!r} {body!r}")
+        target_function(headers, body)

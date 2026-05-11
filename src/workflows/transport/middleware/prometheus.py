@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import functools
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
+from typing import Any
 
 from prometheus_client import Counter, Gauge, Histogram
 
@@ -79,109 +80,165 @@ TRANSACTIONS_IN_PROGRESS = Gauge(
 
 
 class PrometheusMiddleware(BaseTransportMiddleware):
-    def __init__(self, source: str):
+    def __init__(self, source: str) -> None:
         self.source = source
 
-    def subscribe(self, call_next: Callable, channel, callback, **kwargs) -> int:
+    def subscribe(
+        self,
+        call_next: Callable[..., int],
+        channel: str,
+        callback: MessageCallback,
+        *,
+        disable_mangling: bool = False,
+        acknowledgement: bool = False,
+        **kwargs: Any,
+    ) -> int:
         @functools.wraps(callback)
-        def wrapped_callback(header, message):
+        def wrapped_callback(header: Mapping[str, Any], message: Any) -> None:
             start_time = time.perf_counter()
-            result = callback(header, message)
+            callback(header, message)
             end_time = time.perf_counter()
             CALLBACK_PROCESSING_TIME.labels(
                 source=get_callback_source(callback)
             ).observe(end_time - start_time)
-            return result
 
         SUBSCRIPTIONS.labels(source=self.source).inc()
         ACTIVE_SUBSCRIPTIONS.labels(source=self.source).inc()
-        return call_next(channel, wrapped_callback, **kwargs)
+        return call_next(
+            channel,
+            wrapped_callback,
+            disable_mangling=disable_mangling,
+            acknowledgement=acknowledgement,
+            **kwargs,
+        )
 
     def subscribe_temporary(
         self,
-        call_next: Callable,
+        call_next: Callable[..., TemporarySubscription],
         channel_hint: str | None,
         callback: MessageCallback,
-        **kwargs,
+        *,
+        disable_mangling: bool = False,
+        acknowledgement: bool = False,
+        **kwargs: Any,
     ) -> TemporarySubscription:
         @functools.wraps(callback)
-        def wrapped_callback(header, message):
+        def wrapped_callback(header: Mapping[str, Any], message: Any) -> None:
             start_time = time.perf_counter()
-            result = callback(header, message)
+            callback(header, message)
             end_time = time.perf_counter()
             CALLBACK_PROCESSING_TIME.labels(
                 source=get_callback_source(callback)
             ).observe(end_time - start_time)
-            return result
 
         TEMPORARY_SUBSCRIPTIONS.labels(source=self.source).inc()
         ACTIVE_SUBSCRIPTIONS.labels(source=self.source).inc()
-        return call_next(channel_hint, wrapped_callback, **kwargs)
+        return call_next(
+            channel_hint,
+            wrapped_callback,
+            disable_mangling=disable_mangling,
+            acknowledgement=acknowledgement,
+            **kwargs,
+        )
 
     def subscribe_broadcast(
-        self, call_next: Callable, channel, callback, **kwargs
+        self,
+        call_next: Callable[..., int],
+        channel: str,
+        callback: MessageCallback,
+        *,
+        disable_mangling: bool = False,
+        **kwargs: Any,
     ) -> int:
         @functools.wraps(callback)
-        def wrapped_callback(header, message):
+        def wrapped_callback(header: Mapping[str, Any], message: Any) -> None:
             start_time = time.perf_counter()
-            result = callback(header, message)
+            callback(header, message)
             end_time = time.perf_counter()
             CALLBACK_PROCESSING_TIME.labels(
                 source=get_callback_source(callback)
             ).observe(end_time - start_time)
-            return result
 
         BROADCAST_SUBSCRIPTIONS.labels(source=self.source).inc()
         ACTIVE_SUBSCRIPTIONS.labels(source=self.source).inc()
-        return call_next(channel, wrapped_callback, **kwargs)
+        return call_next(
+            channel,
+            wrapped_callback,
+            disable_mangling=disable_mangling,
+            **kwargs,
+        )
 
     def unsubscribe(
         self,
-        call_next: Callable,
+        call_next: Callable[..., None],
         subscription: int,
-        drop_callback_reference=False,
-        **kwargs,
-    ):
+        *,
+        drop_callback_reference: bool = False,
+        **kwargs: Any,
+    ) -> None:
         ACTIVE_SUBSCRIPTIONS.labels(source=self.source).dec()
         call_next(
             subscription, drop_callback_reference=drop_callback_reference, **kwargs
         )
 
-    def send(self, call_next: Callable, destination, message, **kwargs):
+    def send(
+        self,
+        call_next: Callable[..., None],
+        destination: str,
+        message: Any,
+        *,
+        headers: dict | None = None,
+        **kwargs: Any,
+    ) -> None:
         SENDS.labels(source=self.source).inc()
-        call_next(destination, message, **kwargs)
+        call_next(destination, message, headers=headers, **kwargs)
 
     def ack(
         self,
-        call_next: Callable,
-        message,
+        call_next: Callable[..., None],
+        message: Any,
         subscription_id: int | None = None,
-        **kwargs,
-    ):
+        **kwargs: Any,
+    ) -> None:
         ACKS.labels(source=self.source).inc()
         call_next(message, subscription_id=subscription_id, **kwargs)
 
     def nack(
         self,
-        call_next: Callable,
-        message,
+        call_next: Callable[..., None],
+        message: Any,
         subscription_id: int | None = None,
-        **kwargs,
-    ):
+        **kwargs: Any,
+    ) -> None:
         NACKS.labels(source=self.source).inc()
         call_next(message, subscription_id=subscription_id, **kwargs)
 
-    def transaction_begin(self, call_next: Callable, *args, **kwargs) -> int:
+    def transaction_begin(
+        self,
+        call_next: Callable[..., int],
+        subscription_id: int | None = None,
+        **kwargs: Any,
+    ) -> int:
         TRANSACTION_BEGIN.labels(source=self.source).inc()
         TRANSACTIONS_IN_PROGRESS.labels(source=self.source).inc()
-        return call_next(*args, **kwargs)
+        return call_next(subscription_id=subscription_id, **kwargs)
 
-    def transaction_abort(self, call_next: Callable, *args, **kwargs):
+    def transaction_abort(
+        self,
+        call_next: Callable[..., None],
+        transaction_id: int,
+        **kwargs: Any,
+    ) -> None:
         TRANSACTION_ABORT.labels(source=self.source).inc()
         TRANSACTIONS_IN_PROGRESS.labels(source=self.source).dec()
-        call_next(*args, **kwargs)
+        call_next(transaction_id, **kwargs)
 
-    def transaction_commit(self, call_next: Callable, *args, **kwargs):
+    def transaction_commit(
+        self,
+        call_next: Callable[..., None],
+        transaction_id: int,
+        **kwargs: Any,
+    ) -> None:
         TRANSACTION_COMMIT.labels(source=self.source).inc()
         TRANSACTIONS_IN_PROGRESS.labels(source=self.source).dec()
-        call_next(*args, **kwargs)
+        call_next(transaction_id, **kwargs)

@@ -110,3 +110,6 @@ required-imports = ["from __future__ import annotations"]
 
 [tool.mypy]
 mypy_path = "src/"
+
+[tool.pyright]
+exclude = ["tests", ".venv"]

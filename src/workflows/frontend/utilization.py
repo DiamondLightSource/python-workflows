@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import time
+from typing import Any
 
 from workflows.services.common_service import CommonService
 
@@ -9,15 +10,15 @@ class UtilizationStatistics:
     """Generate statistics about the percentage of time spent in different
     statuses over a fixed time slice. This class is not thread-safe."""
 
-    def __init__(self, summation_period=10):
+    def __init__(self, summation_period: float = 10):
         """Reports will always cover the most recent period of summation_period
         seconds."""
         self.period = summation_period
-        self.status_history = [
+        self.status_history: list[dict[str, Any]] = [
             {"start": 0, "end": None, "status": CommonService.SERVICE_STATUS_NEW}
         ]
 
-    def update_status(self, new_status):
+    def update_status(self, new_status: int) -> None:
         """Record a status change with a current timestamp."""
         timestamp = time.time()
         self.status_history[-1]["end"] = timestamp
@@ -25,14 +26,14 @@ class UtilizationStatistics:
             {"start": timestamp, "end": None, "status": new_status}
         )
 
-    def report(self):
+    def report(self) -> dict[int, float]:
         """Return a dictionary of different status codes and the percentage of time
         spent in each throughout the last summation_period seconds.
         Truncate the aggregated history appropriately."""
         timestamp = time.time()
         cutoff = timestamp - self.period
         truncate = 0
-        summary = {}
+        summary: dict[int, float] = {}
         for event in self.status_history[:-1]:
             if event["end"] < cutoff:
                 truncate = truncate + 1

@@ -3,12 +3,12 @@ from __future__ import annotations
 import curses
 import threading
 import time
-from typing import Any
+from collections.abc import Mapping
+from typing import Any, Callable
 
 import workflows.transport
 from workflows.services.common_service import CommonService
-
-basestring = (str, bytes)
+from workflows.transport.common_transport import CommonTransport
 
 
 class Monitor:  # pragma: no cover
@@ -19,7 +19,7 @@ class Monitor:  # pragma: no cover
     shutdown = False
     """Set to true to end the main loop and shut down the service monitor."""
 
-    cards: dict[Any, Any] = {}
+    cards: list
     """Register card shown for seen services"""
 
     border_chars = ()
@@ -27,21 +27,21 @@ class Monitor:  # pragma: no cover
     border_chars_text = ("|", "|", "=", "=", "/", "\\", "\\", "/")
     """Example alternative set of frame border characters."""
 
-    def __init__(self, transport=None):
+    def __init__(self, transport: Callable[[], CommonTransport] | str | None = None):
         """Set up monitor and connect to the network transport layer"""
-        if transport is None or isinstance(transport, basestring):
-            self._transport = workflows.transport.lookup(transport)()
-        else:
+        if callable(transport):
             self._transport = transport()
+        else:
+            self._transport = workflows.transport.lookup(transport)()
         assert self._transport.connect(), "Could not connect to transport layer"
         self._lock = threading.RLock()
-        self._node_status = {}
-        self.message_box = None
+        self._node_status: dict = {}
+        self.message_box: curses.window | None = None
         self._transport.subscribe_broadcast(
             "transient.status", self.update_status, retroactive=True
         )
 
-    def update_status(self, header, message):
+    def update_status(self, header: Mapping[str, Any], message: Any) -> None:
         """Process incoming status message. Acquire lock for status dictionary before updating."""
         with self._lock:
             if self.message_box:
@@ -70,14 +70,21 @@ class Monitor:  # pragma: no cover
                 self._node_status[message["host"]] = message
                 self._node_status[message["host"]]["last_seen"] = receipt_time
 
-    def run(self):
+    def run(self) -> None:
         """A wrapper for the real _run() function to cleanly enable/disable the
         curses environment."""
         curses.wrapper(self._run)
 
     def _boxwin(
-        self, height, width, row, column, title=None, title_x=7, color_pair=None
-    ):
+        self,
+        height: int,
+        width: int,
+        row: int,
+        column: int,
+        title: str | None = None,
+        title_x: int = 7,
+        color_pair: int | None = None,
+    ) -> curses.window:
         with self._lock:
             box = curses.newwin(height, width, row, column)
             box.clear()
@@ -91,7 +98,7 @@ class Monitor:  # pragma: no cover
             box.noutrefresh()
             return curses.newwin(height - 2, width - 2, row + 1, column + 1)
 
-    def _redraw_screen(self, stdscr):
+    def _redraw_screen(self, stdscr: curses.window) -> None:
         """Redraw screen. This could be to initialize, or to redraw after resizing."""
         with self._lock:
             stdscr.clear()
@@ -105,7 +112,7 @@ class Monitor:  # pragma: no cover
             self.message_box.scrollok(True)
             self.cards = []
 
-    def _get_card(self, number):
+    def _get_card(self, number: int) -> curses.window:
         with self._lock:
             if number < len(self.cards):
                 return self.cards[number]
@@ -123,7 +130,7 @@ class Monitor:  # pragma: no cover
                 return self.cards[number]
             raise RuntimeError("Card number too high")
 
-    def _erase_card(self, number):
+    def _erase_card(self, number: int) -> None:
         """Destroy cards with this or higher number."""
         with self._lock:
             if number < (len(self.cards) - 1):
@@ -141,7 +148,7 @@ class Monitor:  # pragma: no cover
             obliterate.noutrefresh()
             del self.cards[number]
 
-    def _run(self, stdscr):
+    def _run(self, stdscr: curses.window) -> None:
         """Start the actual service monitor"""
         with self._lock:
             curses.use_default_colors()

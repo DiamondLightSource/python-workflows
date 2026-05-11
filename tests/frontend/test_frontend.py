@@ -14,7 +14,7 @@ class ServiceCrashingOnInit(CommonService):
     """A service that raises an unhandled exception."""
 
     @staticmethod
-    def initializing():
+    def initializing():  # type: ignore
         """Raise AssertionError.
         This should set the error state, kill the service and cause the frontend
         to leave its main loop."""

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import random
 import time
+from collections.abc import Mapping
+from typing import Any
 
 from workflows.services.common_service import CommonService
 
@@ -16,9 +18,9 @@ class SampleTxn(CommonService):
     # Human readable service name
     _service_name = "Transaction sample"
 
-    def initializing(self):
+    def initializing(self) -> None:
         """Subscribe to a channel. Received messages must be acknowledged."""
-        self.subid = self._transport.subscribe(
+        self.subid = self.transport.subscribe(
             "transient.transaction",
             self.receive_message,
             acknowledgement=True,
@@ -26,12 +28,12 @@ class SampleTxn(CommonService):
         )
 
     @staticmethod
-    def crashpoint():
+    def crashpoint() -> bool:
         """Return true if the service should malfunction at this point."""
         # Probability of not crashing is 90%
         return random.uniform(0, 1) > 0.90
 
-    def receive_message(self, header, message):
+    def receive_message(self, header: Mapping[str, Any], message: Any) -> None:
         """Receive a message"""
 
         self.log.info("=== Receive ===")
@@ -41,29 +43,29 @@ class SampleTxn(CommonService):
         self.log.info("MsgID: {}".format(header["message-id"]))
         assert header["message-id"]
 
-        txn = self._transport.transaction_begin()
+        txn = self.transport.transaction_begin()
         self.log.info(f" 1. Txn: {txn}")
         if self.crashpoint():
-            self._transport.transaction_abort(txn)
+            self.transport.transaction_abort(txn)
             self.log.info("---  Abort  ---")
             return
 
-        self._transport.ack(header["message-id"], self.subid, transaction=txn)
+        self.transport.ack(header["message-id"], self.subid, transaction=txn)
         self.log.info(" 2. Ack")
         if self.crashpoint():
-            self._transport.transaction_abort(txn)
+            self.transport.transaction_abort(txn)
             self.log.info("---  Abort  ---")
             return
 
-        self._transport.send("transient.destination", message, transaction=txn)
+        self.transport.send("transient.destination", message, transaction=txn)
         self.log.info(" 3. Send")
 
         if self.crashpoint():
-            self._transport.transaction_abort(txn)
+            self.transport.transaction_abort(txn)
             self.log.info("---  Abort  ---")
             return
 
-        self._transport.transaction_commit(txn)
+        self.transport.transaction_commit(txn)
         self.log.info(" 4. Commit")
         self.log.info("===  Done   ===")
 
@@ -78,17 +80,17 @@ class SampleTxnProducer(CommonService):
 
     counter = 0
 
-    def initializing(self):
+    def initializing(self) -> None:
         """Service initialization. This function is run before any commands are
         received from the frontend. This is the place to request channel
         subscriptions with the messaging layer, and register callbacks.
         This function can be overridden by specific service implementations."""
         self._register_idle(3, self.create_message)
 
-    def create_message(self):
+    def create_message(self) -> None:
         """Create and send a unique message for this service."""
         self.counter += 1
-        self._transport.send(
+        self.transport.send(
             "transient.transaction",
             "TXMessage #%d\n++++++++Produced@ %f"
             % (self.counter, (time.time() % 1000) * 1000),

@@ -212,7 +212,9 @@ def test_simple_send_message():
 
     ct.send(mock.sentinel.destination, mock.sentinel.message)
 
-    ct._send.assert_called_with(mock.sentinel.destination, mock.sentinel.message)
+    ct._send.assert_called_with(
+        mock.sentinel.destination, mock.sentinel.message, headers=None
+    )
 
 
 def test_simple_broadcast_message():
