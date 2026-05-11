@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import argparse
 import decimal
 import logging
+import optparse
 from collections.abc import Callable, Mapping
 from typing import Any, NamedTuple
 
@@ -46,7 +48,9 @@ class CommonTransport:
         self.middleware.insert(0, middleware)
 
     @classmethod
-    def add_command_line_options(cls, parser) -> None:
+    def add_command_line_options(
+        cls, parser: argparse.ArgumentParser | optparse.OptionParser
+    ) -> None:
         """Inject command line parameters."""
         pass
 
@@ -75,7 +79,7 @@ class CommonTransport:
         """
 
     @middleware.wrap
-    def subscribe(self, channel, callback, **kwargs) -> int:
+    def subscribe(self, channel: str, callback: MessageCallback, **kwargs: Any) -> int:
         """Listen to a queue, notify via callback function.
 
         Args:
@@ -95,7 +99,7 @@ class CommonTransport:
 
         self.__subscription_id += 1
 
-        def mangled_callback(header, message):
+        def mangled_callback(header: Mapping[str, Any], message: Any, /) -> Any:
             return callback(header, self._mangle_for_receiving(message))
 
         if "disable_mangling" in kwargs:
@@ -114,7 +118,10 @@ class CommonTransport:
 
     @middleware.wrap
     def subscribe_temporary(
-        self, channel_hint: str | None, callback: MessageCallback, **kwargs
+        self,
+        channel_hint: str | None,
+        callback: MessageCallback,
+        **kwargs: Any,
     ) -> TemporarySubscription:
         """Listen to a new queue specifically created for this connection.
 
@@ -169,7 +176,11 @@ class CommonTransport:
 
     @middleware.wrap
     def unsubscribe(
-        self, subscription: int, drop_callback_reference=False, **kwargs
+        self,
+        subscription: int,
+        *,
+        drop_callback_reference: bool = False,
+        **kwargs: Any,
     ) -> None:
         """Stop listening to a queue or a broadcast.
 
@@ -213,7 +224,9 @@ class CommonTransport:
         del self.__subscriptions[subscription]
 
     @middleware.wrap
-    def subscribe_broadcast(self, channel, callback, **kwargs) -> int:
+    def subscribe_broadcast(
+        self, channel: str, callback: MessageCallback, **kwargs: Any
+    ) -> int:
         """Listen to a broadcast topic, notify via callback function.
 
         Args:
@@ -231,7 +244,7 @@ class CommonTransport:
 
         self.__subscription_id += 1
 
-        def mangled_callback(header, message):
+        def mangled_callback(header: Mapping[str, Any], message: Any, /) -> Any:
             return callback(header, self._mangle_for_receiving(message))
 
         if "disable_mangling" in kwargs:
@@ -277,7 +290,10 @@ class CommonTransport:
             return self.__callback_interceptor(callback)
         return callback
 
-    def subscription_callback_set_intercept(self, interceptor) -> None:
+    def subscription_callback_set_intercept(
+        self,
+        interceptor: Callable[[MessageCallback], MessageCallback] | None,
+    ) -> None:
         """Set a function to intercept all callbacks.
 
         This is useful to, for example, keep a thread barrier between the
@@ -292,7 +308,12 @@ class CommonTransport:
 
     @middleware.wrap
     def send(
-        self, destination: str, message: Any, *, headers: dict | None = None, **kwargs
+        self,
+        destination: str,
+        message: Any,
+        *,
+        headers: dict | None = None,
+        **kwargs: Any,
     ) -> None:
         """Send a message to a queue.
 
@@ -314,7 +335,7 @@ class CommonTransport:
         self._send(destination, message, headers=headers, **kwargs)
 
     @middleware.wrap
-    def raw_send(self, destination, message, **kwargs) -> None:
+    def raw_send(self, destination: str, message: Any, **kwargs: Any) -> None:
         """Send a raw (unmangled) message to a queue.
 
         This may cause errors if the receiver expects a mangled message.
@@ -333,7 +354,7 @@ class CommonTransport:
         self._send(destination, message, **kwargs)
 
     @middleware.wrap
-    def broadcast(self, destination, message, **kwargs) -> None:
+    def broadcast(self, destination: str, message: Any, **kwargs: Any) -> None:
         """Broadcast a message.
 
         Args:
@@ -351,7 +372,7 @@ class CommonTransport:
         self._broadcast(destination, message, **kwargs)
 
     @middleware.wrap
-    def raw_broadcast(self, destination, message, **kwargs) -> None:
+    def raw_broadcast(self, destination: str, message: Any, **kwargs: Any) -> None:
         """Broadcast a raw (unmangled) message.
 
         This may cause errors if the receiver expects a mangled message.
@@ -374,7 +395,12 @@ class CommonTransport:
         raise NotImplementedError
 
     @middleware.wrap
-    def ack(self, message, subscription_id: int | None = None, **kwargs) -> None:
+    def ack(
+        self,
+        message: Any,
+        subscription_id: int | None = None,
+        **kwargs: Any,
+    ) -> None:
         """Acknowledge receipt of a message.
 
         This only makes sense when the 'acknowledgement' flag was set for the
@@ -409,7 +435,12 @@ class CommonTransport:
         self._ack(message_id, subscription_id=subscription_id, **kwargs)
 
     @middleware.wrap
-    def nack(self, message, subscription_id: int | None = None, **kwargs) -> None:
+    def nack(
+        self,
+        message: Any,
+        subscription_id: int | None = None,
+        **kwargs: Any,
+    ) -> None:
         """Reject receipt of a message.
 
         This only makes sense when the 'acknowledgement' flag was set for the
@@ -442,7 +473,9 @@ class CommonTransport:
         self._nack(message_id, subscription_id=subscription_id, **kwargs)
 
     @middleware.wrap
-    def transaction_begin(self, subscription_id: int | None = None, **kwargs) -> int:
+    def transaction_begin(
+        self, subscription_id: int | None = None, **kwargs: Any
+    ) -> int:
         """Start a new transaction.
 
         Args:
@@ -469,7 +502,7 @@ class CommonTransport:
         return self.__transaction_id
 
     @middleware.wrap
-    def transaction_abort(self, transaction_id: int, **kwargs) -> None:
+    def transaction_abort(self, transaction_id: int, **kwargs: Any) -> None:
         """Abort a transaction and roll back all operations.
 
         Args:
@@ -484,7 +517,7 @@ class CommonTransport:
         self._transaction_abort(transaction_id, **kwargs)
 
     @middleware.wrap
-    def transaction_commit(self, transaction_id: int, **kwargs) -> None:
+    def transaction_commit(self, transaction_id: int, **kwargs: Any) -> None:
         """Commit a transaction.
 
         Args:
@@ -510,7 +543,13 @@ class CommonTransport:
     # -- Low level communication calls to be implemented by subclass -----------
     #
 
-    def _subscribe(self, sub_id: int, channel, callback, **kwargs) -> None:
+    def _subscribe(
+        self,
+        sub_id: int,
+        channel: str,
+        callback: MessageCallback,
+        **kwargs: Any,
+    ) -> None:
         """Listen to a queue, notify via callback function.
 
         Args:
@@ -524,7 +563,13 @@ class CommonTransport:
         """
         raise NotImplementedError("Transport interface not implemented")
 
-    def _subscribe_broadcast(self, sub_id: int, channel, callback, **kwargs) -> None:
+    def _subscribe_broadcast(
+        self,
+        sub_id: int,
+        channel: str,
+        callback: MessageCallback,
+        **kwargs: Any,
+    ) -> None:
         """Listen to a broadcast topic, notify via callback function.
 
         Args:
@@ -541,7 +586,7 @@ class CommonTransport:
         sub_id: int,
         channel_hint: str | None,
         callback: MessageCallback,
-        **kwargs,
+        **kwargs: Any,
     ) -> str:
         """Create and then listen to a temporary queue, notify via callback function.
 
@@ -558,7 +603,7 @@ class CommonTransport:
         """
         raise NotImplementedError("Transport interface not implemented")
 
-    def _unsubscribe(self, sub_id: int, **kwargs) -> None:
+    def _unsubscribe(self, sub_id: int, **kwargs: Any) -> None:
         """Stop listening to a queue or a broadcast.
 
         Args:
@@ -567,7 +612,7 @@ class CommonTransport:
         """
         raise NotImplementedError("Transport interface not implemented")
 
-    def _send(self, destination, message, **kwargs) -> None:
+    def _send(self, destination: str, message: Any, **kwargs: Any) -> None:
         """Send a message to a queue.
 
         Args:
@@ -581,7 +626,7 @@ class CommonTransport:
         """
         raise NotImplementedError("Transport interface not implemented")
 
-    def _broadcast(self, destination, message, **kwargs) -> None:
+    def _broadcast(self, destination: str, message: Any, **kwargs: Any) -> None:
         """Broadcast a message.
 
         Args:
@@ -595,7 +640,7 @@ class CommonTransport:
         """
         raise NotImplementedError("Transport interface not implemented")
 
-    def _ack(self, message_id, subscription_id, **kwargs) -> None:
+    def _ack(self, message_id: Any, subscription_id: int, **kwargs: Any) -> None:
         """Acknowledge receipt of a message.
 
         This only makes sense when the 'acknowledgement' flag was set for the
@@ -610,7 +655,7 @@ class CommonTransport:
         """
         raise NotImplementedError("Transport interface not implemented")
 
-    def _nack(self, message_id, subscription_id, **kwargs) -> None:
+    def _nack(self, message_id: Any, subscription_id: int, **kwargs: Any) -> None:
         """Reject receipt of a message.
 
         This only makes sense when the 'acknowledgement' flag was set for the
@@ -626,7 +671,11 @@ class CommonTransport:
         raise NotImplementedError("Transport interface not implemented")
 
     def _transaction_begin(
-        self, transaction_id: int, *, subscription_id: int | None = None, **kwargs
+        self,
+        transaction_id: int,
+        *,
+        subscription_id: int | None = None,
+        **kwargs: Any,
     ) -> None:
         """Start a new transaction.
 
@@ -637,7 +686,7 @@ class CommonTransport:
         """
         raise NotImplementedError("Transport interface not implemented")
 
-    def _transaction_abort(self, transaction_id: int, **kwargs) -> None:
+    def _transaction_abort(self, transaction_id: int, **kwargs: Any) -> None:
         """Abort a transaction and roll back all operations.
 
         Args:
@@ -646,7 +695,7 @@ class CommonTransport:
         """
         raise NotImplementedError("Transport interface not implemented")
 
-    def _transaction_commit(self, transaction_id: int, **kwargs) -> None:
+    def _transaction_commit(self, transaction_id: int, **kwargs: Any) -> None:
         """Commit a transaction.
 
         Args:
@@ -664,17 +713,17 @@ class CommonTransport:
     # The canonical example is serialization/deserialization, see stomp_transport
 
     @staticmethod
-    def _mangle_for_sending(message):
+    def _mangle_for_sending(message: Any) -> Any:
         """Pass any message through this before forwarding to the actual _send* functions."""
         return message
 
     @staticmethod
-    def _mangle_for_receiving(message):
+    def _mangle_for_receiving(message: Any) -> Any:
         """Pass any message through this before forwarding to the receiving subscribed callback functions."""
         return message
 
 
-def json_serializer(obj):
+def json_serializer(obj: Any) -> Any:
     """Helper function for JSON serialization, usable as the ``default=`` argument.
 
     This function helps the serializer to translate objects that otherwise
