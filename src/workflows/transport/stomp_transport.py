@@ -293,19 +293,21 @@ class StompTransport(CommonTransport):
 
     def _subscribe(self, sub_id, channel, callback, **kwargs):
         """Listen to a queue, notify via callback function.
-        :param sub_id: ID for this subscription in the transport layer
-        :param channel: Queue name to subscribe to
-        :param callback: Function to be called when messages are received
-        :param **kwargs: Further parameters for the transport layer. For example
-          acknowledgement:  If true receipt of each message needs to be
-                            acknowledged.
-          exclusive:        Attempt to become exclusive subscriber to the queue.
-          ignore_namespace: Do not apply namespace to the destination name
-          priority:         Consumer priority, messages are sent to higher
-                            priority consumers whenever possible.
-          selector:         Only receive messages filtered by a selector. See
-                            https://activemq.apache.org/activemq-message-properties.html
-                            for potential filter criteria. Uses SQL 92 syntax.
+
+        Args:
+            sub_id: ID for this subscription in the transport layer
+            channel: Queue name to subscribe to
+            callback: Function to be called when messages are received
+            **kwargs:
+                Further parameters for the transport layer. For example:
+                acknowledgement: If true receipt of each message needs to be acknowledged.
+                exclusive: Attempt to become exclusive subscriber to the queue.
+                ignore_namespace: Do not apply namespace to the destination name.
+                priority: Consumer priority, messages are sent to higher priority consumers
+                    whenever possible.
+                selector: Only receive messages filtered by a selector. See
+                    https://activemq.apache.org/activemq-message-properties.html
+                    for potential filter criteria. Uses SQL 92 syntax.
         """
         headers = {}
         if kwargs.get("exclusive"):
@@ -329,12 +331,15 @@ class StompTransport(CommonTransport):
 
     def _subscribe_broadcast(self, sub_id, channel, callback, **kwargs):
         """Listen to a broadcast topic, notify via callback function.
-        :param sub_id: ID for this subscription in the transport layer
-        :param channel: Topic name to subscribe to
-        :param callback: Function to be called when messages are received
-        :param **kwargs: Further parameters for the transport layer. For example
-          ignore_namespace: Do not apply namespace to the destination name
-          retroactive:      Ask broker to send old messages if possible
+
+        Args:
+            sub_id: ID for this subscription in the transport layer
+            channel: Topic name to subscribe to
+            callback: Function to be called when messages are received
+            **kwargs:
+                Further parameters for the transport layer. For example:
+                ignore_namespace: Do not apply namespace to the destination name.
+                retroactive: Ask broker to send old messages if possible.
         """
         headers = {}
         if kwargs.get("ignore_namespace"):
@@ -353,12 +358,15 @@ class StompTransport(CommonTransport):
         **kwargs,
     ) -> str:
         """Create and then listen to a temporary queue, notify via callback function.
-        :param sub_id: ID for this subscription in the transport layer
-        :param channel_hint: Name suggestion for the temporary queue
-        :param callback: Function to be called when messages are received
-        :param **kwargs: Further parameters for the transport layer.
-               See _subscribe() above.
-        :returns: The name of the temporary queue
+
+        Args:
+            sub_id: ID for this subscription in the transport layer
+            channel_hint: Name suggestion for the temporary queue
+            callback: Function to be called when messages are received
+            **kwargs: Further parameters for the transport layer. See _subscribe().
+
+        Returns:
+            The name of the temporary queue
         """
 
         channel = channel_hint or workflows.util.generate_unique_host_id()
@@ -371,8 +379,10 @@ class StompTransport(CommonTransport):
         return channel
 
     def _unsubscribe(self, subscription, **kwargs):
-        """Stop listening to a queue or a broadcast
-        :param subscription: Subscription ID to cancel
+        """Stop listening to a queue or a broadcast.
+
+        Args:
+            subscription: Subscription ID to cancel
         """
         self._conn.unsubscribe(id=subscription)
         # Callback reference is kept as further messages may already have been received
@@ -381,17 +391,19 @@ class StompTransport(CommonTransport):
         self, destination, message, headers=None, delay=None, expiration=None, **kwargs
     ):
         """Send a message to a queue.
-        :param destination: Queue name to send to
-        :param message: A string to be sent
-        :param **kwargs: Further parameters for the transport layer. For example
-          delay:            Delay transport of message by this many seconds
-          expiration:       Optional expiration time, relative to sending time
-          headers:          Optional dictionary of header entries
-          ignore_namespace: Do not apply namespace to the destination name
-          persistent:       Whether to mark messages as persistent, to be kept
-                            between broker restarts. Default is 'true'.
-          transaction:      Transaction ID if message should be part of a
-                            transaction
+
+        Args:
+            destination: Queue name to send to
+            message: A string to be sent
+            **kwargs:
+                Further parameters for the transport layer. For example:
+                delay: Delay transport of message by this many seconds.
+                expiration: Optional expiration time, relative to sending time.
+                headers: Optional dictionary of header entries.
+                ignore_namespace: Do not apply namespace to the destination name.
+                persistent: Whether to mark messages as persistent, to be kept
+                    between broker restarts. Default is 'true'.
+                transaction: Transaction ID if message should be part of a transaction.
         """
         if not headers:
             headers = {}
@@ -417,15 +429,17 @@ class StompTransport(CommonTransport):
         self, destination, message, headers=None, delay=None, expiration=None, **kwargs
     ):
         """Broadcast a message.
-        :param destination: Topic name to send to
-        :param message: A string to be broadcast
-        :param **kwargs: Further parameters for the transport layer. For example
-          delay:            Delay transport of message by this many seconds
-          expiration:       Optional expiration time, relative to sending time
-          headers:          Optional dictionary of header entries
-          ignore_namespace: Do not apply namespace to the destination name
-          transaction:      Transaction ID if message should be part of a
-                            transaction
+
+        Args:
+            destination: Topic name to send to
+            message: A string to be broadcast
+            **kwargs:
+                Further parameters for the transport layer. For example:
+                delay: Delay transport of message by this many seconds.
+                expiration: Optional expiration time, relative to sending time.
+                headers: Optional dictionary of header entries.
+                ignore_namespace: Do not apply namespace to the destination name.
+                transaction: Transaction ID if message should be part of a transaction.
         """
         if not headers:
             headers = {}
@@ -445,41 +459,52 @@ class StompTransport(CommonTransport):
 
     def _transaction_begin(self, transaction_id, **kwargs):
         """Start a new transaction.
-        :param transaction_id: ID for this transaction in the transport layer.
+
+        Args:
+            transaction_id: ID for this transaction in the transport layer.
         """
         self._conn.begin(transaction=transaction_id)
 
     def _transaction_abort(self, transaction_id, **kwargs):
         """Abort a transaction and roll back all operations.
-        :param transaction_id: ID of transaction to be aborted.
+
+        Args:
+            transaction_id: ID of transaction to be aborted.
         """
         self._conn.abort(transaction_id)
 
     def _transaction_commit(self, transaction_id, **kwargs):
         """Commit a transaction.
-        :param transaction_id: ID of transaction to be committed.
+
+        Args:
+            transaction_id: ID of transaction to be committed.
         """
         self._conn.commit(transaction_id)
 
     def _ack(self, message_id, subscription_id, **kwargs):
         """Acknowledge receipt of a message. This only makes sense when the
         'acknowledgement' flag was set for the relevant subscription.
-        :param message_id: ID of the message to be acknowledged
-        :param subscription: ID of the relevant subscriptiong
-        :param **kwargs: Further parameters for the transport layer. For example
-               transaction: Transaction ID if acknowledgement should be part of
-                            a transaction
+
+        Args:
+            message_id: ID of the message to be acknowledged
+            subscription_id: ID of the relevant subscription
+            **kwargs:
+                Further parameters for the transport layer. For example:
+                transaction: Transaction ID if acknowledgement should be part of
+                    a transaction.
         """
         self._conn.ack(message_id, subscription_id, **kwargs)
 
     def _nack(self, message_id, subscription_id, **kwargs):
         """Reject receipt of a message. This only makes sense when the
         'acknowledgement' flag was set for the relevant subscription.
-        :param message_id: ID of the message to be rejected
-        :param subscription: ID of the relevant subscriptiong
-        :param **kwargs: Further parameters for the transport layer. For example
-               transaction: Transaction ID if rejection should be part of a
-                            transaction
+
+        Args:
+            message_id: ID of the message to be rejected
+            subscription_id: ID of the relevant subscription
+            **kwargs:
+                Further parameters for the transport layer. For example:
+                transaction: Transaction ID if rejection should be part of a transaction.
         """
         self._conn.nack(message_id, subscription_id, **kwargs)
 

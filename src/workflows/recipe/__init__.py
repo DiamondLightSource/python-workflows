@@ -35,24 +35,26 @@ def _wrap_subscription(
     """Internal method to create an intercepting function for incoming messages
     to interpret recipes. This function is then used to subscribe to a channel
     on the transport layer.
-      :param transport_layer: Reference to underlying transport object.
-      :param subscription_call: Reference to the subscribing function of the
-                                transport layer.
-      :param channel:  Channel name to subscribe to.
-      :param callback: Real function to be called when messages are received.
-                       The callback will pass three arguments,
-                       a RecipeWrapper object (details below), the header as
-                       a dictionary structure, and the message.
 
-      :param allow_non_recipe_messages: Pass on incoming messages that do not
-                       include recipe information. In this case the first
-                       argument to the callback function will be 'None'.
-      :param log_extender: If the recipe contains useful contextual information
-                       for log messages, such as a unique ID which can be used
-                       to connect all messages originating from the same
-                       recipe, then the information will be passed to this
-                       function, which must be a context manager factory.
-      :return:         Return value of call to subscription_call.
+    Args:
+        transport_layer: Reference to underlying transport object.
+        subscription_call: Reference to the subscribing function of the transport layer.
+        channel: Channel name to subscribe to.
+        callback:
+            Real function to be called when messages are received.
+            The callback will pass three arguments: a RecipeWrapper object,
+            the header as a dictionary structure, and the message.
+        allow_non_recipe_messages:
+            Pass on incoming messages that do not include recipe information.
+            In this case the first argument to the callback function will be None.
+        log_extender:
+            If the recipe contains useful contextual information for log messages,
+            such as a unique ID which can be used to connect all messages
+            originating from the same recipe, then the information will be passed
+            to this function, which must be a context manager factory.
+
+    Returns:
+        Return value of call to subscription_call.
     """
 
     allow_non_recipe_messages = kwargs.pop("allow_non_recipe_messages", False)
@@ -60,13 +62,17 @@ def _wrap_subscription(
 
     @functools.wraps(callback)
     def unwrap_recipe(header, message):
-        """This is a helper function unpacking incoming messages when they are
-        in a recipe format. Other messages are passed through unmodified.
-        :param header:  A dictionary of message headers. If the header contains
-                        an entry 'workflows-recipe' then the message is parsed
-                        and the embedded recipe information is passed on in a
-                        RecipeWrapper object to the target function.
-        :param message: Incoming deserialized message object.
+        """Unpack incoming messages when they are in a recipe format.
+
+        Other messages are passed through unmodified.
+
+        Args:
+            header:
+                A dictionary of message headers. If the header contains an entry
+                'workflows-recipe' then the message is parsed and the embedded
+                recipe information is passed on in a RecipeWrapper object to the
+                target function.
+            message: Incoming deserialized message object.
         """
         if mangle_for_receiving:
             message = mangle_for_receiving(message)
@@ -125,13 +131,17 @@ def wrap_subscribe(
     transport/common_transport.py. Intercept all incoming messages and parse
     for recipe information.
     See common_transport.subscribe for possible additional keyword arguments.
-      :param transport_layer: Reference to underlying transport object.
-      :param channel:  Queue name to subscribe to.
-      :param callback: Function to be called when messages are received.
-                       The callback will pass three arguments,
-                       a RecipeWrapper object (details below), the header as
-                       a dictionary structure, and the message.
-      :return: A unique subscription ID
+
+    Args:
+        transport_layer: Reference to underlying transport object.
+        channel: Queue name to subscribe to.
+        callback:
+            Function to be called when messages are received. The callback will
+            pass three arguments: a RecipeWrapper object, the header as a
+            dictionary structure, and the message.
+
+    Returns:
+        A unique subscription ID
     """
 
     return _wrap_subscription(
@@ -157,13 +167,17 @@ def wrap_subscribe_broadcast(
     subscribe_broadcast call in transport/common_transport.py. Intercept all
     incoming messages and parse for recipe information.
     See common_transport.subscribe_broadcast for possible arguments.
-      :param transport_layer: Reference to underlying transport object.
-      :param channel:  Topic name to subscribe to.
-      :param callback: Function to be called when messages are received.
-                       The callback will pass three arguments,
-                       a RecipeWrapper object (details below), the header as
-                       a dictionary structure, and the message.
-      :return: A unique subscription ID
+
+    Args:
+        transport_layer: Reference to underlying transport object.
+        channel: Topic name to subscribe to.
+        callback:
+            Function to be called when messages are received. The callback will
+            pass three arguments: a RecipeWrapper object, the header as a
+            dictionary structure, and the message.
+
+    Returns:
+        A unique subscription ID
     """
 
     return _wrap_subscription(

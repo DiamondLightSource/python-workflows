@@ -143,7 +143,9 @@ class RecipeWrapper:
     def checkpoint(self, message, header=None, delay=0, **kwargs):
         """Send a message to the current recipe destination. This can be used to
         keep a state for longer processing tasks.
-        :param delay: Delay transport of message by this many seconds
+
+        Args:
+            delay: Delay transport of message by this many seconds
         """
         if not self.transport:
             raise ValueError(

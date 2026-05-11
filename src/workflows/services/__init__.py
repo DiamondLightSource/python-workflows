@@ -5,8 +5,12 @@ from importlib.metadata import entry_points
 
 def lookup(service: str):
     """Find a service class based on a name.
-    :param service: Name of the service
-    :return: A service class
+
+    Args:
+        service: Name of the service
+
+    Returns:
+        A service class
     """
     service_factory = get_known_services().get(service)
     if service_factory:
@@ -17,9 +21,11 @@ def lookup(service: str):
 
 def get_known_services():
     """Return a dictionary of all known services.
-    :return: A dictionary containing entries { service name : service class factory }
-             A factory is a function that takes no arguments and returns an
-             uninstantiated service class.
+
+    Returns:
+        A dictionary containing entries { service name : service class factory }
+        where a factory is a function that takes no arguments and returns an
+        uninstantiated service class.
     """
     if not hasattr(get_known_services, "cache"):
         setattr(

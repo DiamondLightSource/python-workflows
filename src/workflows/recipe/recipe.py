@@ -275,9 +275,12 @@ class Recipe:
         """Merge two recipes together, returning a single recipe containing all
         nodes.
         Note: This does NOT yet return a minimal recipe.
-        :param other: A Recipe object that should be merged with the current
-                      Recipe object.
-        :return: A new Recipe object containing information from both recipes.
+
+        Args:
+            other: A Recipe object that should be merged with the current Recipe object.
+
+        Returns:
+            A new Recipe object containing information from both recipes.
         """
 
         # Merging empty values returns a copy of the original
