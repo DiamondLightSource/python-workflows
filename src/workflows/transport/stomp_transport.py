@@ -579,6 +579,6 @@ class StompTransport(CommonTransport):
     def _on_message(self, frame: stomp.utils.Frame) -> None:
         headers = frame.headers
         body = frame.body
-        subscription_id = int(headers.get("subscription"))
+        subscription_id = int(headers["subscription"])
         target_function = self.subscription_callback(subscription_id)
         target_function(headers, body)
