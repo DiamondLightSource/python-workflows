@@ -99,14 +99,17 @@ filename = "pyproject.toml"
 filename = "src/workflows/__init__.py"
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "C4", "I"]
+select = ["E", "F", "W", "C4", "I", "ANN"]
 unfixable = ["F841"]
 # E501 line too long (handled by formatter)
-ignore = ["E501"]
+ignore = ["E501", "ANN204", "ANN401"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["dxtbx_*", "dxtbx"]
 required-imports = ["from __future__ import annotations"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["ANN"]
 
 [tool.mypy]
 mypy_path = "src/"
