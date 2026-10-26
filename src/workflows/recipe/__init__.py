@@ -23,6 +23,11 @@ __all__ = [
 
 logger = logging.getLogger("workflows.recipe")
 
+# Attribute set on callbacks decorated with workflows.recipe.typed.typed_handler,
+# which accept recipe messages with the usual three arguments despite their
+# signature declaring an additional 'parameters' argument
+TYPED_HANDLER_MARKER = "_workflows_typed_handler"
+
 
 def _wrap_subscription(
     transport_layer: CommonTransport,

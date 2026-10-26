@@ -36,5 +36,5 @@ repos:
   hooks:
   - id: mypy
     files: 'src/.*\.py$'
-    additional_dependencies: ['types-setuptools>=57.0.2']
+    additional_dependencies: ['types-setuptools>=57.0.2', 'pydantic>=2']
     language_version: python3.12
