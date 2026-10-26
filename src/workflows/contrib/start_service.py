@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import optparse
+import os
 import sys
 from collections.abc import Callable
 from optparse import SUPPRESS_HELP, OptionParser
@@ -11,6 +12,31 @@ import workflows.frontend
 import workflows.services
 import workflows.transport
 from workflows.transport.common_transport import CommonTransport
+
+# Environment variable holding queue overrides, as entries separated by commas
+# or whitespace. Each entry is NAME=QUEUE, to consume QUEUE in place of the
+# default queue NAME, or a bare QUEUE for a service consuming a single queue,
+# which may be given at most once. This is the same format as the --queue option.
+QUEUE_ENVIRONMENT_VARIABLE = "WORKFLOWS_QUEUE"
+
+
+def _parse_queue_overrides(
+    entries: list[str], source: str
+) -> tuple[str | None, dict[str, str]]:
+    """Split [NAME=]QUEUE entries into the unnamed queue and named overrides"""
+    queue: str | None = None
+    queues: dict[str, str] = {}
+    for entry in entries:
+        name, _, queue_name = entry.rpartition("=")
+        if not queue_name:
+            raise ValueError(f"Missing queue name in {source} entry {entry!r}")
+        if name:
+            queues[name] = queue_name
+        elif queue is not None:
+            raise ValueError(f"Only one {source} entry may be given without a NAME")
+        else:
+            queue = queue_name
+    return queue, queues
 
 
 class ServiceStarter:
@@ -137,6 +163,25 @@ class ServiceStarter:
         # Call on_parser_preparation hook
         parser = self.on_parser_preparation(parser) or parser
 
+        # Add the queue option after the hook, and only if a subclass has not
+        # already defined its own -q or --queue option
+        if not (parser.has_option("-q") or parser.has_option("--queue")):
+            parser.add_option(
+                "-q",
+                "--queue",
+                action="append",
+                dest="workflows_queue",
+                default=[],
+                metavar="[NAME=]QUEUE",
+                help=(
+                    "Consume messages from QUEUE instead of the default queue NAME. "
+                    "NAME may be omitted for services that consume a single queue. "
+                    "May be specified multiple times. Defaults can be set in the "
+                    f"{QUEUE_ENVIRONMENT_VARIABLE} environment variable, as a comma or "
+                    "space separated list."
+                ),
+            )
+
         # Parse command line options
         (options, args) = parser.parse_args(cmdline_args)
 
@@ -207,6 +252,25 @@ class ServiceStarter:
         kwargs.setdefault("environment", {})
         if add_metrics_option and options.metrics:
             kwargs["environment"]["metrics"] = {"port": options.metrics_port}
+
+        # Queue overrides from the command line take precedence over those
+        # from the environment variable
+        try:
+            env_queue, env_queues = _parse_queue_overrides(
+                os.environ.get(QUEUE_ENVIRONMENT_VARIABLE, "")
+                .replace(",", " ")
+                .split(),
+                QUEUE_ENVIRONMENT_VARIABLE,
+            )
+            cli_queue, cli_queues = _parse_queue_overrides(
+                getattr(options, "workflows_queue", []), "--queue"
+            )
+        except ValueError as e:
+            parser.error(str(e))
+        if queue := cli_queue or env_queue:
+            kwargs["environment"]["queue"] = queue
+        if queues := {**env_queues, **cli_queues}:
+            kwargs["environment"]["queues"] = queues
 
         if options.liveness:
             kwargs["environment"]["liveness"] = {
