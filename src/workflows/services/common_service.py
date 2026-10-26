@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import contextlib
 import enum
+import inspect
 import itertools
 import logging
 import multiprocessing.connection
@@ -79,6 +80,36 @@ class Priority(enum.IntEnum):
     TIMER = 2
     TRANSPORT = 3
     IDLE = 4
+
+
+def _check_recipe_callback(callback: Callable[..., Any]) -> None:
+    """Check that a callback can receive recipe messages.
+
+    Recipe callbacks are called with (recipe_wrapper, header, message). A
+    callback that also requires a 'parameters' argument has to be decorated
+    with workflows.recipe.typed.typed_handler, which supplies it. Without
+    this check the mistake would only show up when the first message arrives.
+    """
+    if getattr(callback, workflows.recipe.TYPED_HANDLER_MARKER, False):
+        return
+    try:
+        signature = inspect.signature(callback)
+    except (TypeError, ValueError):
+        # No signature available, eg. for some builtins
+        return
+    try:
+        signature.bind(None, None, None)
+    except TypeError:
+        name = getattr(callback, "__qualname__", repr(callback))
+        hint = ""
+        if "parameters" in signature.parameters:
+            hint = (
+                " To receive recipe parameters, decorate it with "
+                "workflows.recipe.typed.typed_handler."
+            )
+        raise TypeError(
+            f"{name} can not be called with (rw, header, message) arguments.{hint}"
+        ) from None
 
 
 class CommonService:
@@ -461,6 +492,7 @@ class CommonService:
         Returns:
             A unique subscription ID
         """
+        _check_recipe_callback(callback)
         queue_name = self._resolve_queue(channel)
         if queue_name != channel:
             self.log.info("Subscribing to queue %s in place of %s", queue_name, channel)
