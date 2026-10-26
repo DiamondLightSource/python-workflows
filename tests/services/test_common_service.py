@@ -626,3 +626,48 @@ def test_transport_callbacks_are_processed_from_main_queue():
         service.SERVICE_STATUS_SHUTDOWN,
         service.SERVICE_STATUS_END,
     ]
+
+
+@pytest.fixture
+def wrap_subscribe(mocker):
+    return mocker.patch("workflows.recipe.wrap_subscribe")
+
+
+def test_subscribe_uses_default_queue(wrap_subscribe):
+    service = CommonService()
+    service.transport = mock.Mock()
+    callback = mock.Mock()
+    service.subscribe("some_queue", callback, exclusive=True)
+    wrap_subscribe.assert_called_once_with(
+        service.transport,
+        "some_queue",
+        callback,
+        acknowledgement=True,
+        log_extender=service.extend_log,
+        exclusive=True,
+    )
+
+
+def test_subscribe_with_named_overrides(wrap_subscribe):
+    service = CommonService(environment={"queues": {"a": "a.test"}})
+    service.transport = mock.Mock()
+    service.subscribe("a", mock.Mock())
+    service.subscribe("b", mock.Mock(), acknowledgement=False)
+    assert [c.args[1] for c in wrap_subscribe.call_args_list] == ["a.test", "b"]
+    assert wrap_subscribe.call_args.kwargs["acknowledgement"] is False
+
+
+def test_subscribe_bare_override_applies_to_single_queue_only(wrap_subscribe):
+    service = CommonService(environment={"queue": "x.test"})
+    service.transport = mock.Mock()
+    service.subscribe("a", mock.Mock())
+    assert wrap_subscribe.call_args.args[1] == "x.test"
+    with pytest.raises(RuntimeError, match="ambiguous"):
+        service.subscribe("b", mock.Mock())
+
+
+def test_subscribe_named_override_takes_precedence(wrap_subscribe):
+    service = CommonService(environment={"queue": "x.test", "queues": {"a": "a.test"}})
+    service.transport = mock.Mock()
+    service.subscribe("a", mock.Mock())
+    assert wrap_subscribe.call_args.args[1] == "a.test"

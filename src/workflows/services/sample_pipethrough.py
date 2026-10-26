@@ -4,7 +4,6 @@ import json
 import time
 from typing import Any
 
-import workflows.recipe
 from workflows.recipe.wrapper import RecipeWrapper
 from workflows.services.common_service import CommonService
 
@@ -22,11 +21,7 @@ class SamplePipethrough(CommonService):
 
     def initializing(self) -> None:
         """Subscribe to a channel."""
-        workflows.recipe.wrap_subscribe(
-            self.transport,
-            "transient.destination",
-            self.process,
-        )
+        self.subscribe("transient.destination", self.process, acknowledgement=False)
 
     def process(self, rw: RecipeWrapper, header: dict, message: Any) -> None:
         """Consume message and send to output pipe."""
