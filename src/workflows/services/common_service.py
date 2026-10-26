@@ -19,6 +19,7 @@ from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
 import workflows
 import workflows.logging
+import workflows.recipe
 from workflows.transport.common_transport import CommonTransport, MessageCallback
 from workflows.transport.middleware.otel_tracing import OTELTracingMiddleware
 
@@ -168,6 +169,7 @@ class CommonService:
         )
         self._idle_callback: Callable[[], None] | None = None
         self._idle_time: float | None = None
+        self.__subscribed_channels: list[str] = []
         self.start_kwargs = {}
 
         # Logger will be overwritten in start() function
@@ -405,6 +407,72 @@ class CommonService:
         time span (in seconds)."""
         self._idle_callback = callback
         self._idle_time = idle_time
+
+    def _resolve_queue(self, channel: str) -> str:
+        """Return the name of the queue to subscribe to in place of channel.
+
+        Overrides are read from the ``environment`` dictionary passed to the
+        service constructor (``self._environment``), not from operating system
+        environment variables or the recipe environment. The service starter
+        fills these entries from its --queue option and the WORKFLOWS_QUEUE
+        environment variable:
+
+        - ``environment["queues"]``, a mapping of default queue names to the
+          queue names to use instead
+        - ``environment["queue"]``, a single queue name. This is only accepted
+          for services subscribing to a single queue.
+        """
+        if override := (self._environment.get("queues") or {}).get(channel):
+            return override
+        if override := self._environment.get("queue"):
+            if self.__subscribed_channels:
+                raise RuntimeError(
+                    f"Queue override {override!r} is ambiguous as this service "
+                    "subscribes to multiple queues. Use --queue NAME=QUEUE instead."
+                )
+            return override
+        return channel
+
+    def subscribe(
+        self,
+        channel: str,
+        callback: Callable[..., Any],
+        *,
+        acknowledgement: bool = True,
+        **kwargs: Any,
+    ) -> int:
+        """Subscribe to a queue of recipe messages.
+
+        Messages are unpacked with :func:`workflows.recipe.wrap_subscribe`, so
+        the callback receives ``(recipe_wrapper, header, message)``. Use
+        ``self.transport.subscribe`` for a subscription without recipe handling.
+
+        The queue name can be overridden when the service is started, with the
+        --queue option or the WORKFLOWS_QUEUE environment variable, see
+        :meth:`_resolve_queue`. By default messages must be acknowledged, and
+        log messages are extended with the recipe ID.
+
+        Args:
+            channel: Default name of the queue to subscribe to.
+            callback: Function to be called when messages are received.
+            acknowledgement: Whether received messages must be acknowledged.
+            **kwargs: Passed on to :func:`workflows.recipe.wrap_subscribe`.
+
+        Returns:
+            A unique subscription ID
+        """
+        queue_name = self._resolve_queue(channel)
+        if queue_name != channel:
+            self.log.info("Subscribing to queue %s in place of %s", queue_name, channel)
+        self.__subscribed_channels.append(channel)
+        kwargs.setdefault("log_extender", self.extend_log)
+        return workflows.recipe.wrap_subscribe(
+            self.transport,
+            queue_name,
+            callback,
+            acknowledgement=acknowledgement,
+            **kwargs,
+        )
 
     def __update_service_status(self, statuscode: int) -> None:
         """Set the internal status of the service object, and notify frontend."""
