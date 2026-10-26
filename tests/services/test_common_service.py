@@ -671,3 +671,40 @@ def test_subscribe_named_override_takes_precedence(wrap_subscribe):
     service.transport = mock.Mock()
     service.subscribe("a", mock.Mock())
     assert wrap_subscribe.call_args.args[1] == "a.test"
+
+
+class CallbackService(CommonService):
+    def three(self, rw, header, message): ...
+
+    def varargs(self, *args, **kwargs): ...
+
+    def with_parameters(self, rw, header, message, parameters): ...
+
+    def with_extra(self, rw, header, message, extra): ...
+
+    def with_optional(self, rw, header, message, parameters=None): ...
+
+
+@pytest.mark.parametrize("name", ["three", "varargs", "with_optional"])
+def test_subscribe_accepts_recipe_callbacks(wrap_subscribe, name):
+    service = CallbackService()
+    service.transport = mock.Mock()
+    service.subscribe("a", getattr(service, name))
+    wrap_subscribe.assert_called_once()
+
+
+def test_subscribe_rejects_parameters_without_typed_handler(wrap_subscribe):
+    service = CallbackService()
+    service.transport = mock.Mock()
+    with pytest.raises(TypeError, match="typed_handler"):
+        service.subscribe("a", service.with_parameters)
+    wrap_subscribe.assert_not_called()
+
+
+def test_subscribe_rejects_incompatible_callback(wrap_subscribe):
+    service = CallbackService()
+    service.transport = mock.Mock()
+    with pytest.raises(TypeError, match="can not be called") as e:
+        service.subscribe("a", service.with_extra)
+    assert "typed_handler" not in str(e.value)
+    wrap_subscribe.assert_not_called()
