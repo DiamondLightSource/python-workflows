@@ -1,6 +1,13 @@
 name: Build and Test
 
-on: [push, pull_request]
+on:
+  # Pushes to PR branches are covered by the pull_request event; running
+  # on every push as well would test each PR twice. Tags must be kept so
+  # that the pypi-publish job runs on release.
+  push:
+    branches: [main]
+    tags: ["*"]
+  pull_request:
 
 jobs:
   build:
