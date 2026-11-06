@@ -49,10 +49,9 @@ def revert_classvariables():
 
 
 @pytest.fixture
-def pikatransport(revert_classvariables, connection_params):
-    # connection_params is unused here, but implements the fixture skipping
-    # logic following a single test, instead of attempting a connection for
-    # every individual test.
+def pikatransport(revert_classvariables, rabbitmq_broker):
+    PikaTransport.defaults["--rabbit-host"] = rabbitmq_broker.host
+    PikaTransport.defaults["--rabbit-port"] = rabbitmq_broker.port
     pt = PikaTransport()
     pt.connect()
     yield pt
@@ -831,27 +830,16 @@ def test_nack_message(mock_pikathread):
 
 
 @pytest.fixture(scope="session")
-def connection_params():
+def connection_params(rabbitmq_broker):
     """Connection Parameters for connecting to a physical RabbitMQ server"""
-    params = [
-        pika.ConnectionParameters(
-            "localhost",
-            5672,
-            "/",
-            pika.PlainCredentials("guest", "guest"),
+    return [
+        rabbitmq_broker.connection_parameters(
             connection_attempts=1,
             retry_delay=1,
             socket_timeout=1,
             stack_timeout=2,
         )
     ]
-    # Try a connection here to make sure this is valid
-    try:
-        bc = pika.BlockingConnection(params)
-    except BaseException:
-        pytest.skip("Failed to create test RabbitMQ connection")
-    bc.close()
-    return params
 
 
 @pytest.fixture
