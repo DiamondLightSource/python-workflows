@@ -1,6 +1,6 @@
 ## Recipes
 
-A [service](../services/README.MD) listens on a [channel](../transport/README.MD), acts on incoming messages, and produces some output.
+A [service](../services/README.md) listens on a [channel](../transport/README.md), acts on incoming messages, and produces some output.
 The place where this output is sent to could be hardcoded, ie. written into the source code of the service.
 This makes the service structure rigid, and connecting one service to the output of another requires coordinating the source code of both services.
 Naturally, this approach does not scale well.
