@@ -801,8 +801,12 @@ class _PikaThread(threading.Thread):
         self._channel_has_active_tx: dict[BlockingChannel, bool] = {}
         # Information on whether a channel is transactional
         self._channel_is_transactional: dict[BlockingChannel, bool] = {}
-        # A common, shared channel, used for sending messages outside of transactions.
-        self._pika_shared_channel: BlockingChannel | None
+        # A common, shared channel, used for transactions not tied to a subscription.
+        self._pika_shared_channel: BlockingChannel | None = None
+        # A channel in publisher-confirms mode, used for sending messages outside
+        # of transactions. Confirm and transaction modes are mutually exclusive
+        # on a channel, so this has to be kept separate from the shared channel.
+        self._pika_confirm_channel: BlockingChannel | None = None
         # Are we allowed to reconnect. Can only be turned off, never on
         self._reconnection_allowed: bool = True
         # Our list of connection parameters, so we know where to connect to
@@ -1117,7 +1121,9 @@ class _PikaThread(threading.Thread):
                         channel = self._transaction_on_channel.inverse[transaction_id]
                         self._channel_has_active_tx[channel] = True
                     else:
-                        channel = self._get_shared_channel()
+                        channel = self._get_confirm_channel()
+                    # On a confirm-mode channel this blocks until the broker
+                    # has acknowledged the message
                     channel.basic_publish(
                         exchange=exchange,
                         routing_key=routing_key,
@@ -1126,6 +1132,14 @@ class _PikaThread(threading.Thread):
                         mandatory=mandatory,
                     )
                     future.set_result(None)
+                except (
+                    pika.exceptions.UnroutableError,
+                    pika.exceptions.NackError,
+                ) as e:
+                    # The broker rejected this message. This is a problem for
+                    # the sender, not for the connection, so don't propagate
+                    # it into (and terminate) the connection runloop.
+                    future.set_exception(e)
                 except BaseException as e:
                     future.set_exception(e)
                     raise
@@ -1367,8 +1381,17 @@ class _PikaThread(threading.Thread):
 
         if not self._pika_shared_channel:
             self._pika_shared_channel = self._connection.channel()
-            ##### self._pika_shared_channel.confirm_delivery()
         return self._pika_shared_channel
+
+    def _get_confirm_channel(self) -> BlockingChannel:
+        """Get the publisher-confirms channel. Create if necessary."""
+
+        assert self._connection is not None
+
+        if not self._pika_confirm_channel:
+            self._pika_confirm_channel = self._connection.channel()
+            self._pika_confirm_channel.confirm_delivery()
+        return self._pika_confirm_channel
 
     def _recreate_subscriptions(self) -> None:
         """Resubscribe all existing subscriptions"""
@@ -1481,6 +1504,7 @@ class _PikaThread(threading.Thread):
                 # Clear the channels because this might be a reconnect
                 self._pika_channels = bidict()
                 self._pika_shared_channel = None
+                self._pika_confirm_channel = None
                 self._transaction_on_channel = bidict()
                 self._channel_has_active_tx = {}
                 self._channel_is_transactional = {}
