@@ -748,7 +748,7 @@ wheels = [
 
 [[package]]
 name = "workflows"
-version = "3.7"
+version = "3.8"
 source = { editable = "." }
 dependencies = [
     { name = "bidict" },
