@@ -1068,14 +1068,68 @@ def test_pikathread_send(connection_params, test_channel):
         ).result()
 
         # But should fail with it declared
-        pytest.xfail("UnroutableError is not raised without publisher confirms, #96")
         with pytest.raises(pika.exceptions.UnroutableError):
             thread.send(
                 "", "unroutable-missing-queue", "Another Message", mandatory=True
             ).result()
 
+        # A rejected message must not take down the connection
+        assert thread.connection_alive
+        thread.send("", queue, "After unroutable").result()
+        assert test_channel.basic_get(queue, auto_ack=True)[2] == b"After unroutable"
+
     finally:
         thread.join(stop=True)
+
+
+def test_pikathread_send_confirmed_during_shared_transaction(
+    connection_params, test_channel
+):
+    """Confirmed sends must coexist with a transaction on the shared channel."""
+    queue = test_channel.temporary_queue_declare(exclusive=True)
+    thread = _PikaThread(connection_params)
+    try:
+        thread.start()
+        thread.wait_for_connection()
+
+        # Open a transaction on the shared (non-subscription) channel
+        thread.tx_select(transaction_id=1, subscription_id=None).result()
+        thread.send("", queue, "in transaction", transaction_id=1).result()
+
+        # A non-transactional send is confirmed and delivered immediately
+        thread.send("", queue, "outside transaction").result()
+        assert test_channel.basic_get(queue, auto_ack=True)[2] == b"outside transaction"
+        # ...while the transactional message is still held back
+        assert test_channel.basic_get(queue, auto_ack=True)[0] is None
+
+        thread.tx_commit(transaction_id=1).result()
+        assert test_channel.basic_get(queue, auto_ack=True)[2] == b"in transaction"
+
+        # Unroutable messages are still caught while the transaction is open
+        thread.tx_select(transaction_id=2, subscription_id=None).result()
+        with pytest.raises(pika.exceptions.UnroutableError):
+            thread.send(
+                "", "unroutable-missing-queue", "Another Message", mandatory=True
+            ).result()
+        thread.tx_rollback(transaction_id=2).result()
+        assert thread.connection_alive
+    finally:
+        thread.join(re_raise=True, stop=True)
+
+
+def test_pikatransport_send_unroutable_raises(connection_params):
+    """PikaTransport.send uses mandatory=True, so a missing queue now raises."""
+    transport = PikaTransport()
+    with mock.patch.object(
+        transport, "_generate_connection_parameters", return_value=connection_params
+    ):
+        transport.connect()
+    try:
+        with pytest.raises(pika.exceptions.UnroutableError):
+            transport.send("unroutable-missing-queue", "message")
+        assert transport.is_connected()
+    finally:
+        transport.disconnect()
 
 
 def test_pikathread_send_named_exchange(connection_params, test_channel):
