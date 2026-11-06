@@ -68,7 +68,7 @@ class Pika:
 
     class Schema(PluginSchema):
         host = fields.Str(required=True)
-        port = fields.Field(required=True)
+        port = fields.Raw(required=True)
         username = fields.Str(required=True)
         password = fields.Str(required=True)
         vhost = fields.Str(required=True)
