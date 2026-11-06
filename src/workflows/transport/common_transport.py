@@ -24,7 +24,7 @@ class CommonTransport:
     Contains e.g. the logic to manage subscriptions and transactions.
     """
 
-    __callback_interceptor = None
+    __callback_interceptor: Callable[[MessageCallback], MessageCallback] | None = None
     __subscriptions: dict[int, dict[str, Any]] = {}
     __subscription_id: int = 0
     __transactions: set[int] = set()
