@@ -187,7 +187,8 @@ def rabbitmq_broker() -> Iterator[RabbitMQBroker]:
         broker, container_id = _start_broker_container(runtime)
     except ContainerStartupError as e:
         _no_broker(str(e))
-    try:
-        yield broker
-    finally:
-        _remove_container(runtime, container_id)
+    else:
+        try:
+            yield broker
+        finally:
+            _remove_container(runtime, container_id)
