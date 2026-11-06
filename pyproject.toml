@@ -77,6 +77,9 @@ opentelemetry = "workflows.util.zocalo.configuration:OTEL"
 [project.scripts]
 "workflows.validate_recipe" = "workflows.recipe.validate:main"
 
+[tool.uv]
+exclude-newer = "7 days"
+
 [tool.isort]
 profile = "black"
 

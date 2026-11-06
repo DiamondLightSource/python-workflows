@@ -1,5 +1,5 @@
 ci:
-  skip: [mypy]
+  skip: [mypy, uv-lock]
   autoupdate_schedule: quarterly
 
 repos:
@@ -38,3 +38,8 @@ repos:
     files: 'src/.*\.py$'
     additional_dependencies: ['types-setuptools>=57.0.2', 'pydantic>=2']
     language_version: python3.12
+
+- repo: https://github.com/astral-sh/uv-pre-commit
+  rev: 0.13.7
+  hooks:
+    - id: uv-lock
